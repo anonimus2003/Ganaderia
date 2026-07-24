@@ -83,9 +83,9 @@ export default function DashboardClientLayout({
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
               
-              {/* 🐄 LOGO DE VACA (SVG / Ícono Blanco) 🐄 */}
-              <div style={{ width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: '0', backgroundColor: '#1f3a1f', borderRadius: '10px' }}>
-              <svg 
+             {/* 🐄 LOGO DE VACA (SVG / Ícono sin fondo) 🐄 */}
+<div style={{ width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: '0', backgroundColor: 'transparent' }}>
+ <svg 
   viewBox="0 0 78 87" 
   style={{ 
     width: '100%', 
@@ -96,22 +96,42 @@ export default function DashboardClientLayout({
     clipRule: 'evenodd' 
   }}
 >
-  {/* Contorno general de la figura con trazo blanco y fondo transparente */}
-  <path 
-    fill="none" 
-    stroke="#ffffff" 
-    strokeWidth="2" 
-    d="M 0,0 c 26,0 52,0 78,0 c 0,29 0,58 0,87 c -26,0 -52,0 -78,0 c 0,-29 0,-58 0,-87 Z"
-  />
-
-  {/* Trazos internos y detalles de la figura en blanco con fondo transparente */}
-  <g fill="none" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M 26.32,30 c -0.14,0.2 -0.28,0.4 -0.42,0.6 c -6.09,-3.79 -11.7,-3.21 -17.85,-0.02 c -0.71,0.71 -0.87,1.53 -0.47,2.44 c 2.19,4.11 5.57,6.61 10.14,7.5 c 1.54,0.91 11.55,-0.77 8.66,-3.39 c -1.62,0.31 -3.24,0.69 -4.87,1.13 c -3.52,1.63 -14.95,-5.03 -10.12,-6.73 c 7.64,-3.55 12.9,0.35 18.75,4.92 c 6.22,2 11.14,5.72 14.76,11.17 c 4.57,7.45 1.65,10.51 -1.52,17.02 c -1.44,-1.1 -2.89,-2.22 -4.34,-3.38 c -8.94,-4.73 -12.19,-5.27 -12.44,-16.41 c -0.69,-0.57 -1.33,-0.51 -1.94,0.16 c -1.11,5.85 0.68,10.59 5.39,14.24 c 3.41,1.55 6.66,3.36 9.76,5.4 c -1.54,0.7 -3.07,1.47 -4.6,2.33 c -4.51,3.17 -5.18,5.61 -7.64,10.2 c -0.4,1.81 1.21,2.93 2.21,1.21 c 1.57,-5.08 6.56,-11.76 12.56,-11.04 c 5.69,4.15 16.11,6.48 20.15,-1.3 c 4.06,-7.15 -6.52,-14.48 -3.95,-24.88 c 0.2,-0.53 0.59,-0.83 1.16,-0.89 c 3.71,0.27 6.86,-0.91 9.45,-3.56 c 3.18,-3.08 -0.27,-4.12 -2.88,-5.32 c -2,-0.66 -4.03,-1.04 -6.1,-1.15 c 1.55,-2.04 2.78,-4.29 3.7,-6.75 c 0.67,-2.2 0.89,-4.45 0.67,-6.74 c -0.36,-1.29 -1.09,-1.55 -2.17,-0.8 c -1.66,3.89 -6.69,9.28 -11.34,8.48 c -8.26,-3.7 -19.83,1.66 -24.49,-8.46 c -0.73,-2.17 -1.48,-4.3 -2.23,-6.38 c -0.55,0.08 -1.01,0.33 -1.38,0.75 c -3.88,7.81 -2.21,13.58 3.39,19.65 Z" />
-    <path d="M 53.69,27.02 c 3.22,10.55 9.13,-7.32 7.73,-4.72 c -2.46,1.76 -5.04,3.33 -7.73,4.72 Z" />
-    <path d="M 57.26,33.03 c 0.86,7.01 5.38,5.93 9.7,2.32 c 0.68,-2.78 -9.71,-3.22 -9.7,-2.32 Z" />
+  <g>
+    <path 
+      fill="#132A13" 
+      stroke="#132A13" 
+      strokeWidth="0.5" 
+      d="M 0,0 c 26,0 52,0 78,0 c 0,29 0,58 0,87 c -26,0 -52,0 -78,0 c 0,-29 0,-58 0,-87 Z M 26.32,30 c -0.14,0.2 -0.28,0.4 -0.42,0.6 c -6.09,-3.79 -11.7,-3.21 -17.85,-0.02 c -0.71,0.71 -0.87,1.53 -0.47,2.44 c 2.19,4.11 5.57,6.61 10.14,7.5 c 1.54,0.91 11.55,-0.77 8.66,-3.39 c -1.62,0.31 -3.24,0.69 -4.87,1.13 c -3.52,1.63 -14.95,-5.03 -10.12,-6.73 c 7.64,-3.55 12.9,0.35 18.75,4.92 c 6.22,2 11.14,5.72 14.76,11.17 c 4.57,7.45 1.65,10.51 -1.52,17.02 c -1.44,-1.1 -2.89,-2.22 -4.34,-3.38 c -8.94,-4.73 -12.19,-5.27 -12.44,-16.41 c -0.69,-0.57 -1.33,-0.51 -1.94,0.16 c -1.11,5.85 0.68,10.59 5.39,14.24 c 3.41,1.55 6.66,3.36 9.76,5.4 c -1.54,0.7 -3.07,1.47 -4.6,2.33 c -4.51,3.17 -5.18,5.61 -7.64,10.2 c -0.4,1.81 1.21,2.93 2.21,1.21 c 1.57,-5.08 6.56,-11.76 12.56,-11.04 c 5.69,4.15 16.11,6.48 20.15,-1.3 c 4.06,-7.15 -6.52,-14.48 -3.95,-24.88 c 0.2,-0.53 0.59,-0.83 1.16,-0.89 c 3.71,0.27 6.86,-0.91 9.45,-3.56 c 3.18,-3.08 -0.27,-4.12 -2.88,-5.32 c -2,-0.66 -4.03,-1.04 -6.1,-1.15 c 1.55,-2.04 2.78,-4.29 3.7,-6.75 c 0.67,-2.2 0.89,-4.45 0.67,-6.74 c -0.36,-1.29 -1.09,-1.55 -2.17,-0.8 c -1.66,3.89 -6.69,9.28 -11.34,8.48 c -8.26,-3.7 -19.83,1.66 -24.49,-8.46 c -0.73,-2.17 -1.48,-4.3 -2.23,-6.38 c -0.55,0.08 -1.01,0.33 -1.38,0.75 c -3.88,7.81 -2.21,13.58 3.39,19.65 Z"
+    />
+  </g>
+  <g>
+    <path 
+      fill="#f0e9e9" 
+      d="M 25.9,30.6 c 3.22,2.35 6.69,4.24 10.42,5.67 c 7.76,5.03 12.78,10.57 13.31,20.2 c 0.24,4.01 -6.15,7.49 -2.67,11.01 c 6.45,3.51 17.99,-0.16 13.22,-9.12 c -4.03,-5.76 -5.19,-12.42 -3.6,-19.3 c -3.83,-22.05 -19.39,-8.23 -29.78,-18.43 c -1.18,-1.46 -2.28,-2.97 -3.29,-4.54 c -1.64,2.96 1.16,8.45 3.26,10.71 c 1.31,1.04 2.63,2.06 3.95,3.07 c 0.14,0.89 -0.26,1.33 -1.18,1.3 c -1.08,-0.39 -2.15,-0.78 -3.22,-1.17 c -5.6,-6.07 -7.27,-11.84 -3.39,-19.65 c 0.37,-0.42 0.83,-0.67 1.38,-0.75 c 0.75,2.08 1.5,4.21 2.23,6.38 c 4.66,10.12 16.23,4.76 24.49,8.46 c 4.65,0.8 9.68,-4.59 11.34,-8.48 c 1.08,-0.75 1.81,-0.49 2.17,0.8 c 0.22,2.29 0,4.54 -0.67,6.74 c -0.92,2.46 -2.15,4.71 -3.7,6.75 c 2.07,0.11 4.1,0.49 6.1,1.15 c 2.61,1.2 6.06,2.24 2.88,5.32 c -2.59,2.65 -5.74,3.83 -9.45,3.56 c -0.57,0.06 -0.96,0.36 -1.16,0.89 c -2.57,10.4 8.01,17.73 3.95,24.88 c -4.04,7.78 -14.46,5.45 -20.15,1.3 c -6,-0.72 -10.99,5.96 -12.56,11.04 c -1,1.72 -2.61,0.6 -2.21,-1.21 c 2.46,-4.59 3.13,-7.03 7.64,-10.2 c 1.53,-0.86 3.06,-1.63 4.6,-2.33 c -3.1,-2.04 -6.35,-3.85 -9.76,-5.4 c -4.71,-3.65 -6.5,-8.39 -5.39,-14.24 c 0.61,-0.67 1.25,-0.73 1.94,-0.16 c 0.25,11.14 3.5,11.68 12.44,16.41 c 1.45,1.16 2.9,2.28 4.34,3.38 c 3.17,-6.51 6.09,-9.57 1.52,-17.02 c -3.62,-5.45 -8.54,-9.17 -14.76,-11.17 c -5.85,-4.57 -11.11,-8.47 -18.75,-4.92 c -4.83,1.7 6.6,8.36 10.12,6.73 c 1.63,-0.44 3.25,-0.82 4.87,-1.13 c 2.89,2.62 -7.12,4.3 -8.66,3.39 c -4.57,-0.89 -7.95,-3.39 -10.14,-7.5 c -0.4,-0.91 -0.24,-1.73 0.47,-2.44 c 6.15,-3.19 11.76,-3.77 17.85,0.02 Z M 53.69,27.02 c 3.22,10.55 9.13,-7.32 7.73,-4.72 c -2.46,1.76 -5.04,3.33 -7.73,4.72 Z M 57.26,33.03 c 0.86,7.01 5.38,5.93 9.7,2.32 c 0.68,-2.78 -9.71,-3.22 -9.7,-2.32 Z"
+    />
+  </g>
+  <g>
+    <path 
+      fill="#132A13" 
+      d="M 57.26,33.03 c -0.01,-0.9 10.38,-0.46 9.7,2.32 c -4.32,3.61 -8.84,4.69 -9.7,-2.32 Z"
+    />
+  </g>
+  <g>
+    <path 
+      fill="#132A13" 
+      d="M 53.69,27.02 c 2.69,-1.39 5.27,-2.96 7.73,-4.72 c 1.4,-2.6 -4.51,15.27 -7.73,4.72 Z"
+    />
+  </g>
+  <g>
+    <path 
+      fill="#132A13" 
+      stroke="#132A13" 
+      strokeWidth="0.5" 
+      d="M 25.9,30.6 c 0.14,-0.2 0.28,-0.4 0.42,-0.6 c 1.07,0.39 2.14,0.78 3.22,1.17 c 0.92,0.03 1.32,-0.41 1.18,-1.3 c -1.32,-1.01 -2.64,-2.03 -3.95,-3.07 c -2.1,-2.26 -4.9,-7.75 -3.26,-10.71 c 1.01,1.57 2.11,3.08 3.29,4.54 c 10.39,10.2 25.95,-3.62 29.78,18.43 c -1.59,6.88 -0.43,13.54 3.6,19.3 c 4.77,8.96 -6.77,12.63 -13.22,9.12 c -3.48,-3.52 2.91,-7 2.67,-11.01 c -0.53,-9.63 -5.55,-15.17 -13.31,-20.2 c -3.73,-1.43 -7.2,-3.32 -10.42,-5.67 Z"
+    />
   </g>
 </svg>
-              </div>
+</div>
 
               <span className="sidebar-text" style={{ fontWeight: '700', fontSize: '16px', letterSpacing: '-0.3px', color: '#ffffff' }}>
                 Ganaderia
@@ -125,9 +145,9 @@ export default function DashboardClientLayout({
               style={{
                 border: 'none',
                 background: 'transparent',
-                borderRadius: '6px',
+                borderRadius: '0',
                 cursor: 'pointer',
-                padding: '6px',
+                padding: '0px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -138,32 +158,52 @@ export default function DashboardClientLayout({
                 src={isCollapsed ? "/rigth.png" : "/left.png"} 
                 alt="Toggle Menu" 
                 className="icon-white"
-                style={{ width: isCollapsed ? '14px' : '18px', height: isCollapsed ? '14px' : '18px', objectFit: 'contain' }} 
+                style={{ width: isCollapsed ? '14px' : '18px', height: isCollapsed ? '10px' : '14px', objectFit: 'contain' }} 
               />
             </button>
           </div>
 
           {/* Botón Acción Rápida (Verde lima brillante con texto oscuro) */}
-          <Link href="/inventario/nuevo" style={{ textDecoration: 'none', width: '100%' }}>
-            <button style={{
-              width: '100%',
-              backgroundColor: '#B5E846',
-              color: '#132A13',
-              border: 'none',
-              borderRadius: '8px',
-              padding: '10px 12px',
-              fontSize: '14px',
-              fontWeight: '600',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: isCollapsed ? 'center' : 'flex-start',
-              gap: '8px',
-              cursor: 'pointer'
-            }}>
-              <span style={{ fontSize: '16px', fontWeight: 'bold' }}>+</span>
-              <span className="sidebar-text">Registrar Ganado</span>
-            </button>
-          </Link>
+          {/* Botón Acción Rápida (Verde lima brillante con texto oscuro) */}
+<Link href="/inventario/nuevo" style={{ textDecoration: 'none', width: '100%', display: 'block' }}>
+  <button style={{
+    width: '100%',
+    backgroundColor: '#B5E846',
+    color: '#132A13',
+    border: 'none',
+    borderRadius: '8px',
+    padding: isCollapsed ? '8px' : '10px 10px', // Ajustado a 10px simétricos igual que el menú
+    fontSize: '14px',
+    fontWeight: '600',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: isCollapsed ? 'center' : 'flex-start',
+    gap: '10px', // Cambiado a 10px exactos igual que en los items de abajo
+    cursor: 'pointer',
+    transition: 'all 0.2s ease'
+  }}>
+    {/* Contenedor estricto de 30px x 30px idéntico al de los demás enlaces */}
+    <div style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+      <img 
+        src="/add.png" 
+        alt="" 
+        style={{ 
+          width: '30px', 
+          height: '30px', 
+          objectFit: 'contain',
+          filter: 'brightness(0) invert(0.1) sepia(1) saturate(100) hue-rotate(100deg)'
+        }} 
+      />
+    </div>
+
+    {/* El texto solo se muestra si NO está colapsado */}
+    {!isCollapsed && (
+      <span className="sidebar-text" style={{ whiteSpace: 'nowrap', overflow: 'hidden' }}>
+        Registrar Ganado
+      </span>
+    )}
+  </button>
+</Link>
 
           {/* Grupo de Links de Navegación (Letras Blancas / Activo en Lima) */}
           <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
