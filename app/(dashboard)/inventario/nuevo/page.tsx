@@ -13,7 +13,7 @@ export default function NuevoBovinoPage() {
       boxSizing: 'border-box'
     }}>
       <h2 style={{ margin: '0 0 8px 0', fontSize: '20px', fontWeight: '700', color: '#09090b' }}>
-        🐄 Registrar Nuevo Bovino
+        Registrar Nuevo Bovino
       </h2>
       <p style={{ margin: '0 0 24px 0', fontSize: '14px', color: '#71717a' }}>
         Ingresa los datos correspondientes para registrar un nuevo animal en el sistema de trazabilidad.
@@ -30,7 +30,7 @@ export default function NuevoBovinoPage() {
         
         {/* Número de Arete */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <label style={{ fontSize: '13px', fontWeight: '600', color: '#09090b' }}>Número de Arete / Identificación *</label>
+          <label style={{ fontSize: '13px', fontWeight: '600', color: '#09090b' }}>Número de Arete *</label>
           <input 
             type="text" 
             name="arete" 
@@ -48,7 +48,7 @@ export default function NuevoBovinoPage() {
 
         {/* Nombre o Alias */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <label style={{ fontSize: '13px', fontWeight: '600', color: '#09090b' }}>Nombre o Alias (Opcional)</label>
+          <label style={{ fontSize: '13px', fontWeight: '600', color: '#09090b' }}>Nombre (Opcional)</label>
           <input 
             type="text" 
             name="nombre" 
@@ -139,7 +139,7 @@ export default function NuevoBovinoPage() {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label style={{ fontSize: '13px', fontWeight: '600', color: '#09090b' }}>Estado / Etapa *</label>
+            <label style={{ fontSize: '13px', fontWeight: '600', color: '#09090b' }}>Estado *</label>
             <select 
               name="estado" 
               required
@@ -159,7 +159,9 @@ export default function NuevoBovinoPage() {
               <option value="Novilla de vientre">Novilla de vientre</option>
               <option value="En producción">En producción</option>
               <option value="Seca">Seca</option>
-              <option value="Macho / Destete / Levante">Macho / Destete / Levante</option>
+              <option value="Macho">Macho</option>
+              <option value="Destete">Destete</option>
+              <option value="Levante">Levante</option>
             </select>
           </div>
         </div>
