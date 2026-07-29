@@ -340,6 +340,13 @@ export default function MedicamentosPage() {
                   <option value="Subcutánea">Subcutánea</option>
                   <option value="Oral">Oral</option>
                   <option value="Tópica">Tópica</option>
+                  <option value="Intravenosa">Intravenosa</option>
+                  <option value="Rectal">Rectal</option>
+                  <option value="Intramamaria">Intramamaria</option>
+                  <option value="Intraruminal">Intraruminal</option>
+                  <option value="Intraperitoneal">Intraperitoneal</option>
+                  <option value="Ocular">Ocular</option>
+                  <option value="Intradérmica">Intradérmica</option>
                 </select>
               </div>
             </div>
