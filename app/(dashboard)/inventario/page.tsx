@@ -1,253 +1,443 @@
-'use client'
+"use client";
 
-import { useState, useMemo, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import React, { useState, useEffect } from "react";
+import { 
+  Search, 
+  ArrowUpRight, 
+  Activity, 
+  Scale, 
+  HeartPulse, 
+  Database, 
+  Eye, 
+  Pencil, 
+  Trash2, 
+  X, 
+  FileText,
+  Filter,
+  RefreshCw
+} from "lucide-react";
 
-export default function InventarioPage() {
-  const supabase = createClient()
-  
-  // ESTADOS
-  const [bovinos, setBovinos] = useState<any[]>([])
-  const [busqueda, setBusqueda] = useState('')
-  const [filtroCat, setFiltroCat] = useState('Todos')
-  const [vacaSeleccionada, setVacaSeleccionada] = useState<any>(null)
-  
-  // ESTADOS PARA EDICIÓN Y GUARDADO
-  const [editando, setEditando] = useState(false)
-  const [formEdicion, setFormEdicion] = useState<any>({})
-  const [guardando, setGuardando] = useState(false)
+import { createClient } from "@/lib/supabase/client";
 
-  // OBTENER ESTADO DIRECTAMENTE DE LA COLUMNA 'estado' (o un fallback por defecto)
-  const obtenerEstadoBovino = (bovino: any) => {
-    return bovino.estado || (bovino.genero === 'Macho' ? 'Macho / Destete / Levante' : 'En producción')
+interface Bovino {
+  id: string;
+  arete: string;
+  nombre: string | null;
+  raza: string;
+  genero: string;
+  peso_inicial: number;
+  fecha_nacimiento: string | null;
+  observaciones: string | null;
+  estado: string | null;
+  created_at: string;
+}
+
+// Lista oficial de estados/etapas productivas del hato
+const ESTADOS_BOVINOS = [
+  "Ternera en lactancia",
+  "Destete",
+  "Ternera en crecimiento",
+  "Levante",
+  "Novilla en desarrollo",
+  "Novilla de vientre",
+  "En producción",
+  "Seca",
+  "Macho"
+];
+
+// Helper para badges de color por estado
+const getEstadoBadgeStyle = (estado: string | null) => {
+  switch (estado) {
+    case "Ternera en lactancia":
+      return "bg-pink-50 text-pink-700 border-pink-200";
+    case "Destete":
+      return "bg-amber-50 text-amber-700 border-amber-200";
+    case "Ternera en crecimiento":
+      return "bg-yellow-50 text-yellow-800 border-yellow-200";
+    case "Levante":
+      return "bg-lime-50 text-lime-800 border-lime-200";
+    case "Novilla en desarrollo":
+      return "bg-indigo-50 text-indigo-700 border-indigo-200";
+    case "Novilla de vientre":
+      return "bg-purple-50 text-purple-700 border-purple-200";
+    case "Producción":
+    case "En producción":
+      return "bg-emerald-50 text-emerald-700 border-emerald-200";
+    case "Seca":
+      return "bg-slate-100 text-slate-600 border-slate-200";
+    case "Macho":
+      return "bg-sky-50 text-sky-700 border-sky-200";
+    default:
+      return "bg-slate-50 text-slate-600 border-slate-200";
   }
+};
 
-  // Estilos visuales según la fase ganadera / estado
-  const getBadgeStyle = (estado: string) => {
-    const est = estado ? estado.toLowerCase() : ''
-    if (est.includes('ternera') || est.includes('lactancia') || est.includes('crecimiento')) return { bg: '#e0f2fe', text: '#0369a1', border: '#bae6fd' } 
-    if (est.includes('novilla')) return { bg: '#fef3c7', text: '#b45309', border: '#fde68a' } 
-    if (est.includes('producción') || est.includes('gestante')) return { bg: '#dcfce7', text: '#15803d', border: '#bbf7d0' } 
-    if (est.includes('seca')) return { bg: '#ffedd5', text: '#c2410c', border: '#fed7aa' } 
-    return { bg: '#f1f5f9', text: '#475569', border: '#e2e8f0' } 
-  }
+export default function InventarioBovinosDashboard() {
+  const supabase = createClient();
 
-  // CARGA DE DATOS
-  async function fetchData() {
-    const { data, error } = await supabase.from('bovinos').select('*')
-    if (error) console.error('Error cargando bovinos:', error)
-    if (data) setBovinos(data)
-  }
+  const [bovinos, setBovinos] = useState<Bovino[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [selectedEstado, setSelectedEstado] = useState<string>("Todos");
+  const [selectedGenero, setSelectedGenero] = useState<string>("Todos");
+
+  // Modales
+  const [selectedBovino, setSelectedBovino] = useState<Bovino | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState<boolean>(false);
+  const [isEditOpen, setIsEditOpen] = useState<boolean>(false);
+  const [editFormData, setEditFormData] = useState<Partial<Bovino>>({});
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   useEffect(() => {
-    fetchData()
-  }, [])
+    fetchBovinos();
+  }, []);
 
-  // MANEJAR APERTURA DE FICHA Y CARGA DE FORMULARIO DE EDICIÓN
-  const abrirFicha = (b: any) => {
-    setVacaSeleccionada(b)
-    setFormEdicion({ ...b })
-    setEditando(false)
-  }
+  const fetchBovinos = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("bovinos")
+        .select("*")
+        .order("created_at", { ascending: false });
 
-  // GUARDAR CAMBIOS EN SUPABASE (Actualiza el estado registrado)
-  const guardarCambios = async () => {
-    if (!formEdicion.id) return
-    setGuardando(true)
-
-    const { error } = await supabase
-      .from('bovinos')
-      .update({
-        arete: formEdicion.arete,
-        nombre: formEdicion.nombre,
-        raza: formEdicion.raza,
-        genero: formEdicion.genero,
-        estado: formEdicion.estado, // Se guarda la columna estado de tu tabla
-        peso_inicial: formEdicion.peso_inicial ? parseFloat(formEdicion.peso_inicial) : null,
-        fecha_nacimiento: formEdicion.fecha_nacimiento || null,
-        observaciones: formEdicion.observaciones
-      })
-      .eq('id', formEdicion.id)
-
-    setGuardando(false)
-
-    if (error) {
-      alert('Error al actualizar: ' + error.message)
-    } else {
-      alert('¡Datos actualizados con éxito!')
-      setEditando(false)
-      await fetchData()
-      // Actualizar el objeto seleccionado actual en el modal
-      setVacaSeleccionada({ ...formEdicion })
+      if (error) {
+        console.error("Error al cargar bovinos:", error);
+      } else {
+        setBovinos(data || []);
+      }
+    } catch (err) {
+      console.error("Error inesperado:", err);
+    } finally {
+      setLoading(false);
     }
-  }
+  };
 
-  // FILTRADO INTELIGENTE
-  const datosFiltrados = useMemo(() => {
-    return bovinos.filter(b => {
-      const est = obtenerEstadoBovino(b)
-      const cumpleBusqueda = b.arete?.toLowerCase().includes(busqueda.toLowerCase()) || 
-                             b.nombre?.toLowerCase().includes(busqueda.toLowerCase())
-      
-      let cumpleCat = false
-      if (filtroCat === 'Todos') cumpleCat = true
-      else if (filtroCat === 'Hembra') cumpleCat = b.genero === 'Hembra'
-      else if (filtroCat === 'Macho') cumpleCat = b.genero === 'Macho'
-      else cumpleCat = est.toLowerCase().includes(filtroCat.toLowerCase())
-      
-      return cumpleBusqueda && cumpleCat
-    })
-  }, [bovinos, busqueda, filtroCat])
+  // Ver Ficha Técnica
+  const handleOpenDetail = (bovino: Bovino) => {
+    setSelectedBovino(bovino);
+    setIsDetailOpen(true);
+  };
 
-  // ESTADÍSTICAS DETALLADAS (Basadas en el campo estado)
-  const stats = useMemo(() => ({
-    ternerasLactancia: bovinos.filter(b => obtenerEstadoBovino(b).toLowerCase().includes('terna en lactancia') || obtenerEstadoBovino(b).toLowerCase().includes('lactancia')).length,
-    ternerasCrecimiento: bovinos.filter(b => obtenerEstadoBovino(b).toLowerCase().includes('crecimiento')).length,
-    novillasDesarrollo: bovinos.filter(b => obtenerEstadoBovino(b).toLowerCase().includes('desarrollo')).length,
-    novillasVientre: bovinos.filter(b => obtenerEstadoBovino(b).toLowerCase().includes('vientre')).length,
-    enProduccion: bovinos.filter(b => obtenerEstadoBovino(b).toLowerCase().includes('producción')).length,
-    secas: bovinos.filter(b => obtenerEstadoBovino(b).toLowerCase().includes('seca')).length,
-    machos: bovinos.filter(b => b.genero === 'Macho' || obtenerEstadoBovino(b).toLowerCase() === 'macho').length,
-    destete: bovinos.filter(b => obtenerEstadoBovino(b).toLowerCase().includes('destete')).length,
-    levante: bovinos.filter(b => obtenerEstadoBovino(b).toLowerCase().includes('levante')).length,
-  }), [bovinos])
+  // Abrir Modal de Edición
+  const handleOpenEdit = (bovino: Bovino) => {
+    setSelectedBovino(bovino);
+    setEditFormData({ ...bovino });
+    setIsEditOpen(true);
+  };
+
+  // Guardar Cambios Editados
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedBovino) return;
+
+    try {
+      setIsSubmitting(true);
+      const { error } = await supabase
+        .from("bovinos")
+        .update({
+          arete: editFormData.arete,
+          nombre: editFormData.nombre,
+          raza: editFormData.raza,
+          genero: editFormData.genero,
+          peso_inicial: Number(editFormData.peso_inicial),
+          fecha_nacimiento: editFormData.fecha_nacimiento,
+          estado: editFormData.estado,
+          observaciones: editFormData.observaciones,
+        })
+        .eq("id", selectedBovino.id);
+
+      if (error) {
+        console.error("Error al actualizar:", error);
+        alert("Ocurrió un error al intentar actualizar los datos.");
+      } else {
+        await fetchBovinos();
+        setIsEditOpen(false);
+      }
+    } catch (err) {
+      console.error("Error inesperado:", err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Eliminar Bovino
+  const handleDelete = async (id: string, arete: string) => {
+    const confirmDelete = window.confirm(
+      `¿Estás seguro de eliminar el registro del arete "${arete}"?`
+    );
+
+    if (!confirmDelete) return;
+
+    try {
+      const { error } = await supabase.from("bovinos").delete().eq("id", id);
+
+      if (error) {
+        console.error("Error al eliminar:", error);
+        alert("Ocurrió un error al intentar eliminar el registro.");
+      } else {
+        setBovinos((prev) => prev.filter((b) => b.id !== id));
+      }
+    } catch (err) {
+      console.error("Error inesperado:", err);
+    }
+  };
+
+  // Filtrado múltiple (Búsqueda por texto + Estado + Género)
+  const filteredBovinos = bovinos.filter((item) => {
+    const term = searchTerm.toLowerCase();
+    const matchesSearch =
+      item.arete.toLowerCase().includes(term) ||
+      (item.nombre && item.nombre.toLowerCase().includes(term)) ||
+      item.raza.toLowerCase().includes(term);
+
+    const matchesEstado = selectedEstado === "Todos" || item.estado === selectedEstado;
+    const matchesGenero = selectedGenero === "Todos" || item.genero === selectedGenero;
+
+    return matchesSearch && matchesEstado && matchesGenero;
+  });
+
+  // Métricas calculadas
+  const totalBovinos = bovinos.length;
+  const totalHembras = bovinos.filter((b) => b.genero === "Hembra").length;
+  const totalMachos = bovinos.filter((b) => b.genero === "Macho").length;
+  const enProduccionCount = bovinos.filter(
+    (b) => b.estado === "Producción" || b.estado === "En producción"
+  ).length;
+  const pesoPromedio =
+    totalBovinos > 0
+      ? (bovinos.reduce((acc, curr) => acc + Number(curr.peso_inicial || 0), 0) / totalBovinos).toFixed(1)
+      : "0.0";
 
   return (
-    <main style={{ padding: '32px', maxWidth: '1400px', margin: '0 auto', fontFamily: 'system-ui, -apple-system, sans-serif', background: '#f8fafc', minHeight: '100vh' }}>
+    <div className="min-h-screen bg-[#F4F7F4] text-slate-800 p-4 md:p-8 font-sans">
       
-      {/* ENCABEZADO */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '28px', flexWrap: 'wrap', gap: '16px' }}>
-        <div>
-          <h1 style={{ fontSize: '26px', fontWeight: '800', color: '#0f172a', margin: 0 }}>
-            Inventario y Estados del Hato
-          </h1>
-          <p style={{ color: '#64748b', fontSize: '14px', margin: '4px 0 0 0' }}>Control y gestión manual de los estados registrados de los animales.</p>
-        </div>
-        <div style={{ background: '#ffffff', padding: '8px 16px', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '14px', fontWeight: '600', color: '#334155', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
-          Total Hato: <span style={{ color: '#15803d', fontWeight: '800' }}>{bovinos.length}</span>
-        </div>
-      </div>
-
-      {/* DASHBOARD DE ESTADÍSTICAS (ACTUALIZADO CON TODAS LAS OPCIONES) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '14px', marginBottom: '28px' }}>
-        {[ 
-          {t: 'T. Lactancia', v: stats.ternerasLactancia, color: '#0369a1', bg: '#e0f2fe', border: '#bae6fd'}, 
-          {t: 'T. Crecimiento', v: stats.ternerasCrecimiento, color: '#0284c7', bg: '#f0f9ff', border: '#e0f2fe'}, 
-          {t: 'N. Desarrollo', v: stats.novillasDesarrollo, color: '#d97706', bg: '#fef3c7', border: '#fde68a'}, 
-          {t: 'N. Vientre', v: stats.novillasVientre, color: '#b45309', bg: '#fffbeb', border: '#fef3c7'}, 
-          {t: 'En Producción', v: stats.enProduccion, color: '#15803d', bg: '#dcfce7', border: '#bbf7d0'}, 
-          {t: 'Secas', v: stats.secas, color: '#c2410c', bg: '#ffedd5', border: '#fed7aa'}, 
-          {t: 'Machos', v: stats.machos, color: '#475569', bg: '#f1f5f9', border: '#e2e8f0'}, 
-          {t: 'Destete', v: stats.destete, color: '#0e7490', bg: '#cffafe', border: '#a5f3fc'}, 
-          {t: 'Levante', v: stats.levante, color: '#65a30d', bg: '#ecfccb', border: '#d9f99d'}, 
-        ].map(s => (
-          <div key={s.t} style={{ background: s.bg, padding: '16px 12px', borderRadius: '14px', border: `1px solid ${s.border}`, textAlign: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.01)' }}>
-            <div style={{ color: s.color, fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{s.t}</div>
-            <div style={{ fontSize: '24px', fontWeight: '800', color: s.color, marginTop: '6px' }}>{s.v}</div>
+      {/* SECCIÓN HERO / KPI METRICS */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
+        
+        {/* Titular y Tarjetas Principales */}
+        <div className="lg:col-span-5 flex flex-col justify-between">
+          <div>
+            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 mb-1">
+              INVENTARIO BOVINO
+            </h1>
+            <p className="text-sm text-slate-500 mb-6">
+              Control integral, etapas de desarrollo y trazabilidad del hato.
+            </p>
           </div>
-        ))}
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-white border border-slate-200/80 p-4 rounded-2xl shadow-sm relative">
+              <div className="flex justify-between items-start mb-2">
+                <span className="text-xs font-semibold uppercase text-slate-400">Total Bovinos</span>
+                <span className="p-1 bg-emerald-50 text-emerald-600 rounded-lg">
+                  <ArrowUpRight className="w-4 h-4" />
+                </span>
+              </div>
+              <div className="text-2xl font-black text-slate-900 mb-1">
+                {totalBovinos} <span className="text-xs font-normal text-slate-500">Cabezas</span>
+              </div>
+              <div className="text-[11px] text-slate-500 flex justify-between border-t border-slate-100 pt-2 mt-2">
+                <span>Hembras: <strong>{totalHembras}</strong></span>
+                <span>Machos: <strong>{totalMachos}</strong></span>
+              </div>
+            </div>
+
+            <div className="bg-white border border-slate-200/80 p-4 rounded-2xl shadow-sm relative">
+              <div className="flex justify-between items-start mb-2">
+                <span className="text-xs font-semibold uppercase text-slate-400">Peso Prom. Inicial</span>
+                <span className="p-1 bg-emerald-50 text-emerald-600 rounded-lg">
+                  <Scale className="w-4 h-4" />
+                </span>
+              </div>
+              <div className="text-2xl font-black text-slate-900 mb-1">
+                {pesoPromedio} <span className="text-xs font-normal text-slate-500">kg</span>
+              </div>
+              <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mt-3">
+                <div className="bg-emerald-500 h-full rounded-full" style={{ width: "100%" }}></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Card Estado Base de Datos */}
+        <div className="lg:col-span-4 bg-gradient-to-br from-emerald-600 to-teal-700 rounded-3xl p-6 text-white flex flex-col justify-between relative overflow-hidden shadow-sm">
+          <div className="absolute right-[-20px] bottom-[-20px] opacity-10">
+            <Database className="w-48 h-48" />
+          </div>
+          <div className="flex justify-between items-center z-10">
+            <span className="text-xs font-bold uppercase tracking-widest bg-white/20 text-white px-3 py-1 rounded-full backdrop-blur-sm">
+              SENA - Supabase Sync
+            </span>
+            <button 
+              onClick={fetchBovinos} 
+              title="Recargar datos"
+              className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/80 hover:text-white"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            </button>
+          </div>
+          <div className="z-10 my-4">
+            <div className="text-3xl font-black">{totalBovinos} Registros</div>
+            <p className="text-emerald-100 text-xs mt-1">Sincronizado correctamente con la base de datos.</p>
+          </div>
+          <div className="text-[11px] text-emerald-200 z-10 border-t border-white/10 pt-2">
+            Última actualización: {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </div>
+        </div>
+
+        {/* Indicadores Adicionales */}
+        <div className="lg:col-span-3 flex flex-col justify-between space-y-4">
+          <div className="bg-white border border-slate-200/80 p-5 rounded-2xl shadow-sm flex items-center justify-between">
+            <div>
+              <div className="text-2xl font-black text-slate-900">{enProduccionCount}</div>
+              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mt-0.5">EN PRODUCCIÓN</div>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <Activity className="w-5 h-5" />
+            </div>
+          </div>
+
+          <div className="bg-white border border-slate-200/80 p-5 rounded-2xl shadow-sm flex items-center justify-between">
+            <div>
+              <div className="text-2xl font-black text-slate-900">100%</div>
+              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mt-0.5">SALUD DEL HATO</div>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <HeartPulse className="w-5 h-5" />
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* FILTROS Y BÚSQUEDA */}
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
-        <input 
-          placeholder="Buscar por arete o nombre..." 
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)} 
-          style={{ flex: 1, minWidth: '260px', padding: '12px 16px', borderRadius: '12px', border: '1px solid #cbd5e1', outline: 'none', background: '#ffffff', fontSize: '14px', color: '#0f172a', boxSizing: 'border-box' }} 
-        />
-        <select 
-          value={filtroCat}
-          onChange={(e) => setFiltroCat(e.target.value)} 
-          style={{ padding: '12px 16px', borderRadius: '12px', border: '1px solid #cbd5e1', outline: 'none', background: '#fff', fontSize: '14px', color: '#334155', fontWeight: '500', cursor: 'pointer' }}
-        >
-          <option value="Todos">Todos los Estados</option>
-          <option value="Ternera en lactancia">Ternera en lactancia</option>
-          <option value="Ternera en crecimiento">Ternera en crecimiento</option>
-          <option value="Novilla en desarrollo">Novilla en desarrollo</option>
-          <option value="Novilla de vientre">Novilla de vientre</option>
-          <option value="En producción">En producción</option>
-          <option value="Seca">Seca</option>
-          <option value="Macho">Macho</option>
-          <option value="Destete">Destete</option>
-          <option value="Levante">Levante</option>
-        </select>
-      </div>
+      {/* SECCIÓN PRINCIPAL: BÚSQUEDA, FILTROS Y TABLA */}
+      <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm">
+        
+        {/* BARRA SUPERIOR DE BÚSQUEDA Y FILTROS */}
+        <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-4 mb-6">
+          
+          {/* Campo de Búsqueda por Texto */}
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input 
+              type="text"
+              placeholder="Buscar por arete, nombre o raza..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+            />
+            {searchTerm && (
+              <button 
+                onClick={() => setSearchTerm("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
 
-      {/* TABLA DE REGISTROS */}
-      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', whiteSpace: 'nowrap' }}>
+          {/* Selectores de Filtro */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
+              <Filter className="w-3.5 h-3.5 text-slate-400" />
+              <select 
+                value={selectedEstado} 
+                onChange={(e) => setSelectedEstado(e.target.value)}
+                className="bg-transparent text-xs font-semibold text-slate-700 focus:outline-none cursor-pointer"
+              >
+                <option value="Todos">Etapa / Estado: Todos</option>
+                {ESTADOS_BOVINOS.map((est) => (
+                  <option key={est} value={est}>{est}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
+              <select 
+                value={selectedGenero} 
+                onChange={(e) => setSelectedGenero(e.target.value)}
+                className="bg-transparent text-xs font-semibold text-slate-700 focus:outline-none cursor-pointer"
+              >
+                <option value="Todos">Género: Todos</option>
+                <option value="Hembra">Hembra</option>
+                <option value="Macho">Macho</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* TABLA DE REGISTROS */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
             <thead>
-              <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                <th style={{ padding: '16px 24px' }}>Nombre</th>
-                <th style={{ padding: '16px 20px' }}>Arete</th>
-                <th style={{ padding: '16px 20px' }}>Raza</th>
-                <th style={{ padding: '16px 20px' }}>Estado Actual</th>
-                <th style={{ padding: '16px 24px', textAlign: 'center' }}>Ficha Técnica</th>
+              <tr className="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                <th className="py-3 px-2">Arete / Nombre</th>
+                <th className="py-3 px-2">Raza</th>
+                <th className="py-3 px-2">Género</th>
+                <th className="py-3 px-2">Peso Inicial</th>
+                <th className="py-3 px-2">Fecha Nacimiento</th>
+                <th className="py-3 px-2 text-center">Estado / Etapa</th>
+                <th className="py-3 px-2 text-right">Acciones</th>
               </tr>
             </thead>
-            <tbody>
-              {datosFiltrados.length > 0 ? (
-                datosFiltrados.map((b, index) => {
-                  const estadoActual = obtenerEstadoBovino(b)
-                  const badge = getBadgeStyle(estadoActual)
-
-                  return (
-                    <tr 
-                      key={b.id || index} 
-                      style={{ borderBottom: index === datosFiltrados.length - 1 ? 'none' : '1px solid #f1f5f9' }}
-                    >
-                      <td style={{ padding: '16px 24px' }}>
-                        <div>
-                          <span style={{ fontWeight: '700', color: '#0f172a', display: 'block', fontSize: '14px' }}>{b.nombre || 'Sin nombre'}</span>
-                          <span style={{ fontSize: '11px', color: '#64748b' }}>{b.genero || 'N/A'}</span>
-                        </div>
-                      </td>
-                      <td style={{ padding: '16px 20px', color: '#334155', fontWeight: '600', fontSize: '14px' }}>
-                        <span style={{ background: '#f1f5f9', padding: '4px 8px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                          {b.arete}
-                        </span>
-                      </td>
-                      <td style={{ padding: '16px 20px', color: '#64748b', fontSize: '14px' }}>{b.raza || 'N/A'}</td>
-                      <td style={{ padding: '16px 20px' }}>
-                        <span style={{ 
-                          background: badge.bg, 
-                          color: badge.text, 
-                          border: `1px solid ${badge.border}`,
-                          fontSize: '12px', 
-                          fontWeight: '700', 
-                          padding: '6px 12px', 
-                          borderRadius: '20px',
-                          display: 'inline-block'
-                        }}>
-                          {estadoActual}
-                        </span>
-                      </td>
-                      <td style={{ padding: '16px 24px', textAlign: 'center' }}>
-                        <button 
-                          onClick={() => abrirFicha(b)}
-                          style={{
-                            background: '#f8fafc',
-                            border: '1px solid #cbd5e1',
-                            borderRadius: '10px',
-                            padding: '8px 14px',
-                            cursor: 'pointer',
-                            fontSize: '13px',
-                            fontWeight: '600',
-                            color: '#334155'
-                          }}
-                        >
-                          Ver Detalle
-                        </button>
-                      </td>
-                    </tr>
-                  )
-                })
+            <tbody className="divide-y divide-slate-100 text-sm">
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-slate-400 text-xs">
+                    <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-emerald-600" />
+                    Cargando datos del inventario...
+                  </td>
+                </tr>
+              ) : filteredBovinos.length > 0 ? (
+                filteredBovinos.map((item) => (
+                  <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="py-3.5 px-2">
+                      <div className="font-bold text-slate-900">{item.arete}</div>
+                      <div className="text-xs text-slate-400">{item.nombre || "Sin nombre"}</div>
+                    </td>
+                    <td className="py-3.5 px-2 text-slate-600 font-medium">{item.raza}</td>
+                    <td className="py-3.5 px-2 font-medium">
+                      <span className={`px-2 py-0.5 rounded-md text-xs font-bold ${
+                        item.genero === "Hembra" ? "bg-pink-50 text-pink-600" : "bg-blue-50 text-blue-600"
+                      }`}>
+                        {item.genero}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-2 text-slate-700 font-semibold">{item.peso_inicial} kg</td>
+                    <td className="py-3.5 px-2 text-slate-500 text-xs">{item.fecha_nacimiento || "No registrada"}</td>
+                    <td className="py-3.5 px-2 text-center">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${getEstadoBadgeStyle(item.estado)}`}>
+                        {item.estado || "Sin asignar"}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-2 text-right space-x-1">
+                      <button 
+                        onClick={() => handleOpenDetail(item)}
+                        title="Ver Ficha Técnica"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => handleOpenEdit(item)}
+                        title="Editar Animal"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => handleDelete(item.id, item.arete)}
+                        title="Eliminar Registro"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
               ) : (
                 <tr>
-                  <td colSpan={5} style={{ padding: '48px', textAlign: 'center', color: '#64748b', fontSize: '15px' }}>
-                    No se encontraron registros de bovinos que coincidan con los filtros de búsqueda.
+                  <td colSpan={7} className="py-12 text-center text-slate-400 text-xs">
+                    No se encontraron bovinos que coincidan con la búsqueda o filtros seleccionados.
                   </td>
                 </tr>
               )}
@@ -256,181 +446,205 @@ export default function InventarioPage() {
         </div>
       </div>
 
-      {/* FICHA TÉCNICA (MODAL CON OPCIÓN DE EDICIÓN) */}
-      {vacaSeleccionada && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '16px' }}>
-          <div style={{ background: '#fff', padding: '32px', borderRadius: '24px', width: '100%', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
-            
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px', marginBottom: '20px' }}>
-              <div>
-                <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '800', color: '#0f172a' }}>
-                  {editando ? 'Editar Ficha Técnica' : 'Ficha Técnica'}
-                </h2>
-                <span style={{ fontSize: '12px', color: '#64748b' }}>{editando ? 'Modifique los campos necesarios' : 'Detalle integral del bovino'}</span>
+      {/* MODAL 1: FICHA TÉCNICA */}
+      {isDetailOpen && selectedBovino && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl shadow-xl w-full max-w-lg overflow-hidden border border-slate-100">
+            <div className="bg-emerald-600 text-white p-6 relative">
+              <button 
+                onClick={() => setIsDetailOpen(false)}
+                className="absolute top-4 right-4 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full p-1 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <div className="flex items-center space-x-2 mb-1">
+                <FileText className="w-5 h-5 text-emerald-200" />
+                <span className="text-xs uppercase tracking-widest font-bold text-emerald-200">Ficha Técnica</span>
               </div>
-              {!editando && (
-                <button 
-                  onClick={() => setEditando(true)}
-                  style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
-                >
-                  Editar Datos
-                </button>
-              )}
+              <h2 className="text-2xl font-black">
+                {selectedBovino.nombre ? selectedBovino.nombre : `Arete: ${selectedBovino.arete}`}
+              </h2>
+              <p className="text-xs text-emerald-100 mt-0.5">Arete: {selectedBovino.arete}</p>
             </div>
 
-            {/* MODO VISTA */}
-            {!editando ? (
-              <>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '14px', color: '#334155' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: '#f8fafc', borderRadius: '8px' }}>
-                    <span style={{ color: '#64748b', fontWeight: '500' }}>Arete:</span>
-                    <span style={{ fontWeight: '700', color: '#0f172a' }}>{vacaSeleccionada.arete}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: '#f8fafc', borderRadius: '8px' }}>
-                    <span style={{ color: '#64748b', fontWeight: '500' }}>Nombre:</span>
-                    <span style={{ fontWeight: '700', color: '#0f172a' }}>{vacaSeleccionada.nombre || 'N/A'}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: '#f8fafc', borderRadius: '8px' }}>
-                    <span style={{ color: '#64748b', fontWeight: '500' }}>Raza:</span>
-                    <span style={{ fontWeight: '600', color: '#0f172a' }}>{vacaSeleccionada.raza || 'N/A'}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: '#f8fafc', borderRadius: '8px' }}>
-                    <span style={{ color: '#64748b', fontWeight: '500' }}>Género:</span>
-                    <span style={{ fontWeight: '600', color: '#0f172a' }}>{vacaSeleccionada.genero || 'N/A'}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: '#f8fafc', borderRadius: '8px' }}>
-                    <span style={{ color: '#64748b', fontWeight: '500' }}>Estado:</span>
-                    <span style={{ fontWeight: '600', color: '#15803d' }}>{obtenerEstadoBovino(vacaSeleccionada)}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: '#f8fafc', borderRadius: '8px' }}>
-                    <span style={{ color: '#64748b', fontWeight: '500' }}>Peso Inicial:</span>
-                    <span style={{ fontWeight: '600', color: '#0f172a' }}>{vacaSeleccionada.peso_inicial ? `${vacaSeleccionada.peso_inicial} kg` : 'N/A'}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: '#f8fafc', borderRadius: '8px' }}>
-                    <span style={{ color: '#64748b', fontWeight: '500' }}>Fecha Nacimiento:</span>
-                    <span style={{ fontWeight: '600', color: '#0f172a' }}>{vacaSeleccionada.fecha_nacimiento || 'No registrada'}</span>
-                  </div>
-                  <div style={{ padding: '12px', background: '#f8fafc', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <span style={{ color: '#64748b', fontWeight: '500', fontSize: '13px' }}>Observaciones:</span>
-                    <span style={{ fontWeight: '500', color: '#0f172a', fontSize: '13px' }}>{vacaSeleccionada.observaciones || 'Ninguna observación registrada.'}</span>
-                  </div>
+            <div className="p-6 space-y-4 text-sm">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                  <span className="text-[11px] font-bold text-slate-400 block uppercase">Raza</span>
+                  <span className="font-bold text-slate-800">{selectedBovino.raza}</span>
                 </div>
+                <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                  <span className="text-[11px] font-bold text-slate-400 block uppercase">Género</span>
+                  <span className="font-bold text-slate-800">{selectedBovino.genero}</span>
+                </div>
+                <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                  <span className="text-[11px] font-bold text-slate-400 block uppercase">Peso Inicial</span>
+                  <span className="font-bold text-slate-800">{selectedBovino.peso_inicial} kg</span>
+                </div>
+                <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                  <span className="text-[11px] font-bold text-slate-400 block uppercase">Nacimiento</span>
+                  <span className="font-bold text-slate-800">{selectedBovino.fecha_nacimiento || "No registrada"}</span>
+                </div>
+              </div>
 
-                <button 
-                  onClick={() => setVacaSeleccionada(null)} 
-                  style={{ marginTop: '24px', padding: '12px', width: '100%', borderRadius: '12px', border: 'none', background: '#0f172a', color: '#fff', fontWeight: '700', fontSize: '14px', cursor: 'pointer' }}
-                >
-                  Cerrar Ficha
-                </button>
-              </>
-            ) : (
-              /* MODO EDICIÓN MANUAL CON EL SELECT DE ESTADOS */
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '14px' }}>
+              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                <span className="text-[11px] font-bold text-slate-400 block uppercase">Estado / Etapa Actual</span>
+                <span className={`inline-block mt-1 px-3 py-0.5 rounded-full font-semibold text-xs border ${getEstadoBadgeStyle(selectedBovino.estado)}`}>
+                  {selectedBovino.estado || "Sin asignar"}
+                </span>
+              </div>
+
+              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                <span className="text-[11px] font-bold text-slate-400 block uppercase">Observaciones</span>
+                <p className="text-slate-600 mt-1 text-xs leading-relaxed">
+                  {selectedBovino.observaciones || "Sin observaciones registradas."}
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 px-6 py-4 flex justify-end">
+              <button
+                onClick={() => setIsDetailOpen(false)}
+                className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold transition-colors"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: EDITAR BOVINO */}
+      {isEditOpen && selectedBovino && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden border border-slate-100">
+            <div className="bg-slate-900 text-white p-5 flex justify-between items-center">
+              <div>
+                <h2 className="font-bold text-base">Editar Animal</h2>
+                <p className="text-xs text-slate-400">Arete: {selectedBovino.arete}</p>
+              </div>
+              <button 
+                onClick={() => setIsEditOpen(false)}
+                className="text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="p-6 space-y-3 text-sm">
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Arete</label>
+                <input 
+                  type="text" 
+                  value={editFormData.arete || ""} 
+                  onChange={(e) => setEditFormData({...editFormData, arete: e.target.value})}
+                  required
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Nombre</label>
+                <input 
+                  type="text" 
+                  value={editFormData.nombre || ""} 
+                  onChange={(e) => setEditFormData({...editFormData, nombre: e.target.value})}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-xs"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label style={{ display: 'block', fontWeight: '600', color: '#475569', marginBottom: '4px' }}>Arete:</label>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Raza</label>
                   <input 
                     type="text" 
-                    value={formEdicion.arete || ''} 
-                    onChange={(e) => setFormEdicion({ ...formEdicion, arete: e.target.value })}
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                    value={editFormData.raza || ""} 
+                    onChange={(e) => setEditFormData({...editFormData, raza: e.target.value})}
+                    required
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-xs"
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontWeight: '600', color: '#475569', marginBottom: '4px' }}>Nombre:</label>
-                  <input 
-                    type="text" 
-                    value={formEdicion.nombre || ''} 
-                    onChange={(e) => setFormEdicion({ ...formEdicion, nombre: e.target.value })}
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontWeight: '600', color: '#475569', marginBottom: '4px' }}>Raza:</label>
-                  <input 
-                    type="text" 
-                    value={formEdicion.raza || ''} 
-                    onChange={(e) => setFormEdicion({ ...formEdicion, raza: e.target.value })}
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontWeight: '600', color: '#475569', marginBottom: '4px' }}>Género:</label>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Género</label>
                   <select 
-                    value={formEdicion.genero || 'Hembra'} 
-                    onChange={(e) => setFormEdicion({ ...formEdicion, genero: e.target.value })}
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#fff', boxSizing: 'border-box' }}
+                    value={editFormData.genero || "Hembra"}
+                    onChange={(e) => setEditFormData({...editFormData, genero: e.target.value})}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-xs"
                   >
                     <option value="Hembra">Hembra</option>
                     <option value="Macho">Macho</option>
                   </select>
                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label style={{ display: 'block', fontWeight: '600', color: '#475569', marginBottom: '4px' }}>Estado:</label>
-                  <select 
-                    value={formEdicion.estado || 'En producción'} 
-                    onChange={(e) => setFormEdicion({ ...formEdicion, estado: e.target.value })}
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#fff', boxSizing: 'border-box' }}
-                  >
-                    <option value="Ternera en lactancia">Ternera en lactancia</option>
-                    <option value="Ternera en crecimiento">Ternera en crecimiento</option>
-                    <option value="Novilla en desarrollo">Novilla en desarrollo</option>
-                    <option value="Novilla de vientre">Novilla de vientre</option>
-                    <option value="En producción">En producción</option>
-                    <option value="Seca">Seca</option>
-                    <option value="Macho">Macho</option>
-                    <option value="Destete">Destete</option>
-                    <option value="Levante">Levante</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontWeight: '600', color: '#475569', marginBottom: '4px' }}>Peso Inicial (kg):</label>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Peso Inicial (kg)</label>
                   <input 
                     type="number" 
-                    value={formEdicion.peso_inicial || ''} 
-                    onChange={(e) => setFormEdicion({ ...formEdicion, peso_inicial: e.target.value })}
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                    step="0.1"
+                    value={editFormData.peso_inicial || 0} 
+                    onChange={(e) => setEditFormData({...editFormData, peso_inicial: Number(e.target.value)})}
+                    required
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-xs"
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontWeight: '600', color: '#475569', marginBottom: '4px' }}>Fecha de Nacimiento:</label>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Fecha Nacimiento</label>
                   <input 
                     type="date" 
-                    value={formEdicion.fecha_nacimiento || ''} 
-                    onChange={(e) => setFormEdicion({ ...formEdicion, fecha_nacimiento: e.target.value })}
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                    value={editFormData.fecha_nacimiento || ""} 
+                    onChange={(e) => setEditFormData({...editFormData, fecha_nacimiento: e.target.value})}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-xs"
                   />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontWeight: '600', color: '#475569', marginBottom: '4px' }}>Observaciones:</label>
-                  <textarea 
-                    value={formEdicion.observaciones || ''} 
-                    onChange={(e) => setFormEdicion({ ...formEdicion, observaciones: e.target.value })}
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', resize: 'vertical' }}
-                    rows={3}
-                  />
-                </div>
-
-                <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-                  <button 
-                    onClick={() => setEditando(false)}
-                    style={{ flex: 1, padding: '12px', borderRadius: '12px', border: '1px solid #cbd5e1', background: '#fff', color: '#334155', fontWeight: '700', cursor: 'pointer' }}
-                  >
-                    Cancelar
-                  </button>
-                  <button 
-                    onClick={guardarCambios}
-                    disabled={guardando}
-                    style={{ flex: 1, padding: '12px', borderRadius: '12px', border: 'none', background: '#15803d', color: '#fff', fontWeight: '700', cursor: 'pointer' }}
-                  >
-                    {guardando ? 'Guardando...' : 'Guardar Cambios'}
-                  </button>
                 </div>
               </div>
-            )}
 
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Etapa / Estado</label>
+                <select 
+                  value={editFormData.estado || ""}
+                  onChange={(e) => setEditFormData({...editFormData, estado: e.target.value})}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-xs"
+                >
+                  <option value="">Seleccionar etapa</option>
+                  {ESTADOS_BOVINOS.map((est) => (
+                    <option key={est} value={est}>{est}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Observaciones</label>
+                <textarea 
+                  rows={2}
+                  value={editFormData.observaciones || ""} 
+                  onChange={(e) => setEditFormData({...editFormData, observaciones: e.target.value})}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-xs resize-none"
+                />
+              </div>
+
+              <div className="pt-3 flex justify-end space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEditOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50"
+                >
+                  {isSubmitting ? "Guardando..." : "Guardar Cambios"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
-    </main>
-  )
+
+    </div>
+  );
 }
