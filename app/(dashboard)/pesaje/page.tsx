@@ -56,7 +56,6 @@ const CATEGORIAS_OPCIONES = [
   "Novilla de vientre",
   "En producción",
   "Seca",
-  "Macho",
 ];
 
 export default function PesajesDashboard() {

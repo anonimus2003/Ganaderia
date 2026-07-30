@@ -180,7 +180,7 @@ export default function NuevoBovinoPage() {
                     <option value="Novilla de vientre">Novilla de vientre</option>
                     <option value="En producción">En producción</option>
                     <option value="Seca">Seca</option>
-                    <option value="Macho">Macho</option>
+   
                     
                   </select>
                 </div>

@@ -1,426 +1,743 @@
-'use client'
+'use client';
 
-import React, { useState, useEffect } from 'react'
-import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
+import React, { useState, useEffect } from 'react';
+import {
+  Syringe,
+  Plus,
+  Search,
+  Pencil,
+  Trash2,
+  Calendar,
+  UserCheck,
+  Clock,
+  AlertTriangle,
+  X,
+  Stethoscope,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
+  Loader2
+} from 'lucide-react';
 
+// Importación usando tu cliente de Supabase
+import { createClient } from '@/lib/supabase/client';
+
+// Definición del tipo para las Vías de Aplicación
+type ViaAplicacion = 'Intramuscular' | 'Subcutánea' | 'Oral' | 'Tópica' | 'Intrauterina' | 'Local';
+
+// Tipos TypeScript según tus esquemas SQL
 interface Bovino {
-  id: string
-  arete: string
-  nombre: string | null
-  raza: string
+  id: string;
+  arete: string;
+  nombre: string | null;
+  raza: string;
+  estado: string | null;
 }
 
 interface Tratamiento {
-  id: string
-  bovino_id: string
-  medicamento: string
-  dosis: string
-  via: 'Intramuscular' | 'Subcutánea' | 'Oral' | 'Tópica'
-  fecha_aplicacion: string
-  tiempo_retiro: number
-  veterinario: string
-  motivo: string | null
-  bovinos?: {
-    arete: string
-    nombre: string | null
-    raza: string
-  }
+  id: string;
+  bovino_id: string;
+  medicamento: string;
+  dosis: string;
+  via: ViaAplicacion;
+  fecha_aplicacion: string;
+  tiempo_retiro: number;
+  veterinario: string;
+  motivo: string | null;
+  created_at?: string;
+  bovino?: Bovino; // Para la relación JOIN
 }
 
-export default function MedicamentosPage() {
-  // Inicializamos el cliente de Supabase dentro del componente o usamos una instancia fija
-  const supabase = createClient()
+export default function TratamientosPage() {
+  // Instanciamos el cliente de Supabase
+  const supabase = createClient();
 
-  const [tratamientos, setTratamientos] = useState<Tratamiento[]>([])
-  const [bovinos, setBovinos] = useState<Bovino[]>([])
-  const [loading, setLoading] = useState(true)
+  // Estados de datos
+  const [bovinos, setBovinos] = useState<Bovino[]>([]);
+  const [tratamientos, setTratamientos] = useState<Tratamiento[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
-  // Estados del formulario
-  const [bovinoId, setBovinoId] = useState('')
-  const [medicamento, setMedicamento] = useState('')
-  const [dosis, setDosis] = useState('')
-  const [via, setVia] = useState<'Intramuscular' | 'Subcutánea' | 'Oral' | 'Tópica'>('Intramuscular')
-  const [fechaAplicacion, setFechaAplicacion] = useState('')
-  const [tiempoRetiro, setTiempoRetiro] = useState('')
-  const [veterinario, setVeterinario] = useState('')
-  const [motivo, setMotivo] = useState('')
+  // Estados de control de UI
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterVia, setFilterVia] = useState<string>('Todas');
+  const [filterFecha, setFilterFecha] = useState<string>(''); // Nuevo estado para filtro por fecha
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
-  // Cargar datos al iniciar
-  useEffect(() => {
-    fetchDatos()
-  }, [])
+  // Estados para Paginación (5 datos por página)
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 5;
 
-  const fetchDatos = async () => {
-    setLoading(true)
+  // Estado del formulario
+  const [formData, setFormData] = useState<{
+    bovino_id: string;
+    medicamento: string;
+    dosis: string;
+    via: ViaAplicacion;
+    fecha_aplicacion: string;
+    tiempo_retiro: number;
+    veterinario: string;
+    motivo: string;
+  }>({
+    bovino_id: '',
+    medicamento: '',
+    dosis: '',
+    via: 'Intramuscular',
+    fecha_aplicacion: new Date().toISOString().split('T')[0],
+    tiempo_retiro: 0,
+    veterinario: '',
+    motivo: '',
+  });
+
+  // ================= 1. CARGAR DATOS DESDE SUPABASE =================
+  const fetchData = async () => {
+    setLoading(true);
     try {
-      // 1. Obtener lista de bovinos para el selector
+      // Obtener bovinos
       const { data: bovinosData, error: bovinosError } = await supabase
         .from('bovinos')
-        .select('id, arete, nombre, raza')
-        .order('arete', { ascending: true })
+        .select('id, arete, nombre, raza, estado');
 
-      if (bovinosError) throw bovinosError
-      if (bovinosData) setBovinos(bovinosData)
+      if (bovinosError) throw bovinosError;
+      setBovinos(bovinosData || []);
 
-      // 2. Obtener tratamientos con información del bovino asociado
+      // Obtener tratamientos haciendo JOIN con la tabla de bovinos
       const { data: tratamientosData, error: tratamientosError } = await supabase
         .from('tratamientos')
         .select(`
           *,
-          bovinos (
-            arete,
-            nombre,
-            raza
-          )
+          bovino:bovinos (id, arete, nombre, raza, estado)
         `)
-        .order('fecha_aplicacion', { ascending: false })
+        .order('fecha_aplicacion', { ascending: false });
 
-      if (tratamientosError) throw tratamientosError
-      if (tratamientosData) setTratamientos(tratamientosData)
-    } catch (error) {
-      console.error('Error al cargar datos:', error)
+      if (tratamientosError) throw tratamientosError;
+      setTratamientos(tratamientosData || []);
+   } catch (error) {
+      console.error('Error consultando Supabase:', error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  // Función para evaluar si el animal sigue en periodo de retiro (cuarentena)
-  const evaluarEstadoRetiro = (fechaAplicacionStr: string, diasRetiro: number) => {
-    if (diasRetiro === 0) return { label: 'Sin Restricción', colorBg: '#f0fdf4', colorText: '#16a34a' }
+  useEffect(() => {
+    fetchData();
+  }, []);
 
-    const fechaAplicacion = new Date(fechaAplicacionStr)
-    const fechaLimite = new Date(fechaAplicacion)
-    fechaLimite.setDate(fechaLimite.getDate() + diasRetiro)
-    
-    const hoy = new Date()
-    hoy.setHours(0, 0, 0, 0)
-    fechaLimite.setHours(0, 0, 0, 0)
+  // Reiniciar a la página 1 cuando el usuario busca o aplica filtros
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterVia, filterFecha]);
 
-    if (hoy <= fechaLimite) {
-      const msDiferencia = fechaLimite.getTime() - hoy.getTime()
-      const diasRestantes = Math.ceil(msDiferencia / (1000 * 60 * 60 * 24))
-      return { 
-        label: `🚫 Retiro Activo (${diasRestantes}d rest.)`, 
-        colorBg: '#fef2f2', 
-        colorText: '#ef4444' 
+  // ================= 2. MODAL Y FORMULARIO =================
+  const handleOpenCreateModal = () => {
+    setEditingId(null);
+    setFormData({
+      bovino_id: bovinos[0]?.id || '',
+      medicamento: '',
+      dosis: '',
+      via: 'Intramuscular',
+      fecha_aplicacion: new Date().toISOString().split('T')[0],
+      tiempo_retiro: 0,
+      veterinario: '',
+      motivo: '',
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEditModal = (tratamiento: Tratamiento) => {
+    setEditingId(tratamiento.id);
+    setFormData({
+      bovino_id: tratamiento.bovino_id,
+      medicamento: tratamiento.medicamento,
+      dosis: tratamiento.dosis,
+      via: tratamiento.via,
+      fecha_aplicacion: tratamiento.fecha_aplicacion,
+      tiempo_retiro: tratamiento.tiempo_retiro,
+      veterinario: tratamiento.veterinario,
+      motivo: tratamiento.motivo || '',
+    });
+    setIsModalOpen(true);
+  };
+
+  // ================= 3. GUARDAR (CREAR O EDITAR) EN SUPABASE =================
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    try {
+      if (editingId) {
+        // Actualizar registro
+        const { error } = await supabase
+          .from('tratamientos')
+          .update({
+            bovino_id: formData.bovino_id,
+            medicamento: formData.medicamento,
+            dosis: formData.dosis,
+            via: formData.via,
+            fecha_aplicacion: formData.fecha_aplicacion,
+            tiempo_retiro: formData.tiempo_retiro,
+            veterinario: formData.veterinario,
+            motivo: formData.motivo || null,
+          })
+          .eq('id', editingId);
+
+        if (error) throw error;
+      } else {
+        // Crear nuevo registro
+        const { error } = await supabase.from('tratamientos').insert([
+          {
+            bovino_id: formData.bovino_id,
+            medicamento: formData.medicamento,
+            dosis: formData.dosis,
+            via: formData.via,
+            fecha_aplicacion: formData.fecha_aplicacion,
+            tiempo_retiro: formData.tiempo_retiro,
+            veterinario: formData.veterinario,
+            motivo: formData.motivo || null,
+          },
+        ]);
+
+        if (error) throw error;
+      }
+
+      await fetchData(); // Recargar los datos actualizados
+      setIsModalOpen(false);
+    } catch (error) {
+      console.error('Error al guardar en Supabase:', error);
+      alert('Ocurrió un error al guardar el registro.');
+    }
+  };
+
+  // ================= 4. ELIMINAR EN SUPABASE =================
+  const handleDelete = async (id: string) => {
+    if (confirm('¿Estás seguro de eliminar este registro de tratamiento?')) {
+      try {
+        const { error } = await supabase.from('tratamientos').delete().eq('id', id);
+        if (error) throw error;
+        await fetchData();
+      } catch (error) {
+        console.error('Error al eliminar:', error);
+        alert('Error al eliminar el tratamiento');
       }
     }
+  };
 
-    return { label: '✅ Liberado', colorBg: '#f0fdf4', colorText: '#16a34a' }
-  }
-
-  // Manejar el envío del formulario a Supabase
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!bovinoId || !medicamento || !dosis || !fechaAplicacion || !veterinario) return
-
-    const nuevoTratamiento = {
-      bovino_id: bovinoId,
-      medicamento,
-      dosis,
-      via,
-      fecha_aplicacion: fechaAplicacion,
-      tiempo_retiro: tiempoRetiro ? parseInt(tiempoRetiro) : 0,
-      veterinario,
-      motivo: motivo.trim() || null
-    }
-
-    const { error } = await supabase.from('tratamientos').insert([nuevoTratamiento])
-
-    if (error) {
-      alert('Hubo un error al guardar el tratamiento: ' + error.message)
-      console.error(error)
-      return
-    }
-
-    // Limpiar campos del formulario
-    setBovinoId('')
-    setMedicamento('')
-    setDosis('')
-    setFechaAplicacion('')
-    setTiempoRetiro('')
-    setVeterinario('')
-    setMotivo('')
+  // ================= 5. LÓGICA DE FILTRADO Y PAGINACIÓN =================
+  const filteredTratamientos = tratamientos.filter((item) => {
+    const bovinoInfo = `${item.bovino?.arete || ''} ${item.bovino?.nombre || ''}`.toLowerCase();
     
-    // Refrescar la tabla y métricas
-    fetchDatos()
-  }
+    // Búsqueda por texto
+    const matchSearch =
+      bovinoInfo.includes(searchTerm.toLowerCase()) ||
+      item.medicamento.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.veterinario.toLowerCase().includes(searchTerm.toLowerCase());
 
-  // Métricas calculadas dinámicamente
-  const totalRegistros = tratamientos.length
-  const enRetiroCount = tratamientos.filter(tr => {
-    const estado = evaluarEstadoRetiro(tr.fecha_aplicacion, tr.tiempo_retiro)
-    return estado.colorText === '#ef4444'
-  }).length
+    // Filtro por Vía de Aplicación
+    const matchVia = filterVia === 'Todas' || item.via === filterVia;
+
+    // Filtro por Fecha de Aplicación
+    const matchFecha = !filterFecha || item.fecha_aplicacion === filterFecha;
+
+    return matchSearch && matchVia && matchFecha;
+  });
+
+  // Cálculo de páginas
+  const totalPages = Math.ceil(filteredTratamientos.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedTratamientos = filteredTratamientos.slice(
+    startIndex,
+    startIndex + ITEMS_PER_PAGE
+  );
+
+  // Cálculo de tiempo de retiro activo
+  const isEnRetiro = (fechaAplicacion: string, diasRetiro: number) => {
+    if (diasRetiro <= 0) return false;
+    const fechaApp = new Date(fechaAplicacion);
+    const fechaFin = new Date(fechaApp);
+    fechaFin.setDate(fechaFin.getDate() + diasRetiro);
+    return new Date() <= fechaFin;
+  };
 
   return (
-    <div style={{ padding: '24px', boxSizing: 'border-box', maxWidth: '1400px', margin: '0 auto' }}>
-      
-      {/* Botón de regreso y Encabezado */}
-      <div style={{ marginBottom: '24px' }}>
-        <Link href="/dashboard" style={{ textDecoration: 'none', color: '#2563eb', fontSize: '14px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px' }}>
-          ← Volver al Dashboard
-        </Link>
-        <h1 style={{ margin: 0, fontSize: '28px', fontWeight: '800', color: '#09090b', letterSpacing: '-0.5px' }}>
-          💉 Sanidad y Medicamentos
-        </h1>
-        <p style={{ margin: '4px 0 0 0', fontSize: '14px', color: '#71717a' }}>
-          Lleva el registro de tratamientos clínicos, diagnósticos y control estricto de tiempos de retiro sincronizado con Supabase.
-        </p>
-      </div>
+    <div className="min-h-screen bg-[#f4f7f4] p-4 md:p-8 text-slate-800 font-sans selection:bg-emerald-200">
+      <div className="max-w-7xl mx-auto space-y-6">
 
-      {/* Tarjetas de Métricas Sanitarias */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', 
-        gap: '16px',
-        marginBottom: '24px'
-      }}>
-        <div style={{ backgroundColor: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.01)' }}>
-          <span style={{ fontSize: '12px', fontWeight: '600', color: '#71717a', textTransform: 'uppercase' }}>Tratamientos Totales</span>
-          <h3 style={{ margin: '8px 0 0 0', fontSize: '24px', fontWeight: '800', color: '#09090b' }}>{totalRegistros} registros</h3>
-          <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: '#71717a' }}>Historial clínico general</p>
-        </div>
-        <div style={{ backgroundColor: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.01)' }}>
-          <span style={{ fontSize: '12px', fontWeight: '600', color: '#71717a', textTransform: 'uppercase' }}>En Tiempo de Retiro</span>
-          <h3 style={{ margin: '8px 0 0 0', fontSize: '24px', fontWeight: '800', color: '#ef4444' }}>{enRetiroCount} animal(es)</h3>
-          <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: '#ef4444', fontWeight: '500' }}>⚠️ Leche/Carne no apta para consumo</p>
-        </div>
-        <div style={{ backgroundColor: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.01)' }}>
-          <span style={{ fontSize: '12px', fontWeight: '600', color: '#71717a', textTransform: 'uppercase' }}>Bovinos Registrados</span>
-          <h3 style={{ margin: '8px 0 0 0', fontSize: '24px', fontWeight: '800', color: '#2563eb' }}>{bovinos.length} total</h3>
-          <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: '#71717a' }}>Disponibles para tratamiento</p>
-        </div>
-      </div>
+        {/* ================= ENCABEZADO Y ESTADÍSTICAS ================= */}
+        <div className="bg-gradient-to-r from-emerald-900 via-emerald-800 to-slate-900 rounded-3xl p-6 md:p-8 text-white shadow-md relative overflow-hidden">
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-semibold mb-3 border border-emerald-500/30">
+                <Stethoscope size={14} />
+                <span>Control Sanitario Veterinario</span>
+              </div>
+              <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">
+                Gestión de Tratamientos
+              </h1>
+              <p className="text-emerald-100/80 text-xs md:text-sm mt-1 max-w-xl">
+                Registro clínico de medicamentos, vías de aplicación y periodos de resguardo sanitario para el hato.
+              </p>
+            </div>
 
-      {/* Grid Principal */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '24px', alignItems: 'start' }}>
-        
-        {/* TABLA DE TRATAMIENTOS */}
-        <div style={{ 
-          backgroundColor: '#ffffff', 
-          border: '1px solid #e4e4e7', 
-          borderRadius: '16px', 
-          boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-          overflow: 'hidden'
-        }}>
-          <div style={{ padding: '20px', borderBottom: '1px solid #f4f4f5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#09090b' }}>Historial Clínico de Aplicaciones</h3>
-            <span style={{ fontSize: '12px', color: '#71717a', fontWeight: '500' }}>{tratamientos.length} registros</span>
+            <button
+              onClick={handleOpenCreateModal}
+              className="inline-flex items-center justify-center gap-2 bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold px-5 py-3 rounded-2xl transition-all shadow-lg hover:shadow-emerald-400/20 active:scale-95 text-sm cursor-pointer"
+            >
+              <Plus size={18} />
+              <span>Registrar Tratamiento</span>
+            </button>
           </div>
 
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '800px' }}>
+          {/* Tarjetas rápidas de estado */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6 pt-6 border-t border-emerald-700/50">
+            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10">
+              <span className="text-xs text-emerald-200 font-medium">Total Tratamientos</span>
+              <div className="text-2xl font-bold mt-1">{tratamientos.length}</div>
+            </div>
+            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10">
+              <span className="text-xs text-emerald-200 font-medium">Animales en Retiro Sanitario</span>
+              <div className="text-2xl font-bold mt-1 text-amber-300 flex items-center gap-2">
+                {tratamientos.filter((t) => isEnRetiro(t.fecha_aplicacion, t.tiempo_retiro)).length}
+                <AlertTriangle size={18} className="text-amber-400" />
+              </div>
+            </div>
+            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10">
+              <span className="text-xs text-emerald-200 font-medium">Bovinos Registrados</span>
+              <div className="text-2xl font-bold mt-1">{bovinos.length}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* ================= CONTROLES DE BÚSQUEDA Y FILTROS ================= */}
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
+          
+          {/* Buscador */}
+          <div className="relative flex-1 max-w-md">
+            <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Buscar por arete, nombre, medicamento o vet..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-xs md:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+            />
+          </div>
+
+          {/* Filtros: Vía y Fecha */}
+          <div className="flex flex-wrap items-center gap-3">
+            
+            {/* Desplegable de Vía */}
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
+              <Filter size={16} className="text-slate-400 shrink-0" />
+              <label htmlFor="select-via" className="text-xs font-semibold text-slate-500 shrink-0">
+                Vía:
+              </label>
+              <select
+                id="select-via"
+                value={filterVia}
+                onChange={(e) => setFilterVia(e.target.value)}
+                className="bg-transparent text-xs md:text-sm font-medium text-slate-700 focus:outline-none cursor-pointer"
+              >
+                <option value="Todas">Todas</option>
+                <option value="Intramuscular">Intramuscular</option>
+                <option value="Subcutánea">Subcutánea</option>
+                <option value="Oral">Oral</option>
+                <option value="Tópica">Tópica</option>
+                <option value="Intrauterina">Intrauterina</option>
+                <option value="Local">Local</option>
+              </select>
+            </div>
+
+            {/* Filtro por Fecha */}
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
+              <Calendar size={16} className="text-slate-400 shrink-0" />
+              <label htmlFor="input-fecha" className="text-xs font-semibold text-slate-500 shrink-0">
+                Fecha:
+              </label>
+              <input
+                id="input-fecha"
+                type="date"
+                value={filterFecha}
+                onChange={(e) => setFilterFecha(e.target.value)}
+                className="bg-transparent text-xs md:text-sm font-medium text-slate-700 focus:outline-none cursor-pointer"
+              />
+              {filterFecha && (
+                <button
+                  type="button"
+                  onClick={() => setFilterFecha('')}
+                  className="text-slate-400 hover:text-rose-500 p-0.5 rounded-full transition-colors cursor-pointer"
+                  title="Limpiar fecha"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+          </div>
+        </div>
+
+        {/* ================= TABLA / LISTADO DE TRATAMIENTOS ================= */}
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs md:text-sm">
               <thead>
-                <tr style={{ backgroundColor: '#fafafa', borderBottom: '1px solid #e4e4e7' }}>
-                  <th style={{ padding: '14px 20px', fontSize: '13px', fontWeight: '600', color: '#71717a' }}>Bovino (Arete)</th>
-                  <th style={{ padding: '14px 20px', fontSize: '13px', fontWeight: '600', color: '#71717a' }}>Medicamento / Dosis</th>
-                  <th style={{ padding: '14px 20px', fontSize: '13px', fontWeight: '600', color: '#71717a' }}>Vía Adm.</th>
-                  <th style={{ padding: '14px 20px', fontSize: '13px', fontWeight: '600', color: '#71717a' }}>Diagnóstico / Motivo</th>
-                  <th style={{ padding: '14px 20px', fontSize: '13px', fontWeight: '600', color: '#71717a' }}>Fecha Aplic.</th>
-                  <th style={{ padding: '14px 20px', fontSize: '13px', fontWeight: '600', color: '#71717a', textAlign: 'center' }}>Estado Retiro</th>
+                <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-semibold uppercase text-[11px] tracking-wider">
+                  <th className="py-4 px-6">Bovino / Arete</th>
+                  <th className="py-4 px-6">Medicamento / Dosis</th>
+                  <th className="py-4 px-6">Vía</th>
+                  <th className="py-4 px-6">Fecha Aplicación</th>
+                  <th className="py-4 px-6">Tiempo Retiro</th>
+                  <th className="py-4 px-6">Veterinario / Motivo</th>
+                  <th className="py-4 px-6 text-right">Acciones</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
                 {loading ? (
                   <tr>
-                    <td colSpan={6} style={{ padding: '30px', textAlign: 'center', color: '#71717a' }}>Cargando historial clínico...</td>
+                    <td colSpan={7} className="text-center py-12 text-slate-400">
+                      <div className="flex justify-center items-center gap-2">
+                        <Loader2 className="animate-spin text-emerald-600" size={20} />
+                        <span>Cargando datos desde la base de datos...</span>
+                      </div>
+                    </td>
                   </tr>
-                ) : tratamientos.length === 0 ? (
+                ) : paginatedTratamientos.length === 0 ? (
                   <tr>
-                    <td colSpan={6} style={{ padding: '30px', textAlign: 'center', color: '#71717a' }}>No hay tratamientos registrados todavía.</td>
+                    <td colSpan={7} className="text-center py-12 text-slate-400">
+                      No se encontraron registros de tratamientos con los filtros seleccionados.
+                    </td>
                   </tr>
                 ) : (
-                  tratamientos.map((tr) => {
-                    const estadoRetiro = evaluarEstadoRetiro(tr.fecha_aplicacion, tr.tiempo_retiro)
+                  paginatedTratamientos.map((t) => {
+                    const enRetiro = isEnRetiro(t.fecha_aplicacion, t.tiempo_retiro);
+
                     return (
-                      <tr key={tr.id} style={{ borderBottom: '1px solid #f4f4f5', transition: 'background-color 0.15s ease' }}>
-                        <td style={{ padding: '14px 20px', fontSize: '14px' }}>
-                          <span style={{ fontWeight: '700', color: '#09090b', display: 'block' }}>{tr.bovinos?.arete || 'S/N'}</span>
-                          <span style={{ fontSize: '12px', color: '#71717a' }}>{tr.bovinos?.nombre ? `${tr.bovinos.nombre} (${tr.bovinos.raza})` : tr.bovinos?.raza || ''}</span>
+                      <tr key={t.id} className="hover:bg-slate-50/60 transition-colors">
+                        {/* Bovino */}
+                        <td className="py-4 px-6">
+                          <div className="font-bold text-slate-900">
+                            {t.bovino?.arete || 'Sin arete'}
+                          </div>
+                          <div className="text-xs text-slate-400">
+                            {t.bovino?.nombre ? t.bovino.nombre : 'Sin nombre asignado'}
+                          </div>
                         </td>
-                        <td style={{ padding: '14px 20px', fontSize: '14px' }}>
-                          <span style={{ fontWeight: '600', color: '#27272a', display: 'block' }}>{tr.medicamento}</span>
-                          <span style={{ fontSize: '12px', color: '#a1a1aa' }}>Cant: {tr.dosis}</span>
-                        </td>
-                        <td style={{ padding: '14px 20px', fontSize: '13px', color: '#27272a' }}>{tr.via}</td>
-                        <td style={{ padding: '14px 20px', fontSize: '13px', color: '#52525b', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {tr.motivo || 'N/A'}
-                        </td>
-                        <td style={{ padding: '14px 20px', fontSize: '14px', color: '#27272a' }}>{tr.fecha_aplicacion}</td>
-                        <td style={{ padding: '14px 20px', textAlign: 'center' }}>
-                          <span style={{ 
-                            padding: '6px 12px', 
-                            borderRadius: '20px', 
-                            backgroundColor: estadoRetiro.colorBg, 
-                            color: estadoRetiro.colorText, 
-                            fontWeight: '700',
-                            fontSize: '11px',
-                            display: 'inline-block',
-                            whiteSpace: 'nowrap'
-                          }}>
-                            {estadoRetiro.label}
+
+                        {/* Medicamento */}
+                        <td className="py-4 px-6">
+                          <div className="font-semibold text-slate-900">{t.medicamento}</div>
+                          <span className="inline-block px-2 py-0.5 bg-slate-100 rounded text-[11px] text-slate-600 font-mono mt-0.5">
+                            {t.dosis}
                           </span>
                         </td>
+
+                        {/* Vía */}
+                        <td className="py-4 px-6">
+                          <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200/60">
+                            {t.via}
+                          </span>
+                        </td>
+
+                        {/* Fecha */}
+                        <td className="py-4 px-6 text-slate-600 whitespace-nowrap">
+                          <div className="flex items-center gap-1.5">
+                            <Calendar size={14} className="text-slate-400" />
+                            <span>{t.fecha_aplicacion}</span>
+                          </div>
+                        </td>
+
+                        {/* Tiempo Retiro */}
+                        <td className="py-4 px-6">
+                          {t.tiempo_retiro > 0 ? (
+                            <div className="space-y-1">
+                              <span
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${
+                                  enRetiro
+                                    ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                                    : 'bg-slate-100 text-slate-600'
+                                }`}
+                              >
+                                <Clock size={12} />
+                                {t.tiempo_retiro} días
+                              </span>
+                              {enRetiro && (
+                                <div className="text-[10px] text-amber-600 font-semibold">
+                                  Restringido
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 text-xs">Sin retiro</span>
+                          )}
+                        </td>
+
+                        {/* Veterinario / Motivo */}
+                        <td className="py-4 px-6">
+                          <div className="flex items-center gap-1 text-slate-800 font-medium">
+                            <UserCheck size={14} className="text-slate-400" />
+                            {t.veterinario}
+                          </div>
+                          {t.motivo && (
+                            <div className="text-xs text-slate-400 truncate max-w-xs mt-0.5">
+                              {t.motivo}
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Acciones */}
+                        <td className="py-4 px-6 text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => handleOpenEditModal(t)}
+                              className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer"
+                              title="Editar"
+                            >
+                              <Pencil size={16} />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(t.id)}
+                              className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                              title="Eliminar"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
                       </tr>
-                    )
+                    );
                   })
                 )}
               </tbody>
             </table>
           </div>
-        </div>
 
-        {/* REGISTRO DE TRATAMIENTO */}
-        <div style={{ 
-          backgroundColor: '#ffffff', 
-          border: '1px solid #e4e4e7', 
-          borderRadius: '16px', 
-          padding: '24px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-          boxSizing: 'border-box'
-        }}>
-          <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: '700', color: '#09090b' }}>💉 Aplicar Tratamiento</h3>
-          
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            
-            {/* Selector de Bovino */}
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#71717a', marginBottom: '6px' }}>Seleccionar Bovino</label>
-              <select 
-                value={bovinoId} 
-                onChange={(e) => setBovinoId(e.target.value)}
-                style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e4e4e7', fontSize: '14px', outline: 'none', boxSizing: 'border-box', backgroundColor: '#ffffff' }}
-                required 
+          {/* ================= BARRA DE PAGINACIÓN ================= */}
+          <div className="bg-slate-50/80 px-6 py-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="text-xs text-slate-500">
+              Mostrando{' '}
+              <span className="font-semibold text-slate-700">
+                {filteredTratamientos.length > 0 ? startIndex + 1 : 0}
+              </span>{' '}
+              a{' '}
+              <span className="font-semibold text-slate-700">
+                {Math.min(startIndex + ITEMS_PER_PAGE, filteredTratamientos.length)}
+              </span>{' '}
+              de{' '}
+              <span className="font-semibold text-slate-700">
+                {filteredTratamientos.length}
+              </span>{' '}
+              tratamientos
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1 || loading}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-white hover:border-slate-300 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer shadow-2xs"
               >
-                <option value="">-- Seleccione un animal --</option>
-                {bovinos.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    Arete: {b.arete} {b.nombre ? `- ${b.nombre}` : ''} ({b.raza})
-                  </option>
-                ))}
-              </select>
-            </div>
+                <ChevronLeft size={16} />
+                <span>Atrás</span>
+              </button>
 
-            {/* Medicamento */}
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#71717a', marginBottom: '6px' }}>Medicamento / Biológico</label>
-              <input 
-                type="text" 
-                placeholder="Ej. Penicilina G" 
-                value={medicamento} 
-                onChange={(e) => setMedicamento(e.target.value)}
-                style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e4e4e7', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }}
-                required 
-              />
-            </div>
+              <span className="text-xs font-semibold text-slate-700">
+                Página {currentPage} de {totalPages || 1}
+              </span>
 
-            {/* Dosis y Vía de Administración */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '12px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#71717a', marginBottom: '6px' }}>Dosis</label>
-                <input 
-                  type="text" 
-                  placeholder="Ej. 15 ml" 
-                  value={dosis} 
-                  onChange={(e) => setDosis(e.target.value)}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e4e4e7', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }}
-                  required 
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#71717a', marginBottom: '6px' }}>Vía</label>
-                <select 
-                  value={via} 
-                  onChange={(e) => setVia(e.target.value as any)}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e4e4e7', fontSize: '14px', outline: 'none', boxSizing: 'border-box', backgroundColor: '#ffffff' }}
-                >
-                  <option value="Intramuscular">Intramuscular</option>
-                  <option value="Subcutánea">Subcutánea</option>
-                  <option value="Oral">Oral</option>
-                  <option value="Tópica">Tópica</option>
-                  <option value="Intravenosa">Intravenosa</option>
-                  <option value="Rectal">Rectal</option>
-                  <option value="Intramamaria">Intramamaria</option>
-                  <option value="Intraruminal">Intraruminal</option>
-                  <option value="Intraperitoneal">Intraperitoneal</option>
-                  <option value="Ocular">Ocular</option>
-                  <option value="Intradérmica">Intradérmica</option>
-                </select>
-              </div>
+              <button
+                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                disabled={currentPage >= totalPages || totalPages === 0 || loading}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-white hover:border-slate-300 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer shadow-2xs"
+              >
+                <span>Siguiente</span>
+                <ChevronRight size={16} />
+              </button>
             </div>
-
-            {/* Fecha y Tiempo de Retiro */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#71717a', marginBottom: '6px' }}>Fecha Aplicación</label>
-                <input 
-                  type="date" 
-                  value={fechaAplicacion} 
-                  onChange={(e) => setFechaAplicacion(e.target.value)}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e4e4e7', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }}
-                  required 
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#71717a', marginBottom: '6px' }}>Retiro (Días)</label>
-                <input 
-                  type="number" 
-                  min="0"
-                  placeholder="Ej. 5" 
-                  value={tiempoRetiro} 
-                  onChange={(e) => setTiempoRetiro(e.target.value)}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e4e4e7', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }}
-                />
-              </div>
-            </div>
-
-            {/* Veterinario */}
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#71717a', marginBottom: '6px' }}>Responsable / Veterinario</label>
-              <input 
-                type="text" 
-                placeholder="Ej. Dr. Felipe Restrepo" 
-                value={veterinario} 
-                onChange={(e) => setVeterinario(e.target.value)}
-                style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e4e4e7', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }}
-                required 
-              />
-            </div>
-
-            {/* Diagnóstico / Motivo */}
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#71717a', marginBottom: '6px' }}>Diagnóstico / Motivo</label>
-              <textarea 
-                placeholder="Ej. Presenta mastitis en cuarto trasero izquierdo." 
-                value={motivo} 
-                onChange={(e) => setMotivo(e.target.value)}
-                style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e4e4e7', fontSize: '14px', outline: 'none', boxSizing: 'border-box', resize: 'vertical', minHeight: '60px' }}
-              />
-            </div>
-
-            <button 
-              type="submit" 
-              style={{
-                backgroundColor: '#09090b',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '8px',
-                padding: '12px',
-                fontSize: '14px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                marginTop: '8px',
-                transition: 'background-color 0.15s'
-              }}
-            >
-              Registrar Aplicación
-            </button>
-          </form>
+          </div>
         </div>
 
       </div>
+
+      {/* ================= MODAL REGISTRAR / EDITAR TRATAMIENTO ================= */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-2xl rounded-3xl shadow-xl border border-slate-200 overflow-hidden transform transition-all animate-in fade-in zoom-in-95 duration-200">
+            
+            {/* Header Modal */}
+            <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Syringe className="text-emerald-400" size={20} />
+                <h2 className="font-bold text-base md:text-lg">
+                  {editingId ? 'Editar Tratamiento' : 'Registrar Nuevo Tratamiento'}
+                </h2>
+              </div>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="text-slate-400 hover:text-white rounded-full p-1 transition-colors cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Formulario */}
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                
+                {/* Desplegable de Bovinos desde la BD */}
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Seleccionar Bovino <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    required
+                    value={formData.bovino_id}
+                    onChange={(e) => setFormData({ ...formData, bovino_id: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs md:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  >
+                    <option value="" disabled>Seleccione una vaca / bovino</option>
+                    {bovinos.map((bovino) => (
+                      <option key={bovino.id} value={bovino.id}>
+                        {bovino.arete} - {bovino.nombre ? bovino.nombre : 'Sin Nombre'} ({bovino.raza})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Medicamento */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Medicamento <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. Oxitetraciclina"
+                    value={formData.medicamento}
+                    onChange={(e) => setFormData({ ...formData, medicamento: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs md:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  />
+                </div>
+
+                {/* Dosis */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Dosis <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. 10 ml o 1 tableta"
+                    value={formData.dosis}
+                    onChange={(e) => setFormData({ ...formData, dosis: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs md:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  />
+                </div>
+
+                {/* Vía de aplicación */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Vía de Aplicación <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    required
+                    value={formData.via}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        via: e.target.value as ViaAplicacion,
+                      })
+                    }
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs md:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  >
+                    <option value="Intramuscular">Intramuscular</option>
+                    <option value="Subcutánea">Subcutánea</option>
+                    <option value="Oral">Oral</option>
+                    <option value="Tópica">Tópica</option>
+                    <option value="Intrauterina">Intrauterina</option>
+                    <option value="Local">Local</option>
+                  </select>
+                </div>
+
+                {/* Fecha de Aplicación */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Fecha de Aplicación <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.fecha_aplicacion}
+                    onChange={(e) => setFormData({ ...formData, fecha_aplicacion: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs md:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  />
+                </div>
+
+                {/* Tiempo de Retiro (días) */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Tiempo de Retiro (Días)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={formData.tiempo_retiro}
+                    onChange={(e) => setFormData({ ...formData, tiempo_retiro: parseInt(e.target.value) || 0 })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs md:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  />
+                </div>
+
+                {/* Veterinario */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Veterinario / Responsable <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Nombre del veterinario"
+                    value={formData.veterinario}
+                    onChange={(e) => setFormData({ ...formData, veterinario: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs md:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  />
+                </div>
+
+                {/* Motivo */}
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Motivo / Diagnóstico
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="Descripción opcional del diagnóstico o síntoma..."
+                    value={formData.motivo}
+                    onChange={(e) => setFormData({ ...formData, motivo: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs md:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 resize-none"
+                  />
+                </div>
+
+              </div>
+
+              {/* Botones de Acción */}
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md transition-all active:scale-95 cursor-pointer"
+                >
+                  {editingId ? 'Guardar Cambios' : 'Registrar Tratamiento'}
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
-  )
+  );
 }

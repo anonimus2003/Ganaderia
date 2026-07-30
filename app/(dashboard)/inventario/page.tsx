@@ -42,7 +42,6 @@ const ESTADOS_BOVINOS = [
   "Novilla de vientre",
   "En producción",
   "Seca",
-  "Macho"
 ];
 
 // Helper para badges de color por estado
