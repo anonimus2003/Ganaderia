@@ -337,6 +337,13 @@ export default function TratamientosPage() {
                 className="bg-transparent text-xs md:text-sm font-medium text-slate-700 focus:outline-none cursor-pointer"
               >
                 <option value="Todas">Todas</option>
+                <option value="Intravenosa">Intravenosa</option>
+                <option value="Rectal">Rectal</option>
+                <option value="Intramamaria">Intramamaria</option>
+                <option value="Intraruminal">Intraruminal</option>
+                <option value="Intraperitonial">Intraperitonial</option>
+                <option value="Ocular">Ocular</option>
+                <option value="Intradermica">Intradermica</option>
                 <option value="Intramuscular">Intramuscular</option>
                 <option value="Subcutánea">Subcutánea</option>
                 <option value="Oral">Oral</option>
