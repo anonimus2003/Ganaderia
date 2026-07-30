@@ -2,8 +2,23 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { 
+  Milk, 
+  Wheat, 
+  TrendingUp, 
+  ClipboardList, 
+  Pencil, 
+  Trash2, 
+  Search, 
+  Calendar, 
+  Filter, 
+  ChevronLeft, 
+  ChevronRight, 
+  Plus, 
+  X,
+  RotateCcw
+} from 'lucide-react';
 
-// Estructura de la tabla Bovinos
 interface Bovino {
   id: string;
   arete: string;
@@ -12,7 +27,6 @@ interface Bovino {
   estado: string | null;
 }
 
-// Estructura de Producción de Leche
 interface ProduccionLeche {
   id: string;
   bovino_id: string;
@@ -30,59 +44,21 @@ interface ProduccionLeche {
 
 const PAGE_SIZE = 10;
 
-// COMPONENTES DE ICONOS SVG REUTILIZABLES
-const IconMilk = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9 3h6m-5 3h4m-5 0v3.28a1 1 0 01-.293.707L7 11.414A1 1 0 006.707 12.12V19a2 2 0 002 2h8a2 2 0 002-2v-6.88a1 1 0 00-.293-.707l-1.707-1.707A1 1 0 0116 9.28V6H9z" />
-  </svg>
-);
-
-const IconGrain = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v18m0-18c-3 0-6 3-6 7 0 5 6 11 6 11s6-6 6-11c0-4-3-7-6-7z" />
-  </svg>
-);
-
-const IconChart = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-  </svg>
-);
-
-const IconClipboard = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-  </svg>
-);
-
-const IconPencil = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-  </svg>
-);
-
-const IconTrash = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-  </svg>
-);
-
-const IconSearch = () => (
-  <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-  </svg>
-);
-
 export default function DashboardProduccionLeche() {
   const supabase = createClient();
 
-  // Estados
+  // Estados de datos y paginación
   const [registros, setRegistros] = useState<ProduccionLeche[]>([]);
   const [bovinosLista, setBovinosLista] = useState<Bovino[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [page, setPage] = useState<number>(1);
-  const [busqueda, setBusqueda] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
+
+  // Estados de Filtros
+  const [busqueda, setBusqueda] = useState<string>('');
+  const [bovinoFiltroId, setBovinoFiltroId] = useState<string>('');
+  const [fechaInicio, setFechaInicio] = useState<string>('');
+  const [fechaFin, setFechaFin] = useState<string>('');
 
   // Métricas
   const [litrosTotales, setLitrosTotales] = useState<number>(0);
@@ -102,7 +78,7 @@ export default function DashboardProduccionLeche() {
     observaciones: '',
   });
 
-  // 1. CARGAR LISTA COMPLETA DE BOVINOS
+  // 1. Cargar lista completa de bovinos para selectores
   const fetchBovinosLista = useCallback(async () => {
     const { data, error } = await supabase
       .from('bovinos')
@@ -114,7 +90,7 @@ export default function DashboardProduccionLeche() {
     }
   }, [supabase]);
 
-  // 2. CARGAR TABLA CON FILTRO GLOBAL DE BÚSQUEDA
+  // 2. Cargar tabla con paginación de 10 y filtros aplicados
   const fetchTablaDatos = useCallback(async () => {
     setLoading(true);
     const from = (page - 1) * PAGE_SIZE;
@@ -127,9 +103,23 @@ export default function DashboardProduccionLeche() {
       .order('created_at', { ascending: false })
       .range(from, to);
 
+    // Filtro por texto (arete o nombre)
     if (busqueda.trim() !== '') {
       const term = busqueda.trim();
       query = query.or(`arete.ilike.%${term}%,nombre.ilike.%${term}%`, { foreignTable: 'bovinos' });
+    }
+
+    // Filtro por animal específico
+    if (bovinoFiltroId) {
+      query = query.eq('bovino_id', bovinoFiltroId);
+    }
+
+    // Filtro por rango de fechas
+    if (fechaInicio) {
+      query = query.gte('fecha', fechaInicio);
+    }
+    if (fechaFin) {
+      query = query.lte('fecha', fechaFin);
     }
 
     const { data, count, error } = await query;
@@ -139,9 +129,9 @@ export default function DashboardProduccionLeche() {
       setTotalCount(count || 0);
     }
     setLoading(false);
-  }, [page, busqueda, supabase]);
+  }, [page, busqueda, bovinoFiltroId, fechaInicio, fechaFin, supabase]);
 
-  // 3. RECALCULAR MÉTRICAS
+  // 3. Recalcular métricas generales respetando los filtros activos
   const fetchMetricas = useCallback(async () => {
     let query = supabase
       .from('produccion_leche')
@@ -150,6 +140,17 @@ export default function DashboardProduccionLeche() {
     if (busqueda.trim() !== '') {
       const term = busqueda.trim();
       query = query.or(`arete.ilike.%${term}%,nombre.ilike.%${term}%`, { foreignTable: 'bovinos' });
+    }
+
+    if (bovinoFiltroId) {
+      query = query.eq('bovino_id', bovinoFiltroId);
+    }
+
+    if (fechaInicio) {
+      query = query.gte('fecha', fechaInicio);
+    }
+    if (fechaFin) {
+      query = query.lte('fecha', fechaFin);
     }
 
     const { data, error } = await query;
@@ -163,7 +164,7 @@ export default function DashboardProduccionLeche() {
       setConcentradoTotal(totalConcentrado);
       setPromedioOrdeno(promedio);
     }
-  }, [busqueda, supabase]);
+  }, [busqueda, bovinoFiltroId, fechaInicio, fechaFin, supabase]);
 
   useEffect(() => {
     fetchBovinosLista();
@@ -174,7 +175,15 @@ export default function DashboardProduccionLeche() {
     fetchMetricas();
   }, [fetchTablaDatos, fetchMetricas]);
 
-  // BOVINOS FILTRADOS DENTRO DEL MODAL
+  const resetFiltros = () => {
+    setBusqueda('');
+    setBovinoFiltroId('');
+    setFechaInicio('');
+    setFechaFin('');
+    setPage(1);
+  };
+
+  // Filtrado de bovinos dentro del modal
   const bovinosFiltradosModal = useMemo(() => {
     if (!filtroBovinoModal.trim()) return bovinosLista;
     const term = filtroBovinoModal.toLowerCase();
@@ -185,12 +194,11 @@ export default function DashboardProduccionLeche() {
     );
   }, [bovinosLista, filtroBovinoModal]);
 
-  // Animal seleccionado actualmente en el modal
   const bovinoSeleccionado = useMemo(() => {
     return bovinosLista.find((b) => b.id === formData.bovino_id);
   }, [bovinosLista, formData.bovino_id]);
 
-  // 4. GUARDAR / EDITAR CON VALIDACIÓN DE 1 REGISTRO POR JORNADA AL DÍA
+  // Guardar o Editar registro
   const handleSaveRegistro = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -199,7 +207,6 @@ export default function DashboardProduccionLeche() {
       return;
     }
 
-    // VALIDACIÓN: Verificar si ya existe un registro para este animal, fecha y jornada
     let queryDuplicado = supabase
       .from('produccion_leche')
       .select('id')
@@ -207,7 +214,6 @@ export default function DashboardProduccionLeche() {
       .eq('fecha', formData.fecha)
       .eq('jornada', formData.jornada);
 
-    // Si estamos editando, ignoramos el registro actual
     if (editingId) {
       queryDuplicado = queryDuplicado.neq('id', editingId);
     }
@@ -224,7 +230,7 @@ export default function DashboardProduccionLeche() {
         ? `[${bovinoSeleccionado.arete}] ${bovinoSeleccionado.nombre || ''}`
         : 'este animal';
       alert(
-        `⚠️ El animal ${nombreAnimal} ya tiene un registro de ordeño para el día ${formData.fecha} en la jornada de la ${formData.jornada}. Solo se permite 1 registro por jornada al día.`
+        `⚠️ El animal ${nombreAnimal} ya tiene un registro para la fecha ${formData.fecha} en la jornada ${formData.jornada}.`
       );
       return;
     }
@@ -258,7 +264,6 @@ export default function DashboardProduccionLeche() {
     fetchMetricas();
   };
 
-  // 5. ELIMINAR REGISTRO
   const handleDelete = async (id: string) => {
     if (confirm('¿Deseas eliminar este registro de ordeño?')) {
       const { error } = await supabase
@@ -307,24 +312,51 @@ export default function DashboardProduccionLeche() {
 
   return (
     <main className="w-full min-h-screen bg-slate-50 p-3 sm:p-6 space-y-4 sm:space-y-6 font-sans text-slate-800 overflow-x-hidden">
-
-      {/* ENCABEZADO Y BUSCADOR GENERAL */}
+      
+      {/* ENCABEZADO PRINCIPAL */}
       <header className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3 bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-200">
         <div>
-          <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-            Producción de Leche
+          <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+            <Milk className="w-6 h-6 text-emerald-600" /> Producción de Leche
           </h1>
           <p className="text-xs text-slate-500 font-medium">
-            Control de ordeño y concentrado por animal
+            Control de ordeño, concentrado y filtrado por fechas
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
-          {/* BARRA DE BÚSQUEDA GENERAL DE TABLA */}
-          <div className="relative w-full sm:w-64 flex items-center">
-            <span className="absolute left-3">
-              <IconSearch />
-            </span>
+        <button
+          onClick={() => {
+            if (bovinosLista.length > 0 && !formData.bovino_id) {
+              setFormData((prev) => ({ ...prev, bovino_id: bovinosLista[0].id }));
+            }
+            setIsModalOpen(true);
+          }}
+          className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-md shadow-emerald-600/20 transition shrink-0"
+        >
+          <Plus className="w-4 h-4" /> Registrar Leche
+        </button>
+      </header>
+
+      {/* SECCIÓN DE FILTROS AVANZADOS */}
+      <section className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 space-y-3">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+          <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5 uppercase tracking-wider">
+            <Filter className="w-3.5 h-3.5 text-emerald-600" /> Filtros de Consulta
+          </span>
+          {(busqueda || bovinoFiltroId || fechaInicio || fechaFin) && (
+            <button
+              onClick={resetFiltros}
+              className="text-[11px] text-rose-600 hover:text-rose-700 font-semibold flex items-center gap-1 transition"
+            >
+              <RotateCcw className="w-3 h-3" /> Limpiar Filtros
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Buscar por texto */}
+          <div className="relative flex items-center">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3" />
             <input
               type="text"
               placeholder="Buscar por arete o nombre..."
@@ -333,35 +365,69 @@ export default function DashboardProduccionLeche() {
                 setBusqueda(e.target.value);
                 setPage(1);
               }}
-              className="w-full pl-9 pr-7 py-2 text-xs bg-slate-100 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-full pl-9 pr-7 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
             {busqueda && (
               <button
                 onClick={() => { setBusqueda(''); setPage(1); }}
-                className="absolute right-2.5 text-xs text-slate-400 hover:text-slate-600 font-bold"
+                className="absolute right-2.5 text-slate-400 hover:text-slate-600"
               >
-                ✕
+                <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
 
-          <button
-            onClick={() => {
-              if (bovinosLista.length > 0 && !formData.bovino_id) {
-                setFormData(prev => ({ ...prev, bovino_id: bovinosLista[0].id }));
-              }
-              setIsModalOpen(true);
-            }}
-            className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-md shadow-emerald-600/20 transition shrink-0"
-          >
-            <span className="text-sm font-black">+</span> Registrar Leche
-          </button>
-        </div>
-      </header>
+          {/* Filtrar por Bovino Específico */}
+          <div>
+            <select
+              value={bovinoFiltroId}
+              onChange={(e) => {
+                setBovinoFiltroId(e.target.value);
+                setPage(1);
+              }}
+              className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 text-slate-700 font-medium"
+            >
+              <option value="">-- Todos los Animales --</option>
+              {bovinosLista.map((b) => (
+                <option key={b.id} value={b.id}>
+                  [{b.arete}] {b.nombre || 'Sin nombre'}
+                </option>
+              ))}
+            </select>
+          </div>
 
-      {/* TARJETAS DE MÉTRICAS CON ICONOS VECTORIALES */}
+          {/* Fecha Inicio */}
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold text-slate-400 shrink-0">Desde:</span>
+            <input
+              type="date"
+              value={fechaInicio}
+              onChange={(e) => {
+                setFechaInicio(e.target.value);
+                setPage(1);
+              }}
+              className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 text-slate-700"
+            />
+          </div>
+
+          {/* Fecha Fin */}
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold text-slate-400 shrink-0">Hasta:</span>
+            <input
+              type="date"
+              value={fechaFin}
+              onChange={(e) => {
+                setFechaFin(e.target.value);
+                setPage(1);
+              }}
+              className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 text-slate-700"
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* TARJETAS DE MÉTRICAS */}
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {/* Litros Totales */}
         <div className="bg-white p-3.5 sm:p-5 rounded-2xl shadow-sm border border-slate-200 flex justify-between items-center">
           <div className="min-w-0">
             <p className="text-[10px] sm:text-[11px] uppercase font-bold tracking-wider text-slate-400 truncate">
@@ -373,11 +439,10 @@ export default function DashboardProduccionLeche() {
             </div>
           </div>
           <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
-            <IconMilk />
+            <Milk className="w-5 h-5" />
           </div>
         </div>
 
-        {/* Concentrado Total */}
         <div className="bg-white p-3.5 sm:p-5 rounded-2xl shadow-sm border border-slate-200 flex justify-between items-center">
           <div className="min-w-0">
             <p className="text-[10px] sm:text-[11px] uppercase font-bold tracking-wider text-slate-400 truncate">
@@ -389,11 +454,10 @@ export default function DashboardProduccionLeche() {
             </div>
           </div>
           <div className="p-3 bg-amber-50 text-amber-600 rounded-xl">
-            <IconGrain />
+            <Wheat className="w-5 h-5" />
           </div>
         </div>
 
-        {/* Promedio por Ordeño */}
         <div className="bg-white p-3.5 sm:p-5 rounded-2xl shadow-sm border border-slate-200 flex justify-between items-center">
           <div className="min-w-0">
             <p className="text-[10px] sm:text-[11px] uppercase font-bold tracking-wider text-slate-400 truncate">
@@ -405,11 +469,10 @@ export default function DashboardProduccionLeche() {
             </div>
           </div>
           <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
-            <IconChart />
+            <TrendingUp className="w-5 h-5" />
           </div>
         </div>
 
-        {/* Total Registros */}
         <div className="bg-white p-3.5 sm:p-5 rounded-2xl shadow-sm border border-slate-200 flex justify-between items-center">
           <div className="min-w-0">
             <p className="text-[10px] sm:text-[11px] uppercase font-bold tracking-wider text-slate-400 truncate">
@@ -420,12 +483,12 @@ export default function DashboardProduccionLeche() {
             </div>
           </div>
           <div className="p-3 bg-slate-100 text-slate-600 rounded-xl">
-            <IconClipboard />
+            <ClipboardList className="w-5 h-5" />
           </div>
         </div>
       </section>
 
-      {/* TABLA PRINCIPAL DE HISTORIAL */}
+      {/* TABLA PRINCIPAL DE HISTORIAL DE REGISTROS */}
       <section className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
         <div className="flex justify-between items-center border-b border-slate-100 pb-3">
           <div>
@@ -456,7 +519,7 @@ export default function DashboardProduccionLeche() {
               {registros.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-8 text-center text-slate-400">
-                    {loading ? 'Consultando registros...' : 'No se encontraron resultados.'}
+                    {loading ? 'Consultando registros...' : 'No se encontraron resultados para los filtros seleccionados.'}
                   </td>
                 </tr>
               ) : (
@@ -484,8 +547,6 @@ export default function DashboardProduccionLeche() {
                     <td className="py-3 px-3 text-right font-black text-slate-900 text-sm whitespace-nowrap">
                       {item.litros} L
                     </td>
-
-                    {/* BOTONES CON ICONOS PARA EDITAR Y ELIMINAR */}
                     <td className="py-3 px-3 text-center whitespace-nowrap">
                       <div className="flex items-center justify-center gap-1.5">
                         <button
@@ -493,14 +554,14 @@ export default function DashboardProduccionLeche() {
                           title="Editar registro"
                           className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition"
                         >
-                          <IconPencil />
+                          <Pencil className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleDelete(item.id)}
                           title="Eliminar registro"
                           className="p-1.5 text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg transition"
                         >
-                          <IconTrash />
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </td>
@@ -511,35 +572,35 @@ export default function DashboardProduccionLeche() {
           </table>
         </div>
 
-        {/* PAGINACIÓN */}
+        {/* PAGINACIÓN CON BOTONES ANTERIOR Y SIGUIENTE */}
         <footer className="flex flex-col sm:flex-row justify-between items-center gap-3 pt-3">
           <p className="text-xs text-slate-500 font-medium text-center sm:text-left">
             Página <span className="font-extrabold text-slate-800">{page}</span> de{' '}
             <span className="font-extrabold text-slate-800">{totalPaginas}</span>{' '}
-            ({totalCount} registros)
+            ({totalCount} registros encontrados)
           </p>
 
           <div className="flex gap-2 w-full sm:w-auto justify-center">
             <button
               onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
               disabled={page === 1 || loading}
-              className="flex-1 sm:flex-initial px-4 py-2 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl transition"
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-1 px-4 py-2 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl transition"
             >
-              ← Atrás
+              <ChevronLeft className="w-4 h-4" /> Anterior
             </button>
 
             <button
               onClick={() => setPage((prev) => Math.min(prev + 1, totalPaginas))}
               disabled={page >= totalPaginas || loading}
-              className="flex-1 sm:flex-initial px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl transition"
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-1 px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl transition"
             >
-              Siguiente →
+              Siguiente <ChevronRight className="w-4 h-4" />
             </button>
           </div>
         </footer>
       </section>
 
-      {/* MODAL REGISTRO / EDICIÓN CON BUSCADOR DE ANIMAL MEJORADO */}
+      {/* MODAL REGISTRO / EDICIÓN */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex justify-center items-center p-3 sm:p-4 z-50">
           <div className="bg-white w-full max-w-md rounded-2xl shadow-xl p-5 space-y-4 max-h-[90vh] overflow-y-auto">
@@ -548,22 +609,18 @@ export default function DashboardProduccionLeche() {
                 {editingId ? 'Editar Registro' : 'Nuevo Registro de Ordeño'}
               </h3>
               <button onClick={closeModal} className="text-slate-400 hover:text-slate-600 font-bold p-1">
-                ✕
+                <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleSaveRegistro} className="space-y-3">
-              {/* SELECCIÓN Y BÚSQUEDA DE ANIMAL */}
               <div className="space-y-1.5">
                 <label className="block text-xs font-bold text-slate-600">
                   Buscar y Seleccionar Bovino
                 </label>
                 
-                {/* Campo para filtrar por arete o nombre */}
                 <div className="relative flex items-center">
-                  <span className="absolute left-2.5">
-                    <IconSearch />
-                  </span>
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5" />
                   <input
                     type="text"
                     placeholder="Filtrar por arete o nombre..."
@@ -573,7 +630,6 @@ export default function DashboardProduccionLeche() {
                   />
                 </div>
 
-                {/* Desplegable que responde al filtro */}
                 <select
                   required
                   value={formData.bovino_id}
@@ -585,7 +641,7 @@ export default function DashboardProduccionLeche() {
                   </option>
                   {bovinosFiltradosModal.map((b) => (
                     <option key={b.id} value={b.id}>
-                      [{b.arete}] {b.nombre || 'Sin Nombre'} - ({b.raza})
+                      [{b.arete}]{b.nombre ? ` ${b.nombre}` : ''}
                     </option>
                   ))}
                 </select>
@@ -597,7 +653,6 @@ export default function DashboardProduccionLeche() {
                 )}
               </div>
 
-              {/* FECHA Y JORNADA */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1">Fecha</label>
@@ -623,7 +678,6 @@ export default function DashboardProduccionLeche() {
                 </div>
               </div>
 
-              {/* LITROS Y CONCENTRADO */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1">Litros de Leche</label>
@@ -651,7 +705,6 @@ export default function DashboardProduccionLeche() {
                 </div>
               </div>
 
-              {/* OBSERVACIONES */}
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1">Observaciones</label>
                 <textarea
@@ -663,7 +716,6 @@ export default function DashboardProduccionLeche() {
                 />
               </div>
 
-              {/* BOTONES DE ACCIÓN */}
               <div className="flex justify-end gap-2 pt-3 border-t">
                 <button
                   type="button"

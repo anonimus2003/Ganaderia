@@ -266,7 +266,7 @@ export default function InventarioBovinosDashboard() {
           </div>
           <div className="flex justify-between items-center z-10">
             <span className="text-xs font-bold uppercase tracking-widest bg-white/20 text-white px-3 py-1 rounded-full backdrop-blur-sm">
-              SENA - Supabase Sync
+              Supabase Sync
             </span>
             <button 
               onClick={fetchBovinos} 
@@ -344,7 +344,7 @@ export default function InventarioBovinosDashboard() {
                 onChange={(e) => setSelectedEstado(e.target.value)}
                 className="bg-transparent text-xs font-semibold text-slate-700 focus:outline-none cursor-pointer"
               >
-                <option value="Todos">Etapa / Estado: Todos</option>
+                <option value="Todos">Etapa: Todos</option>
                 {ESTADOS_BOVINOS.map((est) => (
                   <option key={est} value={est}>{est}</option>
                 ))}
