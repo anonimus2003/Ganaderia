@@ -654,6 +654,14 @@ export default function TratamientosPage() {
                     }
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs md:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                   >
+                    
+                     <option value="Intravenosa">Intravenosa</option>
+                    <option value="Rectal">Rectal</option>
+                    <option value="Intramamaria">Intramamaria</option>
+                    <option value="Intraruminal">Intraruminal</option>
+                    <option value="Intraperitonial">Intraperitonial</option>
+                    <option value="Ocular">Ocular</option>
+                    <option value="Intradermica">Intradermica</option>
                     <option value="Intramuscular">Intramuscular</option>
                     <option value="Subcutánea">Subcutánea</option>
                     <option value="Oral">Oral</option>
