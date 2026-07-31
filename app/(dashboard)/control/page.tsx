@@ -1,498 +1,514 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
+import React, { useState, useEffect, useMemo } from 'react';
+import { createClient } from "@/lib/supabase/client";
+import { 
+  TrendingUp, 
+  FileText, 
+  ChevronDown, 
+  Award, 
+  Syringe, 
+  Activity,
+  Calendar,
+  Loader2
+} from 'lucide-react';
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+} from 'recharts';
 
-// Interfaces de Base de Datos
-export interface Bovino {
-  id: string
-  arete: string
-  nombre?: string
-  raza: string
-  genero: string
-  peso_inicial: number
-  fecha_nacimiento?: string
-  observaciones?: string
-  estado?: string
+// --- CONFIGURACIÓN DE SUPABASE ---
+// Reemplaza con tus variables de entorno (.env.local)
+const supabase = createClient();
+
+// --- TIPOS DE DATOS DE TU BASE DE DATOS ---
+interface Bovino {
+  id: string;
+  arete: string;
+  nombre: string | null;
+  raza: string;
+  genero: string;
+  peso_inicial: number;
+  fecha_nacimiento: string | null;
+  estado: string | null;
+  observaciones: string | null;
 }
 
-export interface ProduccionLeche {
-  id: string
-  bovino_id: string
-  fecha: string
-  litros: number
-  jornada: string
-  concentrado_kg?: number
-  observaciones?: string
+interface ProduccionLeche {
+  id: string;
+  bovino_id: string;
+  fecha: string;
+  litros: number;
+  jornada: 'Mañana' | 'Tarde';
+  concentrado_kg: number | null;
 }
 
-export interface Inseminacion {
-  id: string
-  vaca_id: string
-  fecha: string
-  toro_pajuela?: string
-  tipo?: string
-  inseminador?: string
-  confirmado?: boolean
-  observaciones?: string
+interface Tratamiento {
+  id: string;
+  bovino_id: string;
+  medicamento: string;
+  dosis: string;
+  via: string;
+  fecha_aplicacion: string;
+  tiempo_retiro: number;
+  veterinario: string;
+  motivo: string | null;
 }
 
-export default function DashboardPage() {
-  const supabase = createClient()
-
-  // Estados de carga e inventario
-  const [bovinos, setBovinos] = useState<Bovino[]>([])
-  const [selectedBovinoId, setSelectedBovinoId] = useState<string>('')
-  const [loading, setLoading] = useState<boolean>(true)
-  const [loadingDetalles, setLoadingDetalles] = useState<boolean>(false)
-
-  // Datos del bovino seleccionado (Hoja de Vida)
-  const [bovinoActual, setBovinoActual] = useState<Bovino | null>(null)
-  const [producciones, setProducciones] = useState<ProduccionLeche[]>([])
-  const [inseminaciones, setInseminaciones] = useState<Inseminacion[]>([])
-
-  // Cargar lista general de bovinos
-  useEffect(() => {
-    async function loadBovinos() {
-      try {
-        setLoading(true)
-        const { data, error } = await supabase
-          .from('bovinos')
-          .select('*')
-          .order('arete', { ascending: true })
-
-        if (error) console.error('Error cargando bovinos:', error.message)
-        else setBovinos(data || [])
-      } catch (err) {
-        console.error('Error al consultar bovinos:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-    loadBovinos()
-  }, [])
-
-  // Cargar toda la información de la vaca seleccionada
-  useEffect(() => {
-    if (!selectedBovinoId) {
-      setBovinoActual(null)
-      setProducciones([])
-      setInseminaciones([])
-      return
-    }
-
-    async function fetchHojaDeVida() {
-      setLoadingDetalles(true)
-      try {
-        // 1. Datos básicos del bovino
-        const bActual = bovinos.find((b) => b.id === selectedBovinoId) || null
-        setBovinoActual(bActual)
-
-        // 2. Historial de Producción de Leche
-        const { data: prodData } = await supabase
-          .from('produccion_leche')
-          .select('*')
-          .eq('bovino_id', selectedBovinoId)
-          .order('fecha', { ascending: true })
-
-        setProducciones(prodData || [])
-
-        // 3. Historial de Inseminaciones
-        const { data: insemData } = await supabase
-          .from('inseminaciones')
-          .select('*')
-          .eq('vaca_id', selectedBovinoId)
-          .order('fecha', { ascending: false })
-
-        setInseminaciones(insemData || [])
-      } catch (err) {
-        console.error('Error cargando la Hoja de Vida:', err)
-      } finally {
-        setLoadingDetalles(false)
-      }
-    }
-
-    fetchHojaDeVida()
-  }, [selectedBovinoId, bovinos])
-
-  // --- CÁLCULOS Y MÉTRICAS DE LA VACA SELECCIONADA ---
-  const totalLitros = producciones.reduce((acc, curr) => acc + Number(curr.litros || 0), 0)
-
-  // Agrupar litros por fecha (ordenadas cronológicamente)
-  const diasConProduccion = Array.from(new Set(producciones.map((p) => p.fecha))).sort()
-
-  const promedioDiario =
-    diasConProduccion.length > 0
-      ? (totalLitros / diasConProduccion.length).toFixed(1)
-      : '0.0'
-
-  // Estimación de Fecha de Parto / Inicio Lactancia (primer registro de leche)
-  const primeraFechaProd =
-    diasConProduccion.length > 0 ? new Date(diasConProduccion[0]) : null
-  const hoy = new Date()
-  const diasEnLactancia = primeraFechaProd
-    ? Math.floor((hoy.getTime() - primeraFechaProd.getTime()) / (1000 * 3600 * 24))
-    : 0
-
-  // Máximo diario para calcular la escala Y del gráfico
-  const maxLitrosDia = Math.max(
-    ...diasConProduccion.map((f) =>
-      producciones.filter((p) => p.fecha === f).reduce((a, c) => a + Number(c.litros), 0)
-    ),
-    10
-  )
-
-  // Configuración dinámica del lienzo SVG
-  const svgWidth = Math.max(600, diasConProduccion.length * 70) // Garantiza espacio por cada día
-  const svgHeight = 260
-  const margin = { top: 35, right: 30, bottom: 65, left: 45 }
-  const chartWidth = svgWidth - margin.left - margin.right
-  const chartHeight = svgHeight - margin.top - margin.bottom
-
-  return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '16px' }}>
-      
-      {/* BARRA DE FILTRO POR VACA */}
-      <div style={{
-        backgroundColor: '#ffffff',
-        border: '1px solid #e4e4e7',
-        borderRadius: '16px',
-        padding: '20px 24px',
-        marginBottom: '24px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-        display: 'flex',
-        flexWrap: 'wrap',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: '16px'
-      }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#09090b' }}>
-            🔍 Filtrar Hoja de Vida e Historial Por Vaca
-          </h2>
-          <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#71717a' }}>
-            Selecciona un animal para ver su curva de lactancia individual, producción y eventos.
-          </p>
-        </div>
-
-        <div style={{ minWidth: '280px' }}>
-          <select
-            value={selectedBovinoId}
-            onChange={(e) => setSelectedBovinoId(e.target.value)}
-            disabled={loading}
-            style={{
-              width: '100%',
-              padding: '10px 14px',
-              borderRadius: '8px',
-              border: '1px solid #d4d4d8',
-              backgroundColor: '#f8fafc',
-              fontSize: '14px',
-              fontWeight: '600',
-              color: '#09090b',
-              outline: 'none',
-              cursor: 'pointer'
-            }}
-          >
-            <option value="">-- Ver Hato General (Todas) --</option>
-            {bovinos.map((b) => (
-              <option key={b.id} value={b.id}>
-                Arete: {b.arete} {b.nombre ? `- ${b.nombre}` : ''} ({b.estado || 'Sin estado'})
-              </option>
-            ))}
-          </select>
+// Tooltip flotante con estilo oscuro / neón tipo Google Finanzas
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-zinc-900/95 border border-emerald-500/50 p-3 rounded-lg shadow-2xl backdrop-blur-md font-sans">
+        <p className="text-xs text-zinc-400 font-mono mb-1">{label}</p>
+        <div className="flex items-center gap-2">
+          <span className="text-base">🥛</span>
+          <span className="text-lg font-extrabold text-emerald-400">
+            {Number(payload[0].value).toFixed(1)} <span className="text-xs font-normal text-zinc-300">Lts</span>
+          </span>
         </div>
       </div>
+    );
+  }
+  return null;
+};
 
-      {/* DETALLES DE LA VACA SELECCIONADA */}
-      {selectedBovinoId && bovinoActual ? (
-        loadingDetalles ? (
-          <p style={{ fontSize: '14px', color: '#71717a' }}>Cargando Hoja de Vida...</p>
+export default function AnimalDashboardPage() {
+  // Estados de datos
+  const [bovinos, setBovinos] = useState<Bovino[]>([]);
+  const [selectedBovinoId, setSelectedBovinoId] = useState<string>('');
+  const [produccion, setProduccion] = useState<ProduccionLeche[]>([]);
+  const [tratamientos, setTratamientos] = useState<Tratamiento[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  // Estados de UI
+  const [timeframe, setTimeframe] = useState<'days' | 'month' | 'year'>('days');
+  const [activeTab, setActiveTab] = useState<'metrics' | 'resume'>('metrics');
+
+  // 1. Cargar lista de bovinos al montar la página
+  useEffect(() => {
+    async function fetchBovinos() {
+      setLoading(true);
+      const { data, error } = await supabase.from('bovinos').select('*').order('created_at', { ascending: false });
+      if (!error && data && data.length > 0) {
+        setBovinos(data);
+        setSelectedBovinoId(data[0].id); // Seleccionar el primero por defecto
+      }
+      setLoading(false);
+    }
+    fetchBovinos();
+  }, []);
+
+  // 2. Cargar producción de leche y tratamientos cuando cambia el bovino seleccionado
+  useEffect(() => {
+    if (!selectedBovinoId) return;
+
+    async function fetchAnimalDetails() {
+      setLoading(true);
+      
+      // Consultar ordeños
+      const { data: prodData } = await supabase
+        .from('produccion_leche')
+        .select('*')
+        .eq('bovino_id', selectedBovinoId)
+        .order('fecha', { ascending: true });
+
+      // Consultar medicamentos / tratamientos
+      const { data: tratData } = await supabase
+        .from('tratamientos')
+        .select('*')
+        .eq('bovino_id', selectedBovinoId)
+        .order('fecha_aplicacion', { ascending: false });
+
+      if (prodData) setProduccion(prodData);
+      if (tratData) setTratamientos(tratData);
+      setLoading(false);
+    }
+
+    fetchAnimalDetails();
+  }, [selectedBovinoId]);
+
+  // Bovino actualmente seleccionado
+  const selectedBovino = bovinos.find((b) => b.id === selectedBovinoId);
+
+  // --- AGRUPACIÓN DINÁMICA DE DATOS (Días / Meses / Años) ---
+  const chartData = useMemo(() => {
+    if (!produccion || produccion.length === 0) return [];
+
+    const groupedMap = new Map<string, number>();
+
+    produccion.forEach((item) => {
+      const dateObj = new Date(item.fecha);
+      let key = '';
+
+      if (timeframe === 'days') {
+        // Formato: 25/07
+        key = item.fecha; 
+      } else if (timeframe === 'month') {
+        // Formato: 2026-07 (Año-Mes)
+        const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+        key = `${monthNames[dateObj.getUTCMonth()]} ${dateObj.getUTCFullYear()}`;
+      } else if (timeframe === 'year') {
+        // Formato: 2026
+        key = `${dateObj.getUTCFullYear()}`;
+      }
+
+      const currentLiters = groupedMap.get(key) || 0;
+      groupedMap.set(key, currentLiters + Number(item.litros));
+    });
+
+    // Convertir Map a Array para Recharts
+    return Array.from(groupedMap.entries()).map(([fecha, litros]) => ({
+      fecha,
+      litros: Number(litros.toFixed(2)),
+    }));
+  }, [produccion, timeframe]);
+
+  // --- CÁLCULOS DE KPI Y METRICAS ---
+  const totalProducido = useMemo(() => {
+    return produccion.reduce((acc, curr) => acc + Number(curr.litros), 0);
+  }, [produccion]);
+
+  // Fechas únicas con ordeño
+  const diasConOrdeno = useMemo(() => {
+    const uniqueDates = new Set(produccion.map((p) => p.fecha));
+    return uniqueDates.size;
+  }, [produccion]);
+
+  const promedioDiario = useMemo(() => {
+    return diasConOrdeno > 0 ? (totalProducido / diasConOrdeno).toFixed(1) : '0.0';
+  }, [totalProducido, diasConOrdeno]);
+
+  // Días en Lactancia (DEL) = Días transcurridos desde el 1er ordeño
+  const diasEnLactancia = useMemo(() => {
+    if (produccion.length === 0) return { del: 0, fechaPrimerOrdeno: 'N/A' };
+    
+    // Como está ordenado por fecha ascendente:
+    const primerOrdeno = new Date(produccion[0].fecha);
+    const hoy = new Date();
+    
+    const diffTime = Math.abs(hoy.getTime() - primerOrdeno.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    return {
+      del: diffDays,
+      fechaPrimerOrdeno: produccion[0].fecha,
+    };
+  }, [produccion]);
+
+  return (
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 p-4 md:p-8 font-sans">
+      <div className="max-w-7xl mx-auto space-y-6">
+
+        {/* Header con Selección de Animal y Filtros */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-800 pb-5">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+              <span className="text-emerald-400">🐄</span> Control de Producción y Ganado
+            </h1>
+            <p className="text-sm text-zinc-400">Análisis dinámico de ordeño e historial de salud</p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Selector de Animal de la BD */}
+            <div className="relative">
+              <select
+                value={selectedBovinoId}
+                onChange={(e) => setSelectedBovinoId(e.target.value)}
+                disabled={loading && bovinos.length === 0}
+                className="appearance-none bg-zinc-900 border border-zinc-700 text-white text-sm rounded-lg px-4 py-2.5 pr-10 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium cursor-pointer disabled:opacity-50"
+              >
+                {bovinos.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.arete} - {b.nombre || 'Sin nombre'}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="w-4 h-4 text-zinc-400 absolute right-3 top-3 pointer-events-none" />
+            </div>
+
+            {/* Selector de agrupamiento: Días, Mes, Año */}
+            <div className="flex bg-zinc-900 border border-zinc-800 rounded-lg p-1">
+              {(['days', 'month', 'year'] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTimeframe(t)}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                    timeframe === t
+                      ? 'bg-emerald-500 text-zinc-950 font-bold shadow-md shadow-emerald-500/20'
+                      : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  {t === 'days' ? 'Días' : t === 'month' ? 'Meses' : 'Años'}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Pestañas de Navegación */}
+        <div className="flex gap-4 border-b border-zinc-800">
+          <button
+            onClick={() => setActiveTab('metrics')}
+            className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors ${
+              activeTab === 'metrics'
+                ? 'border-emerald-500 text-emerald-400'
+                : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <TrendingUp className="w-4 h-4" /> Producción y Gráfica
+          </button>
+          <button
+            onClick={() => setActiveTab('resume')}
+            className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors ${
+              activeTab === 'resume'
+                ? 'border-emerald-500 text-emerald-400'
+                : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <FileText className="w-4 h-4" /> Hoja de Vida y Sanidad
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center items-center py-20 text-emerald-400 gap-3">
+            <Loader2 className="w-8 h-8 animate-spin" />
+            <span className="text-sm font-medium text-zinc-400">Cargando datos del animal...</span>
+          </div>
         ) : (
           <>
-            {/* 1. TARJETAS DE MÉTRICAS INDIVIDUALES */}
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', 
-              gap: '16px', 
-              marginBottom: '24px' 
-            }}>
-              
-              {/* Total Litros */}
-              <div style={cardStyle}>
-                <div>
-                  <span style={cardTitleStyle}>Total Producido</span>
-                  <h3 style={cardValueStyle}>{totalLitros.toLocaleString()} Lts</h3>
-                </div>
-                <p style={cardSubtextStyle}>🥛 Litros acumulados cargados</p>
-              </div>
+            {/* --- SECCIÓN 1: METRICAS Y GRAFICA DE MONTAÑAS/PICOS --- */}
+            {activeTab === 'metrics' && (
+              <div className="space-y-6">
+                
+                {/* Las 4 Tarjetas de KPIs reales */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  
+                  {/* Tarjeta 1 */}
+                  <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4 flex flex-col justify-between">
+                    <span className="text-xs font-medium text-zinc-400">Total Producido</span>
+                    <div className="my-2">
+                      <span className="text-2xl font-extrabold text-white">{totalProducido.toFixed(1)} Lts</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs text-zinc-400 border-t border-zinc-800/60 pt-2">
+                      <span>🥛</span>
+                      <span>Litros acumulados cargados</span>
+                    </div>
+                  </div>
 
-              {/* Promedio Diario */}
-              <div style={cardStyle}>
-                <div>
-                  <span style={cardTitleStyle}>Promedio Diario</span>
-                  <h3 style={cardValueStyle}>{promedioDiario} Lts/día</h3>
-                </div>
-                <p style={cardSubtextStyle}>📊 Promedio en días con ordeño</p>
-              </div>
+                  {/* Tarjeta 2 */}
+                  <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4 flex flex-col justify-between">
+                    <span className="text-xs font-medium text-zinc-400">Promedio Diario</span>
+                    <div className="my-2">
+                      <span className="text-2xl font-extrabold text-white">{promedioDiario} <span className="text-sm font-normal text-zinc-400">Lts/día</span></span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs text-zinc-400 border-t border-zinc-800/60 pt-2">
+                      <span>📊</span>
+                      <span>Promedio en días con ordeño</span>
+                    </div>
+                  </div>
 
-              {/* Días en Lactancia (DEL) */}
-              <div style={cardStyle}>
-                <div>
-                  <span style={cardTitleStyle}>Días en Lactancia (DEL)</span>
-                  <h3 style={{ ...cardValueStyle, color: '#2563eb' }}>{diasEnLactancia} Días</h3>
-                </div>
-                <p style={cardSubtextStyle}>
-                  📅 Est. desde 1er ordeño: {primeraFechaProd ? primeraFechaProd.toISOString().split('T')[0] : 'N/A'}
-                </p>
-              </div>
+                  {/* Tarjeta 3 */}
+                  <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4 flex flex-col justify-between">
+                    <span className="text-xs font-medium text-zinc-400">Días en Lactancia (DEL)</span>
+                    <div className="my-2">
+                      <span className="text-2xl font-extrabold text-white">{diasEnLactancia.del} Días</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs text-zinc-400 border-t border-zinc-800/60 pt-2">
+                      <span>📅</span>
+                      <span>Est. desde 1er ordeño: {diasEnLactancia.fechaPrimerOrdeno}</span>
+                    </div>
+                  </div>
 
-              {/* Estado y Raza */}
-              <div style={cardStyle}>
-                <div>
-                  <span style={cardTitleStyle}>Estado Productivo</span>
-                  <h3 style={{ ...cardValueStyle, fontSize: '20px' }}>{bovinoActual.estado || 'En Producción'}</h3>
-                </div>
-                <p style={cardSubtextStyle}>🐄 Raza: {bovinoActual.raza}</p>
-              </div>
-            </div>
-
-            {/* 2. CURVA DE LACTANCIA INDIVIDUAL CON TIEMPO Y VALORES */}
-            <div style={{
-              backgroundColor: '#ffffff',
-              border: '1px solid #e4e4e7',
-              borderRadius: '16px',
-              padding: '24px',
-              marginBottom: '32px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.01)'
-            }}>
-              <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: '700', color: '#09090b' }}>
-                📈 Curva de Lactancia Individual: Arete {bovinoActual.arete} {bovinoActual.nombre ? `(${bovinoActual.nombre})` : ''}
-              </h3>
-
-              {producciones.length === 0 ? (
-                <p style={{ fontSize: '14px', color: '#71717a' }}>No hay registros de leche para generar la curva de este animal.</p>
-              ) : (
-                <div style={{ width: '100%', overflowX: 'auto' }}>
-                  <div style={{ width: `${svgWidth}px`, height: `${svgHeight}px`, margin: '0 auto' }}>
-                    <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} style={{ width: '100%', height: '100%' }}>
-                      
-                      {/* Líneas horizontales de referencia */}
-                      <line x1={margin.left} y1={margin.top} x2={svgWidth - margin.right} y2={margin.top} stroke="#f4f4f5" strokeWidth="1" />
-                      <line x1={margin.left} y1={margin.top + chartHeight / 2} x2={svgWidth - margin.right} y2={margin.top + chartHeight / 2} stroke="#f4f4f5" strokeWidth="1" />
-                      <line x1={margin.left} y1={margin.top + chartHeight} x2={svgWidth - margin.right} y2={margin.top + chartHeight} stroke="#e4e4e7" strokeWidth="1.5" />
-
-                      {/* Etiquetas del eje Y (Litros) */}
-                      <text x={margin.left - 8} y={margin.top + 4} fill="#a1a1aa" fontSize="10" fontWeight="600" textAnchor="end">{maxLitrosDia} L</text>
-                      <text x={margin.left - 8} y={margin.top + chartHeight / 2 + 4} fill="#a1a1aa" fontSize="10" fontWeight="600" textAnchor="end">{(maxLitrosDia / 2).toFixed(0)} L</text>
-                      <text x={margin.left - 8} y={margin.top + chartHeight + 4} fill="#a1a1aa" fontSize="10" fontWeight="600" textAnchor="end">0 L</text>
-
-                      {/* Trazado continuo de la línea de producción */}
-                      <polyline
-                        fill="none"
-                        stroke="#2563eb"
-                        strokeWidth="3"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        points={diasConProduccion.map((fecha, i) => {
-                          const totalDia = producciones
-                            .filter((p) => p.fecha === fecha)
-                            .reduce((a, c) => a + Number(c.litros), 0)
-                          
-                          const x = margin.left + (diasConProduccion.length === 1 ? chartWidth / 2 : (i / (diasConProduccion.length - 1)) * chartWidth)
-                          const y = margin.top + chartHeight - (totalDia / maxLitrosDia) * chartHeight
-                          return `${x},${y}`
-                        }).join(' ')}
-                      />
-
-                      {/* Puntos, totales por fecha y eje de tiempo (Eje X) */}
-                      {diasConProduccion.map((fecha, i) => {
-                        const totalDia = producciones
-                          .filter((p) => p.fecha === fecha)
-                          .reduce((a, c) => a + Number(c.litros), 0)
-
-                        const x = margin.left + (diasConProduccion.length === 1 ? chartWidth / 2 : (i / (diasConProduccion.length - 1)) * chartWidth)
-                        const y = margin.top + chartHeight - (totalDia / maxLitrosDia) * chartHeight
-
-                        return (
-                          <g key={fecha}>
-                            {/* Punto del día */}
-                            <circle cx={x} cy={y} r="5" fill="#2563eb" stroke="#ffffff" strokeWidth="2" />
-
-                            {/* VALOR TOTAL EN EL PICO (Mañana + Tarde) */}
-                            <text
-                              x={x}
-                              y={y - 10}
-                              fill="#1e40af"
-                              fontSize="11"
-                              fontWeight="800"
-                              textAnchor="middle"
-                            >
-                              {totalDia.toFixed(1)} L
-                            </text>
-
-                            {/* Marca en la línea del eje X */}
-                            <line x1={x} y1={margin.top + chartHeight} x2={x} y2={margin.top + chartHeight + 6} stroke="#a1a1aa" strokeWidth="1" />
-
-                            {/* VARIABLE DE TIEMPO (FECHA DÍA DE ORDEÑO) */}
-                            <text
-                              x={x}
-                              y={margin.top + chartHeight + 20}
-                              fill="#52525b"
-                              fontSize="11"
-                              fontWeight="600"
-                              textAnchor="end"
-                              transform={`rotate(-35, ${x}, ${margin.top + chartHeight + 20})`}
-                            >
-                              {fecha}
-                            </text>
-                          </g>
-                        )
-                      })}
-                    </svg>
+                  {/* Tarjeta 4 */}
+                  <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4 flex flex-col justify-between">
+                    <span className="text-xs font-medium text-zinc-400">Estado Productivo</span>
+                    <div className="my-2">
+                      <span className="text-lg font-bold text-emerald-400">
+                        {selectedBovino?.estado || 'Sin estado'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs text-zinc-400 border-t border-zinc-800/60 pt-2 truncate">
+                      <span>🐄</span>
+                      <span className="truncate">Raza: {selectedBovino?.raza}</span>
+                    </div>
                   </div>
                 </div>
-              )}
-            </div>
 
-            {/* 3. HOJA DE VIDA COMPLETA DEL ANIMAL */}
-            <div style={{
-              backgroundColor: '#ffffff',
-              border: '1px solid #e4e4e7',
-              borderRadius: '16px',
-              padding: '24px',
-              marginBottom: '32px'
-            }}>
-              <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: '700', color: '#09090b' }}>
-                📄 Hoja de Vida e Información General
-              </h3>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', fontSize: '14px', color: '#3f3f46' }}>
-                <div><strong>Arete:</strong> {bovinoActual.arete}</div>
-                <div><strong>Nombre:</strong> {bovinoActual.nombre || 'N/A'}</div>
-                <div><strong>Raza:</strong> {bovinoActual.raza}</div>
-                <div><strong>Género:</strong> {bovinoActual.genero}</div>
-                <div><strong>Peso Inicial:</strong> {bovinoActual.peso_inicial} kg</div>
-                <div><strong>Fecha Nacimiento:</strong> {bovinoActual.fecha_nacimiento || 'No registrada'}</div>
-                <div><strong>Estado:</strong> {bovinoActual.estado || 'No especificado'}</div>
-                <div style={{ gridColumn: '1 / -1' }}><strong>Observaciones:</strong> {bovinoActual.observaciones || 'Sin observaciones.'}</div>
+                {/* GRÁFICA DE LECHE (Con efecto Picos / Curva de Montaña) */}
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 shadow-xl">
+                  <div className="flex justify-between items-center mb-6">
+                    <div>
+                      <h3 className="text-lg font-semibold text-white">Curva de Producción de Leche</h3>
+                      <p className="text-xs text-zinc-400">
+                        Visualización por {timeframe === 'days' ? 'Días' : timeframe === 'month' ? 'Meses' : 'Años'}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs text-zinc-400">Registros</span>
+                      <p className="text-sm font-bold text-emerald-400">{chartData.length} Puntos</p>
+                    </div>
+                  </div>
+
+                  {/* Canvas de la Gráfica */}
+                  <div className="h-80 w-full">
+                    {chartData.length === 0 ? (
+                      <div className="h-full flex items-center justify-center text-zinc-500 text-sm">
+                        No hay registros de ordeño para este animal.
+                      </div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                          <defs>
+                            {/* Gradiente estilo Neón / Montaña */}
+                            <linearGradient id="neonGradient" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#10b981" stopOpacity={0.5} />
+                              <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+                            </linearGradient>
+                          </defs>
+
+                          <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
+
+                          <XAxis 
+                            dataKey="fecha" 
+                            stroke="#71717a" 
+                            fontSize={12} 
+                            tickLine={false} 
+                            axisLine={false} 
+                          />
+                          <YAxis 
+                            stroke="#71717a" 
+                            fontSize={12} 
+                            tickLine={false} 
+                            axisLine={false} 
+                          />
+
+                          {/* Línea vertical punteada al pasar el cursor (Estilo Google) */}
+                          <Tooltip 
+                            content={<CustomTooltip />} 
+                            cursor={{ stroke: '#10b981', strokeWidth: 1.5, strokeDasharray: '4 4' }} 
+                          />
+
+                          {/* Curva Suave (type="monotone" genera los picos suaves tipo montaña) */}
+                          <Area
+                            type="monotone"
+                            dataKey="litros"
+                            stroke="#10b981"
+                            strokeWidth={3}
+                            fillOpacity={1}
+                            fill="url(#neonGradient)"
+                            activeDot={{ r: 6, fill: '#10b981', stroke: '#09090b', strokeWidth: 2 }}
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    )}
+                  </div>
+                </div>
+
               </div>
-            </div>
+            )}
 
-            {/* HISTORIAL REPRODUCTIVO / INSEMINACIONES */}
-            <div style={{
-              backgroundColor: '#ffffff',
-              border: '1px solid #e4e4e7',
-              borderRadius: '16px',
-              padding: '24px',
-              marginBottom: '32px'
-            }}>
-              <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: '700', color: '#09090b' }}>
-                💉 Historial Reproductivo / Inseminaciones ({inseminaciones.length})
-              </h3>
-              {inseminaciones.length === 0 ? (
-                <p style={{ fontSize: '13px', color: '#71717a' }}>No se registran inseminaciones para este animal.</p>
-              ) : (
-                <table style={{ width: '100%', textAlign: 'left', fontSize: '13px', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid #e4e4e7', color: '#71717a' }}>
-                      <th style={{ padding: '8px' }}>Fecha</th>
-                      <th style={{ padding: '8px' }}>Toro/Pajuela</th>
-                      <th style={{ padding: '8px' }}>Tipo</th>
-                      <th style={{ padding: '8px' }}>Inseminador</th>
-                      <th style={{ padding: '8px' }}>Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {inseminaciones.map((ins) => (
-                      <tr key={ins.id} style={{ borderBottom: '1px solid #f4f4f5' }}>
-                        <td style={{ padding: '8px' }}>{ins.fecha}</td>
-                        <td style={{ padding: '8px' }}>{ins.toro_pajuela || '-'}</td>
-                        <td style={{ padding: '8px' }}>{ins.tipo || 'IA'}</td>
-                        <td style={{ padding: '8px' }}>{ins.inseminador || '-'}</td>
-                        <td style={{ padding: '8px' }}>
-                          {ins.confirmado ? '✅ Preñada' : '⏳ Pendiente'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
+            {/* --- SECCIÓN 2: HOJA DE VIDA DEL ANIMAL --- */}
+            {activeTab === 'resume' && selectedBovino && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                
+                {/* Tarjeta Datos Generales */}
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl">
+                      <Award className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-white">{selectedBovino.nombre || 'Sin Nombre'}</h3>
+                      <p className="text-xs text-zinc-400">Arete: {selectedBovino.arete}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 text-xs border-t border-zinc-800 pt-3">
+                    <div className="flex justify-between">
+                      <span className="text-zinc-400">Género:</span>
+                      <span className="font-medium text-zinc-200">{selectedBovino.genero}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-zinc-400">Raza:</span>
+                      <span className="font-medium text-zinc-200">{selectedBovino.raza}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-zinc-400">Fecha Nacimiento:</span>
+                      <span className="font-medium text-zinc-200">{selectedBovino.fecha_nacimiento || 'No registrada'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-zinc-400">Peso Inicial:</span>
+                      <span className="font-medium text-zinc-200">{selectedBovino.peso_inicial} Kg</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-zinc-400">Estado Actual:</span>
+                      <span className="font-semibold text-emerald-400">{selectedBovino.estado}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tarjeta Observaciones / Notas */}
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-xl">
+                      <Activity className="w-6 h-6" />
+                    </div>
+                    <h3 className="text-base font-bold text-white">Observaciones del Bovino</h3>
+                  </div>
+
+                  <div className="border-t border-zinc-800 pt-3 text-xs text-zinc-300">
+                    <p className="italic bg-zinc-950 p-3 rounded border border-zinc-800/80">
+                      "{selectedBovino.observaciones || 'Sin observaciones registradas para este ejemplar.'}"
+                    </p>
+                  </div>
+                </div>
+
+                {/* Tarjeta Historial de Tratamientos y Sanidad (Desde la tabla 'tratamientos') */}
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl">
+                      <Syringe className="w-6 h-6" />
+                    </div>
+                    <h3 className="text-base font-bold text-white">Tratamientos Medicamentos</h3>
+                  </div>
+
+                  <div className="space-y-2 border-t border-zinc-800 pt-3 text-xs max-h-60 overflow-y-auto pr-1">
+                    {tratamientos.length === 0 ? (
+                      <p className="text-zinc-500 text-xs">No hay tratamientos aplicados.</p>
+                    ) : (
+                      tratamientos.map((t) => (
+                        <div key={t.id} className="p-2.5 bg-zinc-950 rounded border border-zinc-800 space-y-1">
+                          <div className="flex justify-between font-semibold text-zinc-200">
+                            <span>{t.medicamento}</span>
+                            <span className="text-emerald-400">{t.dosis}</span>
+                          </div>
+                          <div className="flex justify-between text-[11px] text-zinc-400">
+                            <span>Vía: {t.via}</span>
+                            <span>{t.fecha_aplicacion}</span>
+                          </div>
+                          {t.tiempo_retiro > 0 && (
+                            <div className="text-[10px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded w-fit">
+                              Tiempo retiro: {t.tiempo_retiro} días
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+              </div>
+            )}
           </>
-        )
-      ) : (
-        /* PANORAMA GENERAL CUANDO NO HAY NINGUNA VACA SELECCIONADA */
-        <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-            <div style={cardStyle}>
-              <div>
-                <span style={cardTitleStyle}>Total Bovinos</span>
-                <h3 style={cardValueStyle}>{bovinos.length}</h3>
-              </div>
-              <p style={cardSubtextStyle}>🐂 Registrados en el hato</p>
-            </div>
-          </div>
+        )}
 
-          <h2 style={{ fontSize: '16px', fontWeight: '600', margin: '0 0 16px 0', color: '#09090b' }}>Módulos del Sistema</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
-            <div style={cardStyle}>
-              <h3 style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: '700' }}>📋 Inventario de Ganado</h3>
-              <p style={{ margin: '0 0 20px 0', fontSize: '13px', color: '#71717a' }}>Gestión integral de bovinos y pesajes.</p>
-              <Link href="/dashboard/inventario">
-                <button style={btnPrimaryStyle}>Ver animales</button>
-              </Link>
-            </div>
-          </div>
-        </>
-      )}
+      </div>
     </div>
-  )
-}
-
-// Estilos Reutilizables
-const cardStyle: React.CSSProperties = {
-  backgroundColor: '#ffffff',
-  border: '1px solid #e4e4e7',
-  borderRadius: '16px',
-  padding: '24px',
-  boxSizing: 'border-box',
-  display: 'flex',
-  flexDirection: 'column',
-  justifyContent: 'space-between',
-  minHeight: '130px',
-  boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
-}
-
-const cardTitleStyle: React.CSSProperties = {
-  fontSize: '12px',
-  fontWeight: '600',
-  color: '#71717a',
-  textTransform: 'uppercase',
-  letterSpacing: '0.5px'
-}
-
-const cardValueStyle: React.CSSProperties = {
-  margin: '8px 0 0 0',
-  fontSize: '28px',
-  fontWeight: '800',
-  letterSpacing: '-0.8px',
-  color: '#09090b'
-}
-
-const cardSubtextStyle: React.CSSProperties = {
-  margin: '8px 0 0 0',
-  fontSize: '12px',
-  color: '#71717a'
-}
-
-const btnPrimaryStyle: React.CSSProperties = {
-  backgroundColor: '#09090b',
-  color: '#ffffff',
-  border: 'none',
-  borderRadius: '8px',
-  padding: '10px 16px',
-  fontSize: '13px',
-  fontWeight: '600',
-  cursor: 'pointer'
+  );
 }
