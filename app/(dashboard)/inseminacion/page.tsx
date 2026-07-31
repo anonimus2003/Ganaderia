@@ -291,6 +291,7 @@ function InseminacionModal({
                 <option value="I.A.">I.A. (Artificial)</option>
                 <option value="Monta Natural">Monta Natural</option>
                 <option value="T.E.">T.E. (Transf. Embrión)</option>
+                <option value="Celo no Servido">Celo no Servido</option>
               </select>
             </div>
 

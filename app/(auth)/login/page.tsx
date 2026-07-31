@@ -38,7 +38,7 @@ export default function LoginPage() {
       height: '100vh', 
       width: '100vw',
       // Recuerda subir tu imagen de fondo a la carpeta /public con este nombre
-      backgroundImage: 'linear-gradient(rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45)), url("/background-cow.jpg")', 
+      backgroundImage: 'linear-gradient(rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45)), url("https://erkepwaugzippkgzzrzf.supabase.co/storage/v1/object/sign/imagenes/fondo.jpg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9mN2JlOWRmYy0yNzUyLTRkYzgtODZiMy00MTVmOWQxMzg3MzIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJpbWFnZW5lcy9mb25kby5qcGciLCJzY29wZSI6ImRvd25sb2FkIiwiaWF0IjoxNzg1NTMyNTI3LCJleHAiOjE4MTcwNjg1Mjd9.0HS-ivbJQF2sOiRg25rWTbs3_gGsvpOFnVF0dNPjjEQ")', 
       backgroundSize: 'cover',
       backgroundPosition: 'center',
       fontFamily: 'system-ui, -apple-system, sans-serif',
