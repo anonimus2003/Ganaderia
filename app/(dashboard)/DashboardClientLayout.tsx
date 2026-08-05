@@ -163,48 +163,6 @@ export default function DashboardClientLayout({
             </button>
           </div>
 
-          {/* Botón Acción Rápida (Verde lima brillante con texto oscuro) */}
-          {/* Botón Acción Rápida (Verde lima brillante con texto oscuro) */}
-<Link href="/inventario/nuevo" style={{ textDecoration: 'none', width: '100%', display: 'block' }}>
-  <button style={{
-    width: '100%',
-    backgroundColor: '#B5E846',
-    color: '#132A13',
-    border: 'none',
-    borderRadius: '8px',
-    padding: isCollapsed ? '8px' : '10px 10px', // Ajustado a 10px simétricos igual que el menú
-    fontSize: '14px',
-    fontWeight: '600',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: isCollapsed ? 'center' : 'flex-start',
-    gap: '10px', // Cambiado a 10px exactos igual que en los items de abajo
-    cursor: 'pointer',
-    transition: 'all 0.2s ease'
-  }}>
-    {/* Contenedor estricto de 30px x 30px idéntico al de los demás enlaces */}
-    <div style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-      <img 
-        src="/add.png" 
-        alt="" 
-        style={{ 
-          width: '30px', 
-          height: '30px', 
-          objectFit: 'contain',
-          filter: 'brightness(0) invert(0.1) sepia(1) saturate(100) hue-rotate(100deg)'
-        }} 
-      />
-    </div>
-
-    {/* El texto solo se muestra si NO está colapsado */}
-    {!isCollapsed && (
-      <span className="sidebar-text" style={{ whiteSpace: 'nowrap', overflow: 'hidden' }}>
-        Registrar Ganado
-      </span>
-    )}
-  </button>
-</Link>
-
           {/* Grupo de Links de Navegación (Letras Blancas / Activo en Lima) */}
           <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             {!isCollapsed && (
@@ -262,7 +220,7 @@ export default function DashboardClientLayout({
                 )}
                 <Link 
                   href="/control" 
-                  title="Panel Control"
+                  title="Dashboard"
                   style={{ 
                     display: 'flex', 
                     alignItems: 'center', 

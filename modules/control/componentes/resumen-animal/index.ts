@@ -1,0 +1,1 @@
+export { default as ItemResumen } from "./ItemResumen";
