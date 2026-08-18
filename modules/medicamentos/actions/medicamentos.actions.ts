@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/client';
-import { TratamientoFormData } from '../schemas';
+import { Tratamiento } from '../schemas';
 
 const supabase = createClient();
 
@@ -16,21 +16,23 @@ export async function getTratamientos() {
     .from('tratamientos')
     .select(`
       *,
-      bovino:bovinos (id, arete, nombre, raza, estado)
+      bovinos:bovinos (id, arete, nombre, raza, estado)
     `)
     .order('fecha_aplicacion', { ascending: false });
   if (error) throw error;
   return data || [];
 }
 
-export async function saveTratamiento(formData: TratamientoFormData, editingId: string | null) {
+export async function saveTratamiento(formData: Tratamiento, editingId: string | null) {
   const payload = {
     bovino_id: formData.bovino_id,
     medicamento: formData.medicamento,
     dosis: formData.dosis,
     via: formData.via,
     fecha_aplicacion: formData.fecha_aplicacion,
-    tiempo_retiro: formData.tiempo_retiro,
+    tiempo_retiro: formData.tiempo_retiro ?? 0,
+    retiro_leche: formData.retiro_leche ?? 0,
+    retiro_carne: formData.retiro_carne ?? 0,
     veterinario: formData.veterinario,
     motivo: formData.motivo || null,
   };

@@ -24,3 +24,34 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+
+@media print {
+  /* Ocultar todo lo que no sea la tabla principal al imprimir */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Mostrar únicamente el contenedor de la tabla y su contenido */
+  .p-6.max-w-7xl.mx-auto, 
+  .p-6.max-w-7xl.mx-auto * {
+    visibility: visible;
+  }
+
+  /* Posicionar el contenido impreso arriba del todo */
+  .p-6.max-w-7xl.mx-auto {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 0;
+    margin: 0;
+  }
+
+  /* Ocultar botones de acción, paginaciones inferiores y el menú flotante de filtros */
+  button, 
+  .flex.flex-wrap.items-center.gap-2, /* Botones de exportar/filtrar superiores */
+  .fixed.inset-0 { /* Drawer de filtros si estuviera abierto */
+    display: none !important;
+  }
+}

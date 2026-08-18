@@ -1,34 +1,32 @@
 "use client";
 
+import React, { useState, useEffect } from "react";
+
 interface EncabezadoDashboardProps {
-  titulo: string;
-  subtitulo: string;
   nombreUsuario?: string;
 }
 
 export default function EncabezadoDashboard({
-  titulo,
-  subtitulo,
   nombreUsuario
 }: EncabezadoDashboardProps) {
+  const [saludo, setSaludo] = useState("Bienvenido");
+
+  useEffect(() => {
+    const hora = new Date().getHours();
+    if (hora >= 5 && hora < 12) {
+      setSaludo("Buenos días");
+    } else if (hora >= 12 && hora < 18) {
+      setSaludo("Buenas tardes");
+    } else {
+      setSaludo("Buenas noches");
+    }
+  }, []);
 
   return (
     <div className="mb-6">
-
-      <h1 className="text-2xl font-black text-gray-900">
-        {titulo}
+      <h1 className="text-3xl font-black text-gray-900 tracking-tight">
+        {saludo}, {nombreUsuario || "Ganadero"} 👋
       </h1>
-
-      <p className="text-sm text-gray-500 mt-1">
-        {subtitulo}
-      </p>
-
-      {nombreUsuario && (
-        <p className="text-sm text-emerald-600 mt-2 font-semibold">
-          Bienvenido, {nombreUsuario}
-        </p>
-      )}
-
     </div>
   );
 }

@@ -1,122 +1,218 @@
+// src/modules/potreros/hooks/usePotreros.ts
 import { useState, useEffect, useCallback } from 'react';
-import { Potrero, HistorialItem } from '../schemas';
-import {
-  getPotreros,
-  getHistorialPotrero,
-  updatePotreroCoordenadas,
-  insertPotrero,
-  updatePotreroCompleto,
-  deletePotreroDb,
-} from '../actions/potreros.actions';
+import { createClient } from "@/lib/supabase/client";
+import { Potrero } from '../schemas';
 
 export function usePotreros() {
+  const supabase = createClient();
   const [potreros, setPotreros] = useState<Potrero[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [selectedId, setSelectedId] = useState<number>(1);
-  const [filtroEstado, setFiltroEstado] = useState<string>('todos');
-  const [busqueda, setBusqueda] = useState<string>('');
-  
-  const [historialPotrero, setHistorialPotrero] = useState<HistorialItem[]>([]);
-  const [mostrarHistorial, setMostrarHistorial] = useState<boolean>(false);
-  const [paginaHistorial, setPaginaHistorial] = useState<number>(1);
-  const [mostrarControlesMover, setMostrarControlesMover] = useState<boolean>(false);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
 
-  const [creandoDesdeMapa, setCreandoDesdeMapa] = useState<boolean>(false);
-  const [nuevoX, setNuevoX] = useState<number>(50);
-  const [nuevoY, setNuevoY] = useState<number>(50);
+  const fetchPotreros = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('potreros')
+      .select('*')
+      .order('id', { ascending: true });
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-
-  // 1. Quitamos 'selectedId' de las dependencias para evitar ciclos innecesarios
-  const fetchPotrerosData = useCallback(async () => {
-    try {
-      setLoading(true);
-      const formatted = await getPotreros();
-      setPotreros(formatted);
-    } catch (error) {
+    if (error) {
       console.error('Error al cargar potreros:', error);
-    } finally {
-      setLoading(false);
+    } else {
+      setPotreros(data || []);
     }
-  }, []);
+    setLoading(false);
+  }, [supabase]);
 
-  const fetchHistorialData = useCallback(async (id: number) => {
-    setPaginaHistorial(1);
-    const data = await getHistorialPotrero(id);
-    setHistorialPotrero(data);
-  }, []);
-
-  // Carga inicial de los potreros
   useEffect(() => {
-    fetchPotrerosData();
-  }, [fetchPotrerosData]);
+    fetchPotreros();
+  }, [fetchPotreros]);
 
-  // 2. CORREGIDO: Se removió 'potreros' de las dependencias. Solo debe cargar el historial cuando cambie el ID seleccionado.
-  useEffect(() => {
-    if (selectedId) {
-      fetchHistorialData(selectedId);
+  // Ingresar ganado: cambia estado a 'Ocupado' y reinicia el pasto a 0% por el consumo
+  const ingresarGanado = async (potreroId: number, bovinosIds: string[], fechaEntrada: string) => {
+    const cantidadBovinos = bovinosIds.length;
+
+    const { data: bovinosInfo } = await supabase
+      .from('bovinos')
+      .select('nombre, arete')
+      .in('id', bovinosIds);
+
+    const listaNombres = bovinosInfo 
+      ? bovinosInfo.map((b: { nombre?: string; arete: string }) => 
+          b.nombre ? `${b.nombre} (${b.arete})` : `Arete: ${b.arete}`
+        ).join(', ')
+      : '';
+
+    const { data: potreroData } = await supabase
+      .from('potreros')
+      .select('nombre, estado')
+      .eq('id', potreroId)
+      .single();
+
+    const estadoAnterior = potreroData?.estado || 'Disponible';
+    const nombrePotrero = potreroData?.nombre || '';
+
+    const { error: updateError } = await supabase
+      .from('potreros')
+      .update({
+        estado: 'ocupado',
+        bovinos_actuales: cantidadBovinos,
+        fecha_entrada_ganado: fechaEntrada,
+        progreso_pasto: 0, // El pasto se consume al ingresar los animales
+      })
+      .eq('id', potreroId);
+
+    if (updateError) {
+      console.error('Error al actualizar potrero:', updateError);
+      throw updateError;
     }
-  }, [selectedId, fetchHistorialData]);
 
-  // Si el id seleccionado no es válido tras un cambio, seleccionamos el primero por defecto de forma segura
-  const potreroSeleccionado = potreros.find((p) => p.id === selectedId) || potreros[0];
+    const { error: histError } = await supabase.from('historial_potreros').insert([
+      {
+        potrero_id: potreroId,
+        potrero_nombre: nombrePotrero,
+        estado_anterior: estadoAnterior,
+        estado_nuevo: 'Ocupado',
+        bovinos_actuales: cantidadBovinos,
+        fecha_entrada: fechaEntrada,
+        bovinos_ids: bovinosIds,
+        nombres_bovinos: listaNombres,
+      },
+    ]);
 
-  const moverPin = async (direccion: 'arriba' | 'abajo' | 'izquierda' | 'derecha') => {
-    if (!potreroSeleccionado) return;
-    let x = potreroSeleccionado.x;
-    let y = potreroSeleccionado.y;
-    const paso = 1.5;
-
-    if (direccion === 'arriba') y = Math.max(0, Number((y - paso).toFixed(1)));
-    if (direccion === 'abajo') y = Math.min(100, Number((y + paso).toFixed(1)));
-    if (direccion === 'izquierda') x = Math.max(0, Number((x - paso).toFixed(1)));
-    if (direccion === 'derecha') x = Math.min(100, Number((x + paso).toFixed(1)));
-
-    try {
-      await updatePotreroCoordenadas(potreroSeleccionado.id, x, y);
-      setPotreros(potreros.map((p) => (p.id === potreroSeleccionado.id ? { ...p, x, y } : p)));
-    } catch (error) {
-      console.error("Error al mover el pin:", error);
+    if (histError) {
+      console.error('Error al insertar en historial_potreros:', histError);
+      throw histError;
     }
+
+    await fetchPotreros();
   };
 
-  const potrerosFiltrados = potreros.filter((p) => {
-    const coincideFiltro = filtroEstado === 'todos' || p.estado.toLowerCase() === filtroEstado.toLowerCase();
-    const coincideBusqueda = p.nombre.toLowerCase().includes(busqueda.toLowerCase()) || p.id.toString().includes(busqueda);
-    return coincideFiltro && coincideBusqueda;
-  });
+  // Sacar ganado: actualiza la fila existente en el historial manteniendo la cantidad de bovinos y el estado
+  const sacarGanado = async (potreroId: number, fechaSalida: string) => {
+    const { error: updateError } = await supabase
+      .from('potreros')
+      .update({
+        estado: 'En Descanso',
+        bovinos_actuales: 0,
+        fecha_salida_ganado: fechaSalida,
+        dias_descanso: 0,
+      })
+      .eq('id', potreroId);
+
+    if (updateError) throw updateError;
+
+    // ACTUALIZAR la fila pendiente de salida: 
+    // Solo añadimos la fecha de salida. NO sobrescribimos 'bovinos_actuales' ni el 'estado_anterior' 
+    // para que la cantidad (ej. 7) y los datos originales sigan apareciendo intactos en esa misma fila.
+    const { error: histError } = await supabase
+      .from('historial_potreros')
+      .update({
+        estado_nuevo: 'En Descanso',
+        fecha_salida: fechaSalida,
+      })
+      .eq('potrero_id', potreroId)
+      .is('fecha_salida', null); // Busca la fila abierta actual
+
+    if (histError) throw histError;
+
+    await fetchPotreros();
+  };
+
+  const registrarAbono = async (potreroId: number, insumo: string, cantidad: string, fecha: string) => {
+    const { error } = await supabase.from('historial_abonos').insert([
+      {
+        potrero_id: potreroId,
+        insumo,
+        cantidad,
+        fecha_aplicacion: fecha,
+      },
+    ]);
+
+    if (error) throw error;
+
+    await supabase
+      .from('potreros')
+      .update({
+        ultimo_abono: insumo,
+        fecha_abono: fecha,
+      })
+      .eq('id', potreroId);
+
+    await fetchPotreros();
+  };
+
+  const guardarPotrero = async (datos: { nombre: string; area_m2?: number; tipo_pasto?: string; progreso_pasto?: number; aforo?: number; x?: number; y?: number }, id?: number) => {
+    if (id) {
+      const { error } = await supabase
+        .from('potreros')
+        .update(datos)
+        .eq('id', id);
+
+      if (error) {
+        console.error("Detalle del error Supabase (Update):", JSON.stringify(error, null, 2));
+        throw error;
+      }
+    } else {
+      const { error } = await supabase
+        .from('potreros')
+        .insert([{ 
+          ...datos, 
+          estado: 'Disponible', 
+          bovinos_actuales: 0, 
+          progreso_pasto: datos.progreso_pasto ?? 0, 
+          x: datos.x ?? 50, 
+          y: datos.y ?? 50 
+        }]);
+
+      if (error) {
+        console.error("Detalle del error Supabase (Insert):", JSON.stringify(error, null, 2));
+        throw error;
+      }
+    }
+
+    await fetchPotreros();
+  };
+
+  const moverPotrero = async (potreroId: number, nuevoX: number, nuevoY: number) => {
+    const { error } = await supabase
+      .from('potreros')
+      .update({ x: nuevoX, y: nuevoY })
+      .eq('id', potreroId);
+
+    if (error) {
+      console.error('Error al mover el potrero:', error);
+      throw error;
+    }
+
+    await fetchPotreros();
+  };
+
+  const eliminarPotrero = async (potreroId: number) => {
+    const { error } = await supabase
+      .from('potreros')
+      .delete()
+      .eq('id', potreroId);
+
+    if (error) {
+      console.error('Error al eliminar el potrero:', error);
+      throw error;
+    }
+
+    await fetchPotreros();
+  };
 
   return {
     potreros,
     loading,
     selectedId,
     setSelectedId,
-    filtroEstado,
-    setFiltroEstado,
-    busqueda,
-    setBusqueda,
-    historialPotrero,
-    mostrarHistorial,
-    setMostrarHistorial,
-    paginaHistorial,
-    setPaginaHistorial,
-    mostrarControlesMover,
-    setMostrarControlesMover,
-    creandoDesdeMapa,
-    setCreandoDesdeMapa,
-    nuevoX,
-    setNuevoX,
-    nuevoY,
-    setNuevoY,
-    isModalOpen,
-    setIsModalOpen,
-    isEditModalOpen,
-    setIsEditModalOpen,
-    potreroSeleccionado,
-    potrerosFiltrados,
-    moverPin,
-    fetchPotrerosData,
-    fetchHistorialData,
+    ingresarGanado,
+    sacarGanado,
+    registrarAbono,
+    guardarPotrero,
+    moverPotrero,
+    eliminarPotrero,
+    refetch: fetchPotreros,
   };
 }

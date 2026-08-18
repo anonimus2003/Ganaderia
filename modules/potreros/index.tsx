@@ -1,247 +1,327 @@
 'use client';
 
-import React from 'react';
-import { Search, Plus, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import { PlusCircle, ArrowRightLeft, Sprout, X, RefreshCw } from 'lucide-react';
 import { usePotreros } from './hooks/usePotreros';
-import { insertPotrero, updatePotreroCompleto, deletePotreroDb } from './actions/potreros.actions';
-
 import MapaPotreros from './components/MapaPotreros';
-import PanelDetalle from './components/PanelDetalle';
-import ModalNuevoPotrero from './components/ModalNuevoPotrero';
-import ModalEditarPotrero from './components/ModalEditarPotrero';
+import VistaPotreros from './components/vistaPotreros';
+import EditarPotreroModal from './components/EditarPotreroModal';
+import HistorialList from './components/HistorialList';
+import ControlGanado from './components/ControlGanado';
+import ControlAbono from './components/ControlAbono';
+import RecuperacionPotrero from './components/RecuperarcionPotrero';
 
-export default function GestionPotrerosModule() {
+export default function PotrerosPage() {
   const {
     potreros,
     loading,
     selectedId,
     setSelectedId,
-    filtroEstado,
-    setFiltroEstado,
-    busqueda,
-    setBusqueda,
-    historialPotrero,
-    creandoDesdeMapa,
-    setCreandoDesdeMapa,
-    nuevoX,
-    setNuevoX,
-    nuevoY,
-    setNuevoY,
-    isModalOpen,
-    setIsModalOpen,
-    isEditModalOpen,
-    setIsEditModalOpen,
-    potreroSeleccionado,
-    potrerosFiltrados,
-    moverPin,
-    fetchPotrerosData,
-    fetchHistorialData,
+    ingresarGanado,
+    sacarGanado,
+    registrarAbono,
+    guardarPotrero,
+    eliminarPotrero,
   } = usePotreros();
 
-  const handleManejarClickMapa = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!creandoDesdeMapa) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const xClick = e.clientX - rect.left;
-    const yClick = e.clientY - rect.top;
-    setNuevoX(Math.round((xClick / rect.width) * 100));
-    setNuevoY(Math.round((yClick / rect.height) * 100));
-    setCreandoDesdeMapa(false);
-    setIsModalOpen(true);
+  const supabase = createClient();
+
+  const [historialRotacion, setHistorialRotacion] = useState<any[]>([]);
+  const [historialAbonos, setHistorialAbonos] = useState<any[]>([]);
+  const [progresoCrecimiento, setProgresoCrecimiento] = useState<number>(0);
+
+  const [mostrarModalEdicion, setMostrarModalEdicion] = useState<boolean>(false);
+  const [mostrarModalCreacion, setMostrarModalCreacion] = useState<boolean>(false);
+  const [mostrarMenuFlotante, setMostrarMenuFlotante] = useState<boolean>(false);
+  const [accionActiva, setAccionActiva] = useState<'ganado' | 'abono' | 'recuperacion' | null>(null);
+  const [creandoDesdeMapa, setCreandoDesdeMapa] = useState<boolean>(false);
+
+  const potreroSeleccionado = potreros.find((p) => p.id === selectedId) || null;
+  const estadoPotrero = potreroSeleccionado?.estado?.toLowerCase().trim() || '';
+  const estaOcupado = estadoPotrero === 'ocupado';
+  const estaEnDescanso = estadoPotrero === 'en descanso';
+
+  const abrirAccion = (accion: 'ganado' | 'abono' | 'recuperacion') => {
+    if (!potreroSeleccionado) return;
+    setMostrarMenuFlotante(true);
+    setAccionActiva(accionActiva === accion ? null : accion);
   };
 
-  const agregarNuevoPotrero = async (datos: { nombre: string; area: number; pasto: string; aforo: number }) => {
+  const fetchHistoriales = useCallback(async () => {
     try {
-      const nuevoPotreroDb = {
-        nombre: datos.nombre.trim() || 'Nuevo Potrero',
-        estado: 'En Descanso',
-        area_m2: Number(datos.area),
-        tipo_pasto: datos.pasto,
-        bovinos_actuales: 0,
-        dias_descanso: 0,
-        crecimiento: 0,
-        aforo: Number(datos.aforo),
-        x: Number(nuevoX),
-        y: Number(nuevoY),
-      };
-      const data = await insertPotrero(nuevoPotreroDb);
-      setFiltroEstado('todos');
-      await fetchPotrerosData();
-      if (data && data.length > 0) setSelectedId(data[0].id);
-      setIsModalOpen(false);
-    } catch (error: any) {
-      alert(`Error al guardar: ${error.message}`);
-    }
-  };
+      let qR = supabase.from('historial_potreros').select('*').order('id', { ascending: false });
+      let qA = supabase.from('historial_abonos').select('*').order('fecha_aplicacion', { ascending: false });
 
-  const guardarEdicionPotrero = async (datos: {
-    nombre: string;
-    area: number;
-    pasto: string;
-    aforo: number;
-    bovinos: number;
-    fechaEntrada: string;
-    fechaSalida: string;
-  }) => {
-    const bovinosFinal = Number(datos.bovinos);
-    const nuevoEstado = bovinosFinal > 0 ? 'Ocupado' : 'En Descanso';
-    const estadoAnterior = potreroSeleccionado?.estado || 'En Descanso';
-
-    let diasDescansoCalculados = 0;
-    if (nuevoEstado === 'En Descanso' && datos.fechaSalida) {
-      const diffTime = Math.abs(new Date().getTime() - new Date(datos.fechaSalida).getTime());
-      diasDescansoCalculados = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    }
-
-    const datosActualizados = {
-      nombre: datos.nombre,
-      area_m2: Number(datos.area),
-      estado: nuevoEstado,
-      bovinos_actuales: bovinosFinal,
-      tipo_pasto: datos.pasto,
-      aforo: Number(datos.aforo),
-      fecha_entrada_ganado: datos.fechaEntrada || null,
-      fecha_salida_ganado: datos.fechaSalida || null,
-      dias_descanso: diasDescansoCalculados,
-    };
-
-    const historialData = {
-      potrero_id: selectedId,
-      potrero_nombre: datos.nombre,
-      estado_anterior: estadoAnterior,
-      estado_nuevo: nuevoEstado,
-      bovinos_actuales: bovinosFinal,
-      fecha_entrada: datos.fechaEntrada || null,
-      fecha_salida: datos.fechaSalida || null,
-    };
-
-    try {
-      await updatePotreroCompleto(selectedId, datosActualizados, historialData);
-      await fetchPotrerosData();
-      await fetchHistorialData(selectedId);
-      setIsEditModalOpen(false);
-    } catch (error: any) {
-      alert(`Error al actualizar: ${error.message}`);
-    }
-  };
-
-  const eliminarPotrero = async (id: number) => {
-    if (potreros.length <= 1) {
-      alert('Debe conservar al menos un potrero en el sistema.');
-      return;
-    }
-    if (confirm('¿Está seguro de eliminar este potrero?')) {
-      try {
-        await deletePotreroDb(id);
-        fetchPotrerosData();
-      } catch (error: any) {
-        alert(`Error al eliminar: ${error.message}`);
+      if (selectedId !== null) {
+        qR = qR.eq('potrero_id', selectedId);
+        qA = qA.eq('potrero_id', selectedId);
       }
+
+      const [{ data: rotaciones }, { data: abonos }] = await Promise.all([qR, qA]);
+      setHistorialRotacion(rotaciones || []);
+      setHistorialAbonos(abonos || []);
+    } catch (error) {
+      console.error('Error cargando historiales:', error);
+    }
+  }, [selectedId, supabase]);
+
+  useEffect(() => {
+    fetchHistoriales();
+  }, [fetchHistoriales]);
+
+  useEffect(() => {
+    if (potreroSeleccionado) {
+      setProgresoCrecimiento(potreroSeleccionado.progreso_pasto || 0);
+    } else {
+      setProgresoCrecimiento(0);
+      setMostrarMenuFlotante(false);
+      setAccionActiva(null);
+    }
+  }, [potreroSeleccionado]);
+
+  const handleGuardarPotrero = async (datos: any) => {
+    if (!potreroSeleccionado) return;
+    await guardarPotrero(datos, potreroSeleccionado.id);
+    await fetchHistoriales();
+  };
+
+  const handleEliminarPotrero = async () => {
+    if (!potreroSeleccionado || !eliminarPotrero) return;
+    await eliminarPotrero(potreroSeleccionado.id);
+    setSelectedId(null);
+    setMostrarMenuFlotante(false);
+    setAccionActiva(null);
+    await fetchHistoriales();
+  };
+
+  // RECUPERACIÓN: Disponible solo si el progreso es exactamente 100%
+  const handleRecuperacion = async (potreroId: number, progreso: number, fecha: string, observacion?: string) => {
+    try {
+      const progresoNormalizado = Math.min(100, Math.max(0, Number(progreso) || 0));
+      const potreroActual = potreros.find((p) => p.id === potreroId);
+
+      if (!potreroActual) throw new Error('No se encontró el potrero.');
+
+      const estadoActual = potreroActual.estado?.toLowerCase().trim();
+      let nuevoEstado = potreroActual.estado;
+
+      if (estadoActual === 'en descanso') {
+        nuevoEstado = progresoNormalizado === 100 ? 'Disponible' : 'En Descanso';
+      }
+
+      await guardarPotrero({ progreso_pasto: progresoNormalizado, estado: nuevoEstado } as any, potreroId);
+      setProgresoCrecimiento(progresoNormalizado);
+      await fetchHistoriales();
+      setAccionActiva(null);
+      setMostrarMenuFlotante(false);
+
+      if (estadoActual === 'en descanso' && progresoNormalizado === 100) {
+        alert('Recuperación registrada correctamente. El potrero ya está disponible.');
+      } else {
+        alert('Recuperación registrada correctamente.');
+      }
+    } catch (error) {
+      console.error('Error registrando recuperación:', error);
+      alert('No se pudo registrar la recuperación del potrero.');
     }
   };
 
   if (loading) {
     return (
-      <div className="w-full h-screen flex items-center justify-center bg-slate-100">
-        <div className="flex items-center space-x-2 text-emerald-700 font-semibold">
-          <Loader2 className="w-6 h-6 animate-spin" />
-          <span>Cargando potreros desde Supabase...</span>
-        </div>
+      <div className="flex h-[80vh] items-center justify-center">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-600" />
       </div>
     );
   }
 
   return (
-    <div className="w-full h-full bg-slate-100 font-sans text-slate-800 flex flex-col overflow-hidden p-4 gap-4">
-      {/* Barra de Filtros y Búsqueda */}
-      <div className="bg-white border border-slate-200 rounded-2xl px-6 py-3 flex flex-wrap items-center justify-between gap-4 shadow-sm">
-        <div className="flex items-center space-x-2">
-          <button
-            type="button"
-            onClick={() => setFiltroEstado('todos')}
-            className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition ${
-              filtroEstado === 'todos' ? 'bg-emerald-700 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            Todos ({potreros.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setFiltroEstado('Ocupado')}
-            className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition ${
-              filtroEstado === 'Ocupado' ? 'bg-rose-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            Ocupados
-          </button>
-          <button
-            type="button"
-            onClick={() => setFiltroEstado('En Descanso')}
-            className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition ${
-              filtroEstado === 'En Descanso' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            En Descanso
-          </button>
-        </div>
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 relative pb-24">
+      {/* CABECERA */}
+      <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-sm">
+        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-5">
+          <div>
+            <span className="inline-flex text-xs font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
+              Módulo Ganadero
+            </span>
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-800 mt-2">Gestión de Potreros</h1>
+            <p className="text-xs sm:text-sm text-slate-500 mt-1">Controla animales, fertilización y recuperación del terreno.</p>
 
-        <div className="flex items-center space-x-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Buscar Potrero..."
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              className="pl-9 pr-4 py-2 bg-slate-100 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 w-56 transition"
-            />
+            {potreroSeleccionado && (
+              <div className="flex items-center gap-2 mt-3">
+                <span className="text-[11px] font-bold text-slate-400 uppercase">Potrero:</span>
+                <span className="text-xs font-black text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg">
+                  {potreroSeleccionado.nombre}
+                </span>
+                <span
+                  className={`text-[10px] font-bold px-2 py-1 rounded-lg ${
+                    estaOcupado
+                      ? 'bg-amber-50 text-amber-700'
+                      : estaEnDescanso
+                      ? 'bg-blue-50 text-blue-700'
+                      : 'bg-emerald-50 text-emerald-700'
+                  }`}
+                >
+                  {potreroSeleccionado.estado}
+                </span>
+              </div>
+            )}
           </div>
-          <button
-            type="button"
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center space-x-2 bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-2 rounded-lg text-xs font-semibold shadow-sm transition"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Nuevo Potrero</span>
-          </button>
+
+          {/* ACCIONES PRINCIPALES */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={!potreroSeleccionado}
+              onClick={() => abrirAccion('ganado')}
+              className={`group flex items-center gap-2 px-4 py-3 rounded-xl text-xs font-bold border transition-all ${
+                accionActiva === 'ganado'
+                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg shadow-emerald-600/20'
+                  : 'bg-white text-slate-700 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50'
+              } ${!potreroSeleccionado ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <ArrowRightLeft size={17} className={accionActiva === 'ganado' ? 'text-white' : 'text-emerald-600'} />
+              <span>{estaOcupado ? 'Sacar Animales' : 'Control Bovinos'}</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={!potreroSeleccionado}
+              onClick={() => abrirAccion('abono')}
+              className={`group flex items-center gap-2 px-4 py-3 rounded-xl text-xs font-bold border transition-all ${
+                accionActiva === 'abono'
+                  ? 'bg-amber-600 text-white border-amber-600 shadow-lg shadow-amber-600/20'
+                  : 'bg-white text-slate-700 border-slate-200 hover:border-amber-300 hover:bg-amber-50'
+              } ${!potreroSeleccionado ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <Sprout size={17} className={accionActiva === 'abono' ? 'text-white' : 'text-amber-600'} />
+              <span>Abonos</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={!potreroSeleccionado || !estaEnDescanso}
+              onClick={() => abrirAccion('recuperacion')}
+              className={`group flex items-center gap-2 px-4 py-3 rounded-xl text-xs font-bold border transition-all ${
+                accionActiva === 'recuperacion'
+                  ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-600/20'
+                  : 'bg-white text-slate-700 border-slate-200 hover:border-blue-300 hover:bg-blue-50'
+              } ${!potreroSeleccionado || !estaEnDescanso ? 'opacity-40 cursor-not-allowed' : ''}`}
+            >
+              <RefreshCw size={17} className={accionActiva === 'recuperacion' ? 'text-white' : 'text-blue-600'} />
+              <span>Recuperación</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setMostrarModalCreacion(true)}
+              className="flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-3 rounded-xl text-xs font-bold shadow-lg transition-all"
+            >
+              <PlusCircle size={16} />
+              <span>Crear Potrero</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Contenido Principal */}
-      <div className="flex-1 flex overflow-hidden gap-4 min-h-0">
-        <MapaPotreros
-          potreros={potrerosFiltrados}
-          selectedId={selectedId}
-          onSelectPotrero={setSelectedId}
-          creandoDesdeMapa={creandoDesdeMapa}
-          onCrearDesdeMapa={handleManejarClickMapa}
-        />
+      {/* GRID PRINCIPAL */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <MapaPotreros
+            potreros={potreros}
+            selectedId={selectedId}
+            onSelectPotrero={setSelectedId}
+            creandoDesdeMapa={creandoDesdeMapa}
+            onCrearDesdeMapa={(_coords) => {
+              setCreandoDesdeMapa(true);
+              setMostrarModalCreacion(true);
+            }}
+          />
+        </div>
 
-        <PanelDetalle
-          potrero={potreroSeleccionado}
-          historial={historialPotrero}
-          onEditar={() => setIsEditModalOpen(true)}
-          onEliminar={eliminarPotrero}
-          onMoverPin={moverPin}
+        <VistaPotreros
+          potreroSeleccionado={potreroSeleccionado}
+          selectedId={selectedId}
+          setSelectedId={setSelectedId}
+          setMostrarModalEdicion={setMostrarModalEdicion}
+          setMostrarModalControl={() => {
+            if (potreroSeleccionado) setMostrarMenuFlotante(true);
+          }}
+          progresoCrecimiento={progresoCrecimiento}
         />
       </div>
 
-      {/* Modales */}
-      <ModalNuevoPotrero
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSave={agregarNuevoPotrero}
-        onActivarSeleccionMapa={() => {
-          setIsModalOpen(false);
-          setCreandoDesdeMapa(true);
-        }}
+      {/* MODAL EDICIÓN */}
+      <EditarPotreroModal
+        potrero={potreroSeleccionado}
+        isOpen={mostrarModalEdicion}
+        onClose={() => setMostrarModalEdicion(false)}
+        onSave={handleGuardarPotrero}
+        onDelete={handleEliminarPotrero}
       />
 
-      <ModalEditarPotrero
-        isOpen={isEditModalOpen}
-        potrero={potreroSeleccionado}
-        onClose={() => setIsEditModalOpen(false)}
-        onSave={guardarEdicionPotrero}
-      />
+      {/* FORMULARIO DE ACCIÓN */}
+      {potreroSeleccionado && mostrarMenuFlotante && accionActiva && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-slate-900/20 backdrop-blur-[2px]">
+          <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-2xl w-full max-w-md relative max-h-[90vh] overflow-y-auto">
+            <button
+              type="button"
+              onClick={() => {
+                setAccionActiva(null);
+                setMostrarMenuFlotante(false);
+              }}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 p-2 rounded-full hover:bg-slate-100 transition-colors"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="mb-5 pr-10">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Gestión de Potrero</span>
+              <h2 className="text-xl font-black text-slate-800 mt-1">{potreroSeleccionado.nombre}</h2>
+              <p className="text-xs text-slate-500 mt-1">
+                Estado actual: <span className="font-bold text-slate-700">{potreroSeleccionado.estado}</span>
+              </p>
+            </div>
+
+            {accionActiva === 'ganado' && (
+              <ControlGanado
+                potrero={potreroSeleccionado}
+                onIngresarGanado={async (id, bovinos, fecha) => {
+                  await ingresarGanado(id, bovinos, fecha);
+                  await fetchHistoriales();
+                  setAccionActiva(null);
+                  setMostrarMenuFlotante(false);
+                }}
+                onSacarGanado={async (id, fecha) => {
+                  await sacarGanado(id, fecha);
+                  await fetchHistoriales();
+                  setAccionActiva(null);
+                  setMostrarMenuFlotante(false);
+                }}
+              />
+            )}
+
+            {accionActiva === 'abono' && (
+              <ControlAbono
+                potreroId={potreroSeleccionado.id}
+                onRegistrarAbono={async (id, insumo, cantidad, fecha) => {
+                  await registrarAbono(id, insumo, cantidad, fecha);
+                  await fetchHistoriales();
+                  setAccionActiva(null);
+                  setMostrarMenuFlotante(false);
+                }}
+              />
+            )}
+
+            {accionActiva === 'recuperacion' && (
+              <RecuperacionPotrero potrero={potreroSeleccionado} onActualizar={handleRecuperacion} />
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* HISTORIALES */}
+      <HistorialList rotaciones={historialRotacion} abonos={historialAbonos} />
     </div>
   );
 }

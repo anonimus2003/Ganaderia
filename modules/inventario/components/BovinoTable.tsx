@@ -1,231 +1,196 @@
 'use client';
 
-import React, { useState, useMemo } from "react";
-import { Bovino, ESTADOS_BOVINOS, getEstadoBadgeStyle } from "../schemas";
-import { Eye, Pencil, Trash2, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import DataTable, { Column } from "@/components/ui/DataTable";
+import ActionDropdown from "@/components/ui/ActionDropdown";
+import { Bovino } from "../schemas";
+import { Pencil, Trash2 } from "lucide-react";
+import { exportToPDF } from "@/lib/utils/exportUtils";
+import { useExportData } from "@/hooks/useExportData";
 
 interface BovinoTableProps {
-  bovinos: Bovino[];
-  loading: boolean;
-  onView: (bovino: Bovino) => void;
-  onEdit: (bovino: Bovino) => void;
-  onDelete: (id: string, arete: string) => void;
+  data: Bovino[];
+  loading?: boolean;
+  onAddRecord?: () => void;
+  onEdit?: (bovino: Bovino) => void;
+  onDelete?: (id: string, arete: string) => void;
+  onRowClick?: (bovino: Bovino) => void;
+  onFilters?: () => void;
+  page: number;
+  total: number;
+  nextPage: () => void;
+  prevPage: () => void;
+  pageSize: number;
+  permisos?: {
+    puede_ver: boolean;
+    puede_crear: boolean;
+    puede_editar: boolean;
+    puede_eliminar: boolean;
+  };
 }
 
-export default function BovinoTable({
-  bovinos,
+export default function BovinoTable({ 
+  data, 
   loading,
-  onView,
-  onEdit,
-  onDelete,
+  onAddRecord, 
+  onEdit, 
+  onDelete, 
+  onRowClick, 
+  onFilters,
+  page,
+  total,
+  nextPage,
+  prevPage,
+  pageSize,
+  permisos = { puede_ver: true, puede_crear: true, puede_editar: true, puede_eliminar: true }
 }: BovinoTableProps) {
-  // Estados de paginación, filtros locales y buscador
-  const [currentPage, setCurrentPage] = useState(1);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterEstado, setFilterEstado] = useState("Todos");
-  const [filterGenero, setFilterGenero] = useState("Todos");
-  const itemsPerPage = 5;
+  
+  const { exportAll, isExporting } = useExportData();
+  
+  const columns: Column<Bovino>[] = [
+    { 
+      header: "Bovino", 
+      accessor: "arete",
+      render: (_, b) => (
+        <div>
+          <span className="font-semibold text-slate-800 block">{b.arete || "Sin arete"}</span>
+          {b.nombre && <span className="text-xs text-slate-500 block">{b.nombre}</span>}
+        </div>
+      )
+    },
+    { 
+      header: "Género", 
+      accessor: "genero",
+      render: (value) => {
+        const genero = String(value || "").toLowerCase();
+        const esFemenino = genero.includes("femenino") || genero === "f" || genero.includes("hembra");
+        
+        return (
+          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold inline-block border ${
+            esFemenino 
+              ? "bg-rose-100 text-rose-700 border-rose-200" 
+              : "bg-sky-100 text-sky-700 border-sky-200"
+          }`}>
+            {value}
+          </span>
+        );
+      }
+    },
+    { header: "Raza", accessor: "raza" },
+    { 
+      header: "Peso", 
+      accessor: "peso_inicial",
+      render: (value) => value ? `${value} kg` : "-"
+    },
+    { 
+      header: "Estado", 
+      accessor: "estado",
+      render: (value) => {
+        const estado = String(value || "").toLowerCase();
+        let badgeStyle = "bg-slate-100 text-slate-700 border-slate-200";
+        
+        if (estado.includes("producción") || estado.includes("produccion")) {
+          badgeStyle = "bg-emerald-100 text-emerald-700 border-emerald-200";
+        } else if (estado.includes("novilla en desarrollo")) {
+          badgeStyle = "bg-amber-100 text-amber-700 border-amber-200";
+        } else if (estado.includes("novilla de vientre")) {
+          badgeStyle = "bg-pink-100 text-pink-700 border-pink-200";
+        } else if (estado.includes("crecimiento")) {
+          badgeStyle = "bg-blue-100 text-blue-700 border-blue-200";
+        } else if (estado.includes("lactancia")) {
+          badgeStyle = "bg-purple-100 text-purple-700 border-purple-200";
+        } else if (estado.includes("destete") || estado.includes("levante")) {
+          badgeStyle = "bg-indigo-100 text-indigo-700 border-indigo-200";
+        } else if (estado.includes("seca")) {
+          badgeStyle = "bg-orange-100 text-orange-700 border-orange-200";
+        }
 
-  // Filtrar los bovinos según búsqueda (Arete o Nombre), etapa (estado) y género
-  const filteredBovinos = useMemo(() => {
-    return bovinos.filter((bovino) => {
-      const matchesSearch = 
-        bovino.arete.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (bovino.nombre && bovino.nombre.toLowerCase().includes(searchTerm.toLowerCase()));
-      
-      const matchEstado = filterEstado === "Todos" || bovino.estado === filterEstado;
-      const matchGenero = filterGenero === "Todos" || bovino.genero === filterGenero;
-      
-      return matchesSearch && matchEstado && matchGenero;
-    });
-  }, [bovinos, searchTerm, filterEstado, filterGenero]);
-
-  // Cálculos de paginación basados en los datos filtrados
-  const totalPages = Math.ceil(filteredBovinos.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const currentBovinos = filteredBovinos.slice(startIndex, startIndex + itemsPerPage);
-
-  const handlePrevPage = () => {
-    if (currentPage > 1) setCurrentPage(currentPage - 1);
-  };
-
-  const handleNextPage = () => {
-    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
-  };
-
-  // Resetear la página actual al interactuar con filtros o buscador
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(e.target.value);
-    setCurrentPage(1);
-  };
-
-  const handleEstadoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setFilterEstado(e.target.value);
-    setCurrentPage(1);
-  };
-
-  const handleGeneroChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setFilterGenero(e.target.value);
-    setCurrentPage(1);
-  };
-
-  if (loading) {
-    return (
-      <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-12 text-center text-slate-400">
-        Cargando registros del hato...
-      </div>
-    );
-  }
+        return (
+          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border inline-block ${badgeStyle}`}>
+            {value}
+          </span>
+        );
+      }
+    },
+    { 
+      header: "Condición", 
+      accessor: "condicion",
+      render: (value, b) => {
+        const condicion = String(value || "Activo");
+        const esActivo = condicion === "Activo";
+        
+        return (
+          <div className="flex flex-col gap-1">
+            <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border inline-block w-fit ${
+              esActivo ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-700 border-red-200"
+            }`}>
+              {condicion}
+            </span>
+            {!esActivo && b.motivo_baja && (
+              <span className="text-xs text-slate-500 italic max-w-xs truncate" title={`${b.motivo_baja}${b.observacion_baja ? ` - ${b.observacion_baja}` : ""}`}>
+                <strong>{b.motivo_baja}</strong> {b.observacion_baja ? `- ${b.observacion_baja}` : ""}
+              </span>
+            )}
+          </div>
+        );
+      }
+    },
+    { 
+      header: "Observaciones", 
+      accessor: "observaciones",
+      render: (value) => {
+        const obs = String(value || "").trim();
+        if (!obs) return <span className="text-slate-400 italic">Sin observaciones</span>;
+        
+        return (
+          <span className="text-slate-600 truncate max-w-xs block" title={obs}>
+            {obs}
+          </span>
+        );
+      }
+    },
+    { 
+      header: "", 
+      accessor: "id",
+      render: (_, b) => (
+        <ActionDropdown actions={[
+          { 
+            label: "Editar", 
+            icon: <Pencil className="w-4 h-4"/>, 
+            onClick: () => onEdit?.(b),
+            disabled: !permisos.puede_editar 
+          },
+          { 
+            label: "Eliminar", 
+            icon: <Trash2 className="w-4 h-4"/>, 
+            onClick: () => onDelete?.(b.id, b.arete), 
+            danger: true,
+            disabled: !permisos.puede_eliminar 
+          },
+        ]} />
+      )
+    }
+  ];
 
   return (
-    <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-      
-      {/* BARRA DE BÚSQUEDA Y FILTROS INTERNOS */}
-      <div className="p-4 md:p-5 border-b border-slate-100 bg-slate-50/50 flex flex-col md:flex-row items-center justify-between gap-3">
-        
-        {/* Buscador por Arete o Nombre */}
-        <div className="relative w-full md:w-72">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={handleSearchChange}
-            placeholder="Buscar por arete o nombre..."
-            className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-2xl text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 shadow-sm transition-all"
-          />
-        </div>
-
-        {/* Filtros por Etapa y Género */}
-        <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
-          <select
-            value={filterEstado}
-            onChange={handleEstadoChange}
-            className="px-3 py-2 bg-white border border-slate-200 rounded-2xl text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 shadow-sm"
-          >
-            <option value="Todos">Todas las etapas</option>
-            {ESTADOS_BOVINOS.map((est) => (
-              <option key={est} value={est}>{est}</option>
-            ))}
-          </select>
-
-          <select
-            value={filterGenero}
-            onChange={handleGeneroChange}
-            className="px-3 py-2 bg-white border border-slate-200 rounded-2xl text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 shadow-sm"
-          >
-            <option value="Todos">Todos los géneros</option>
-            <option value="Hembra">Hembra</option>
-            <option value="Macho">Macho</option>
-          </select>
-        </div>
-      </div>
-
-      {/* CONTENEDOR DE LA TABLA */}
-      {filteredBovinos.length === 0 ? (
-        <div className="p-12 text-center text-slate-400 text-sm">
-          No se encontraron registros que coincidan con la búsqueda o filtros seleccionados.
-        </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50/75 border-b border-slate-100 text-[10px] md:text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                <th className="py-3 px-3 md:py-4 md:px-6">Arete</th>
-                <th className="py-3 px-3 md:py-4 md:px-6">Nombre</th>
-                <th className="py-3 px-3 md:py-4 md:px-6">Género</th>
-                <th className="py-3 px-3 md:py-4 md:px-6">Raza</th>
-                <th className="py-3 px-3 md:py-4 md:px-6">Peso Inicial</th>
-                <th className="py-3 px-3 md:py-4 md:px-6">Etapa</th>
-                <th className="py-3 px-3 md:py-4 md:px-6 text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-xs md:text-sm">
-              {currentBovinos.map((bovino) => (
-                <tr key={bovino.id} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="py-3 px-3 md:py-4 md:px-6 font-semibold text-slate-800">
-                    {bovino.arete}
-                  </td>
-                  <td className="py-3 px-3 md:py-4 md:px-6 text-slate-600">
-                    {bovino.nombre || <span className="text-slate-300 italic">Sin nombre</span>}
-                  </td>
-                  <td className="py-3 px-3 md:py-4 md:px-6 text-slate-600 font-medium">
-                    {bovino.genero || <span className="text-slate-300 italic">No asignado</span>}
-                  </td>
-                  <td className="py-3 px-3 md:py-4 md:px-6 text-slate-800 font-medium">
-                    {bovino.raza || <span className="text-slate-300 italic">No asignada</span>}
-                  </td>
-                  <td className="py-3 px-3 md:py-4 md:px-6 text-slate-600 font-medium">
-                    {bovino.peso_inicial} kg
-                  </td>
-                  <td className="py-3 px-3 md:py-4 md:px-6">
-                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] md:text-xs font-semibold border ${getEstadoBadgeStyle(bovino.estado)}`}>
-                      {bovino.estado || 'No asignado'}
-                    </span>
-                  </td>
-                  <td className="py-3 px-3 md:py-4 md:px-6 text-right space-x-0.5 md:space-x-1">
-                    <button
-                      onClick={() => onView(bovino)}
-                      className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors"
-                      title="Ver detalles"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => onEdit(bovino)}
-                      className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"
-                      title="Editar"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => onDelete(bovino.id, bovino.arete)}
-                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
-                      title="Eliminar"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* PAGINACIÓN INFERIOR */}
-      {filteredBovinos.length > 0 && (
-        <div className="flex items-center justify-between px-4 md:px-6 py-3.5 bg-slate-50/50 border-t border-slate-100 text-xs text-slate-500">
-          <div>
-            Mostrando <span className="font-semibold text-slate-700">{startIndex + 1}</span> a{" "}
-            <span className="font-semibold text-slate-700">
-              {Math.min(startIndex + itemsPerPage, filteredBovinos.length)}
-            </span>{" "}
-            de <span className="font-semibold text-slate-700">{filteredBovinos.length}</span> registros
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handlePrevPage}
-              disabled={currentPage === 1}
-              className="p-1.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
-              title="Anterior"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span className="font-semibold text-slate-700 px-1">
-              {currentPage} / {totalPages || 1}
-            </span>
-            <button
-              onClick={handleNextPage}
-              disabled={currentPage === totalPages || totalPages === 0}
-              className="p-1.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
-              title="Siguiente"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      )}
-
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+      <DataTable 
+        title="REGISTROS DE ANIMALES" 
+        totalLabel="Total Bovinos:"
+        data={data} 
+        columns={columns} 
+        loading={loading}
+        onAddRecord={onAddRecord}
+        isAddDisabled={!permisos.puede_crear}
+        onRowClick={onRowClick}
+        onExportCSV={() => exportAll('bovinos', '*')} 
+        onDownloadPDF={exportToPDF}
+        onFilters={onFilters}
+        page={page}
+        total={total}
+        nextPage={nextPage}
+        prevPage={prevPage}
+        pageSize={pageSize}
+      />
     </div>
   );
 }

@@ -58,3 +58,18 @@ export async function obtenerActividadReciente(): Promise<RegistroActividad[]> {
   if (error) throw new Error(`Error al cargar actividad: ${error.message}`);
   return data || [];
 }
+
+// NUEVA FUNCIÓN PARA OBTENER EL NOMBRE AUTOMÁTICO DE LA TABLA PERFILES
+export async function obtenerPerfilUsuario(): Promise<string> {
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) return "";
+
+  const { data, error } = await supabase
+    .from("perfiles")
+    .select("nombre")
+    .eq("id", user.id)
+    .single();
+
+  if (error || !data) return "";
+  return data.nombre || "";
+}

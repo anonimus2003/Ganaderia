@@ -2,6 +2,7 @@
 
 import React from "react";
 import { useDashboard } from "./hooks/useDashboard";
+import EncabezadoDashboard from "./componentes/EncabezadoDashboard";
 import TarjetasMetricas from "./componentes/metricas/TarjetasMetricas";
 import ContenedorGraficaPrincipal from "./componentes/grafica/ContenedorGraficaPrincipal";
 import SaludHato from "./componentes/lateral/SaludHato";
@@ -19,31 +20,30 @@ export default function DashboardControl() {
     setBovinoSeleccionado,
     loading,
     error,
-  } = useDashboard();
+    usuarioNombre, // <--- Si tu hook ya lo tiene o lo agregamos allá, lo usas directo aquí
+  } = useDashboard() as any; // (Si TypeScript te reclama la propiedad, este cast temporal evita el rojo)
 
   if (loading && bovinos.length === 0) {
-    return <p className="p-6 text-white">Cargando panel principal...</p>;
+    return <p className="p-6 text-gray-700">Cargando panel principal...</p>;
   }
 
   if (error) {
-    return <p className="p-6 text-red-500">Error al cargar los datos: {error}</p>;
+    return <p className="p-6 text-rose-600">Error al cargar los datos: {error}</p>;
   }
 
   // Cálculos para la gráfica y promedios basados en los registros filtrados
-  const totalLitrosGrafica = produccion.reduce((acc, curr) => acc + Number(curr.litros), 0);
+  const totalLitrosGrafica = produccion.reduce((acc: number, curr: any) => acc + Number(curr.litros || 0), 0);
   const promedioDiario = produccion.length > 0 ? totalLitrosGrafica / produccion.length : 0;
-  const bovinoObj = bovinos.find((b) => b.id === bovinoSeleccionado) || null;
 
   return (
-    <div className="p-6 space-y-6  min-h-screen text-white">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-4xl font-black text-black">Panel Principal</h1>
-          <p className="text-xs text-gray-400">Resumen general de tu producción y ganado hoy</p>
-        </div>
-      </div>
+    <div className="p-6 space-y-6 min-h-screen bg-gray-50/50">
+      
+      {/* El encabezado recibe el nombre de forma automática desde el hook */}
+      <EncabezadoDashboard 
+        nombreUsuario={usuarioNombre || "Ganadero"} 
+      />
 
-      {/* Tarjetas superiores usando el total histórico global en la primera tarjeta */}
+      {/* Tarjetas superiores */}
       <TarjetasMetricas 
         totalLitrosHoy={totalHistorico} 
         promedioDiario={promedioDiario} 

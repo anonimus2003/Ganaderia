@@ -58,15 +58,15 @@ export default function ContenedorGraficaPrincipal({
   }, [data, periodo]);
 
   return (
-    <div className="border border-gray-800 bg-[#0d1110] p-6 rounded-2xl space-y-6 shadow-sm">
+    <div className="border border-gray-100 bg-white p-6 rounded-3xl space-y-6 shadow-sm hover:shadow-md transition-shadow">
       {/* Cabecera de la sección */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div>
-          <h3 className="text-lg font-bold text-white flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+          <h3 className="text-sm font-semibold tracking-wide text-gray-600 uppercase flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
             Producción de Leche
           </h3>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-gray-400 mt-0.5">
             Litros producidos por {periodo === "dias" ? "día" : periodo === "meses" ? "mes" : "año"}
           </p>
         </div>

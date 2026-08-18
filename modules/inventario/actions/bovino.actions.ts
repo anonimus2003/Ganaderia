@@ -1,63 +1,56 @@
-// Archivo: src/app/(dashboard)/inventario/nuevo/actions.ts
-'use server';
+import { createClient } from "@/lib/supabase/client"; // Ajusta según tu configuración de Supabase
+import { Bovino } from "../schemas";
 
-import { createClient } from '@/lib/supabase/server';
-import { revalidatePath } from 'next/cache';
+const supabase = createClient();
 
-export async function registrarBovino(formData: FormData) {
-  const supabase = createClient();
-
-  // 1. Verificar autenticación del usuario
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
-    // Devolvemos un objeto error en lugar de lanzar throw
-    return { error: 'No estás autorizado para realizar esta acción.' };
-  }
-
-  // 2. Extraer la información del formulario
-  const arete = formData.get('arete') as string;
-  const nombre = formData.get('nombre') as string;
-  const raza = formData.get('raza') as string;
-  const genero = formData.get('genero') as string;
-  const peso_inicial_str = formData.get('peso_inicial') as string;
-  const fecha_nacimiento = formData.get('fecha_nacimiento') as string;
-  const estado = formData.get('estado') as string;
-  const observaciones = formData.get('observaciones') as string;
-
-  // Validación básica
-  if (!arete || !raza || !genero || !peso_inicial_str || !estado) {
-    return { error: 'Por favor complete todos los campos obligatorios marcados con *' };
-  }
-
-  const peso_inicial = parseFloat(peso_inicial_str);
-
-  // 3. Insertar el registro en la base de datos
-  const { error } = await supabase
-    .from('bovinos')
-    .insert([
-      {
-        arete,
-        nombre: nombre || null,
-        raza,
-        genero,
-        peso_inicial,
-        fecha_nacimiento: fecha_nacimiento || null,
-        estado,
-        observaciones: observaciones || null,
-        creado_por: user.id
-      }
-    ]);
+// Obtener todos los bovinos
+export async function getBovinos() {
+  const { data, error } = await supabase
+    .from("bovinos")
+    .select("*")
+    .order("created_at", { ascending: false });
 
   if (error) {
-    console.error('Error al insertar en BD:', error.message);
-    // Retornamos un objeto con el mensaje de error
-    return { error: 'Ocurrió un error al intentar registrar el bovino. Es posible que el número de arete ya exista.' };
+    console.error("Error al obtener bovinos:", error.message);
+    throw new Error(error.message);
   }
 
-  // 4. ÉXITO: Revalidamos la página de inventario para que aparezca el nuevo animal
-  revalidatePath('/inventario');
-  
-  // Retornamos un objeto indicando éxito (sin propiedad error)
-  return { success: true };
+  return data as Bovino[];
+}
+
+// Crear o actualizar un bovino
+export async function saveBovino(bovino: Partial<Bovino>) {
+  if (bovino.id) {
+    // Actualizar
+    const { data, error } = await supabase
+      .from("bovinos")
+      .update(bovino)
+      .eq("id", bovino.id)
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+    return data;
+  } else {
+    // Insertar nuevo
+    const { data, error } = await supabase
+      .from("bovinos")
+      .insert([bovino])
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+    return data;
+  }
+}
+
+// Eliminar un bovino
+export async function deleteBovino(id: string) {
+  const { error } = await supabase
+    .from("bovinos")
+    .delete()
+    .eq("id", id);
+
+  if (error) throw new Error(error.message);
+  return true;
 }

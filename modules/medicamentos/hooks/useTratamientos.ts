@@ -1,162 +1,93 @@
-import { useState, useEffect } from 'react';
-import { Bovino, Tratamiento, TratamientoFormData, ViaAplicacion } from '../schemas';
-import { getBovinos, getTratamientos, saveTratamiento, deleteTratamiento } from '../actions/medicamentos.actions';
+import { useState, useEffect, useCallback } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { Tratamiento } from "../schemas";
+
+const PAGE_SIZE = 10;
 
 export function useTratamientos() {
-  const [bovinos, setBovinos] = useState<Bovino[]>([]);
-  const [tratamientos, setTratamientos] = useState<Tratamiento[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [tratamientos, setTratamientos] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const supabase = createClient();
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterVia, setFilterVia] = useState<string>('Todas');
-  const [filterFecha, setFilterFecha] = useState<string>('');
-  
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-
-  const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 5;
-
-  const [formData, setFormData] = useState<TratamientoFormData>({
-    bovino_id: '',
-    medicamento: '',
-    dosis: '',
-    via: 'Intramuscular',
-    fecha_aplicacion: new Date().toISOString().split('T')[0],
-    tiempo_retiro: 0,
-    veterinario: '',
-    motivo: '',
-  });
-
-  const fetchData = async () => {
+  const fetchTratamientos = useCallback(async (currentPage: number) => {
     setLoading(true);
-    try {
-      const [bovinosData, tratamientosData] = await Promise.all([
-        getBovinos(),
-        getTratamientos(),
-      ]);
-      setBovinos(bovinosData);
-      setTratamientos(tratamientosData);
-    } catch (error) {
-      console.error('Error consultando Supabase:', error);
-    } finally {
-      setLoading(false);
+    const from = (currentPage - 1) * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+
+    const { data, count, error } = await supabase
+      .from("tratamientos")
+      .select("*, bovinos(id, arete, nombre)", { count: "exact" })
+      .order("fecha_aplicacion", { ascending: false })
+      .range(from, to);
+
+    if (error) {
+      console.error("Error al cargar tratamientos:", error);
+    } else {
+      setTratamientos(data || []);
+      setTotal(count || 0);
     }
-  };
+    setLoading(false);
+  }, [supabase]);
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    fetchTratamientos(page);
+  }, [page, fetchTratamientos]);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, filterVia, filterFecha]);
-
-  const handleOpenCreateModal = () => {
-    setEditingId(null);
-    setFormData({
-      bovino_id: bovinos[0]?.id || '',
-      medicamento: '',
-      dosis: '',
-      via: 'Intramuscular',
-      fecha_aplicacion: new Date().toISOString().split('T')[0],
-      tiempo_retiro: 0,
-      veterinario: '',
-      motivo: '',
-    });
-    setIsModalOpen(true);
-  };
-
-  const handleOpenEditModal = (tratamiento: Tratamiento) => {
-    setEditingId(tratamiento.id);
-    setFormData({
-      bovino_id: tratamiento.bovino_id,
-      medicamento: tratamiento.medicamento,
-      dosis: tratamiento.dosis,
-      via: tratamiento.via,
-      fecha_aplicacion: tratamiento.fecha_aplicacion,
-      tiempo_retiro: tratamiento.tiempo_retiro,
-      veterinario: tratamiento.veterinario,
-      motivo: tratamiento.motivo || '',
-    });
-    setIsModalOpen(true);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await saveTratamiento(formData, editingId);
-      await fetchData();
-      setIsModalOpen(false);
-    } catch (error) {
-      console.error('Error al guardar:', error);
-      alert('Ocurrió un error al guardar el registro.');
+  const handleSave = async (data: Partial<Tratamiento>) => {
+    const { id, ...rest } = data;
+    
+    let payload: any = { ...rest };
+    if (!id) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        payload.creado_por = user.id;
+      }
     }
+
+    if (id) {
+      const { error } = await supabase
+        .from("tratamientos")
+        .update(payload)
+        .eq("id", id);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase
+        .from("tratamientos")
+        .insert([payload]);
+      if (error) throw error;
+    }
+    fetchTratamientos(page);
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('¿Estás seguro de eliminar este registro de tratamiento?')) {
-      try {
-        await deleteTratamiento(id);
-        await fetchData();
-      } catch (error) {
-        console.error('Error al eliminar:', error);
-        alert('Error al eliminar el tratamiento');
-      }
+    if (!confirm("¿Estás seguro de eliminar este registro de tratamiento?")) return;
+    const { error } = await supabase.from("tratamientos").delete().eq("id", id);
+    if (error) {
+      console.error("Error al eliminar:", error);
+    } else {
+      fetchTratamientos(page);
     }
   };
 
-  const isEnRetiro = (fechaAplicacion: string, diasRetiro: number) => {
-    if (diasRetiro <= 0) return false;
-    const fechaApp = new Date(fechaAplicacion);
-    const fechaFin = new Date(fechaApp);
-    fechaFin.setDate(fechaFin.getDate() + diasRetiro);
-    return new Date() <= fechaFin;
+  const nextPage = () => {
+    if (page * PAGE_SIZE < total) setPage(p => p + 1);
   };
 
-  const filteredTratamientos = tratamientos.filter((item) => {
-    const bovinoInfo = `${item.bovino?.arete || ''} ${item.bovino?.nombre || ''}`.toLowerCase();
-    const matchSearch =
-      bovinoInfo.includes(searchTerm.toLowerCase()) ||
-      item.medicamento.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.veterinario.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchVia = filterVia === 'Todas' || item.via === filterVia;
-    const matchFecha = !filterFecha || item.fecha_aplicacion === filterFecha;
-
-    return matchSearch && matchVia && matchFecha;
-  });
-
-  const totalPages = Math.ceil(filteredTratamientos.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedTratamientos = filteredTratamientos.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  const prevPage = () => {
+    if (page > 1) setPage(p => p - 1);
+  };
 
   return {
-    bovinos,
     tratamientos,
     loading,
-    searchTerm,
-    setSearchTerm,
-    filterVia,
-    setFilterVia,
-    filterFecha,
-    setFilterFecha,
-    isModalOpen,
-    setIsModalOpen,
-    editingId,
-    currentPage,
-    setCurrentPage,
-    totalPages,
-    startIndex,
-    ITEMS_PER_PAGE,
-    formData,
-    setFormData,
-    paginatedTratamientos,
-    filteredTratamientos,
-    handleOpenCreateModal,
-    handleOpenEditModal,
-    handleSubmit,
+    handleSave,
     handleDelete,
-    isEnRetiro,
+    page,
+    total,
+    nextPage,
+    prevPage,
+    PAGE_SIZE,
   };
 }

@@ -1,6 +1,14 @@
-// modules/leche/actions/leche.actions.ts
+// modules/ordeno/actions/leche.actions.ts
 import { SupabaseClient } from '@supabase/supabase-js';
-import { ProduccionLeche, Bovino } from '../schemas';
+import { ProduccionLeche } from '../schemas';
+
+export interface Bovino {
+  id: string;
+  arete: string;
+  nombre?: string | null;
+  raza?: string;
+  estado?: string;
+}
 
 const PAGE_SIZE = 10;
 

@@ -17,15 +17,15 @@ export default function FiltroPeriodo({ value, onChange }: Props) {
   ];
 
   return (
-    <div className="flex items-center bg-[#141a18] border border-gray-800 p-1 rounded-xl">
+    <div className="flex items-center bg-gray-100/80 border border-gray-200/80 p-1 rounded-xl">
       {opciones.map((op) => (
         <button
           key={op.id}
           onClick={() => onChange(op.id)}
-          className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+          className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
             value === op.id
-              ? "bg-emerald-500 text-white shadow-sm"
-              : "text-gray-400 hover:text-white"
+              ? "bg-white text-gray-900 shadow-xs border border-gray-200/50"
+              : "text-gray-500 hover:text-gray-900"
           }`}
         >
           {op.label}

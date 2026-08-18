@@ -7,7 +7,7 @@ export async function getPotreros(): Promise<Potrero[]> {
   const { data, error } = await supabase.from('potreros').select('*').order('id', { ascending: true });
   if (error) throw error;
 
-  return (data || []).map((p) => {
+  return (data || []).map((p): Potrero => {
     let diasDescansoCalculados = p.dias_descanso || 0;
     if (p.fecha_salida_ganado && (!p.fecha_entrada_ganado || new Date(p.fecha_salida_ganado) > new Date(p.fecha_entrada_ganado))) {
       const diffTime = Math.abs(new Date().getTime() - new Date(p.fecha_salida_ganado).getTime());
@@ -19,15 +19,16 @@ export async function getPotreros(): Promise<Potrero[]> {
       nombre: p.nombre,
       estado: p.estado || 'En Descanso',
       crecimiento: p.crecimiento,
-      tipoPasto: p.tipo_pasto,
-      ultimoAbono: p.ultimo_abono,
-      fechaAbono: p.fecha_abono,
-      diasDescanso: diasDescansoCalculados,
-      bovinosActuales: p.bovinos_actuales ?? 0,
-      mensajeCrecimiento: p.mensaje_crecimiento,
-      areaM2: p.area_m2,
-      fechaSalidaGanado: p.fecha_salida_ganado,
-      fechaEntradaGanado: p.fecha_entrada_ganado,
+      tipo_pasto: p.tipo_pasto,
+      ultimo_abono: p.ultimo_abono,
+      fecha_abono: p.fecha_abono,
+      dias_descanso: diasDescansoCalculados,
+      bovinos_actuales: p.bovinos_actuales ?? 0,
+      mensaje_crecimiento: p.mensaje_crecimiento,
+      created_at: p.created_at,
+      area_m2: p.area_m2,
+      fecha_salida_ganado: p.fecha_salida_ganado,
+      fecha_entrada_ganado: p.fecha_entrada_ganado,
       aforo: p.aforo ?? 0,
       x: p.x ?? 50,
       y: p.y ?? 50,
