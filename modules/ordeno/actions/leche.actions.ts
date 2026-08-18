@@ -1,4 +1,3 @@
-// modules/ordeno/actions/leche.actions.ts
 import { SupabaseClient } from '@supabase/supabase-js';
 import { ProduccionLeche } from '../schemas';
 
@@ -12,6 +11,15 @@ export interface Bovino {
 
 const PAGE_SIZE = 10;
 
+interface FetchTablaParams {
+  page: number;
+  busqueda: string;
+  bovinoFiltroId: string;
+  fechaInicio: string;
+  fechaFin: string;
+}
+
+// 1. Cargar lista de bovinos para selectores
 export async function getBovinosLista(supabase: SupabaseClient): Promise<Bovino[]> {
   const { data, error } = await supabase
     .from('bovinos')
@@ -22,14 +30,7 @@ export async function getBovinosLista(supabase: SupabaseClient): Promise<Bovino[
   return data || [];
 }
 
-interface FetchTablaParams {
-  page: number;
-  busqueda: string;
-  bovinoFiltroId: string;
-  fechaInicio: string;
-  fechaFin: string;
-}
-
+// 2. Cargar tabla paginada de producción
 export async function getProduccionLechePaginated(supabase: SupabaseClient, params: FetchTablaParams) {
   const { page, busqueda, bovinoFiltroId, fechaInicio, fechaFin } = params;
   const from = (page - 1) * PAGE_SIZE;
@@ -67,6 +68,7 @@ export async function getProduccionLechePaginated(supabase: SupabaseClient, para
   };
 }
 
+// 3. Métricas de producción
 export async function getMetricasLeche(supabase: SupabaseClient, filters: Omit<FetchTablaParams, 'page'>) {
   const { busqueda, bovinoFiltroId, fechaInicio, fechaFin } = filters;
 
@@ -104,7 +106,41 @@ export async function getMetricasLeche(supabase: SupabaseClient, filters: Omit<F
   };
 }
 
+// 4. Eliminar registro
 export async function deleteProduccionLeche(supabase: SupabaseClient, id: string) {
   const { error } = await supabase.from('produccion_leche').delete().eq('id', id);
   if (error) throw new Error(error.message);
+}
+
+// 5. Crear nuevo registro
+export async function createProduccionLeche(supabase: SupabaseClient, payload: Partial<ProduccionLeche>) {
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const dataToInsert = {
+    bovino_id: payload.bovino_id,
+    fecha: payload.fecha,
+    litros: payload.litros,
+    jornada: payload.jornada,
+    concentrado_kg: payload.concentrado_kg || 0,
+    observaciones: payload.observaciones || null,
+    registrado_por: user ? user.id : null,
+  };
+
+  const { error } = await supabase.from('produccion_leche').insert([dataToInsert]);
+  if (error) throw new Error('Error al crear registro: ' + error.message);
+}
+
+// 6. Actualizar registro existente
+export async function updateProduccionLeche(supabase: SupabaseClient, id: string, payload: Partial<ProduccionLeche>) {
+  const dataToUpdate = {
+    bovino_id: payload.bovino_id,
+    fecha: payload.fecha,
+    litros: payload.litros,
+    jornada: payload.jornada,
+    concentrado_kg: payload.concentrado_kg || 0,
+    observaciones: payload.observaciones || null,
+  };
+
+  const { error } = await supabase.from('produccion_leche').update(dataToUpdate).eq('id', id);
+  if (error) throw new Error('Error al actualizar registro: ' + error.message);
 }

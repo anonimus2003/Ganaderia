@@ -1,4 +1,5 @@
 'use client';
+
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import ProduccionTable from "@/modules/ordeno/components/ProduccionTable";
 import ProduccionFormModal from "@/modules/ordeno/components/ProduccionFormModal";
@@ -7,7 +8,12 @@ import DetailOrdene from "@/modules/ordeno/components/DetailOrdene";
 import { useModuloPermissions } from "@/hooks/useModuloPermissions";
 import { createClient } from "@/lib/supabase/client";
 import { ProduccionLeche } from "./schemas";
-import { getProduccionLechePaginated, deleteProduccionLeche } from "@/modules/ordeno/actions/leche.actions";
+import { 
+  getProduccionLechePaginated, 
+  deleteProduccionLeche, 
+  createProduccionLeche, 
+  updateProduccionLeche 
+} from "@/modules/ordeno/actions/leche.actions";
 import { X } from "lucide-react";
 
 export default function ProduccionPage() {
@@ -17,7 +23,7 @@ export default function ProduccionPage() {
   // 1. Estados de datos y paginación acoplados a tus actions
   const [registros, setRegistros] = useState<ProduccionLeche[]>([]);
   const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1); // Ojo: tus actions usan paginación base 1
+  const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
 
   // 2. Estados de filtros que coinciden con FetchTablaParams
@@ -61,7 +67,7 @@ export default function ProduccionPage() {
     fetchData();
   }, [fetchData]);
 
-  // Filtrado adicional en cliente para la jornada (si tus actions no lo filtraban directo)
+  // Filtrado adicional en cliente para la jornada
   const filteredRegistros = useMemo(() => {
     return registros.filter(item => {
       const coincideJornada = !filterValues.jornada || item.jornada === filterValues.jornada;
@@ -80,6 +86,25 @@ export default function ProduccionPage() {
     if (!permisos.puede_editar) return;
     setSelectedRegistro(item);
     setIsModalOpen(true);
+  };
+
+  // Función para guardar (Crear o Actualizar) usando las actions correctas
+  const handleSaveRegistro = async (formData: Partial<ProduccionLeche>) => {
+    try {
+      if (formData.id) {
+        // Si tiene ID, actualizamos el registro existente
+        await updateProduccionLeche(supabase, formData.id, formData);
+      } else {
+        // Si no tiene ID, creamos un registro nuevo
+        await createProduccionLeche(supabase, formData);
+      }
+
+      setIsModalOpen(false);
+      await fetchData();
+    } catch (error: any) {
+      console.error("Error al guardar el registro:", error);
+      throw error; // Deja pasar el error para que el modal muestre la alerta
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -126,7 +151,7 @@ export default function ProduccionPage() {
               values={filterValues}
               onChange={(id, val) => {
                 setFilterValues(prev => ({ ...prev, [id]: val }));
-                setPage(1); // Reiniciar a página 1 al filtrar
+                setPage(1);
               }}
               onReset={() => {
                 setFilterValues({ busqueda: "", bovinoFiltroId: "", fechaInicio: "", fechaFin: "", jornada: "" });
@@ -146,7 +171,7 @@ export default function ProduccionPage() {
         onDelete={handleDelete}
         onView={handleRowClick}
         onFilters={() => setShowFilters(true)}
-        page={page - 1} // Ajustado si tu DataTable maneja índice 0
+        page={page - 1}
         total={total}
         nextPage={nextPage}
         prevPage={prevPage}
@@ -158,10 +183,7 @@ export default function ProduccionPage() {
       <ProduccionFormModal 
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSave={async () => {
-          setIsModalOpen(false);
-          await fetchData();
-        }}
+        onSave={handleSaveRegistro}
         initialData={selectedRegistro}
       />
 

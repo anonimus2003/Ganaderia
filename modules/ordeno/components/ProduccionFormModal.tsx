@@ -32,7 +32,7 @@ export default function ProduccionFormModal({ isOpen, onClose, onSave, initialDa
     if (isOpen) fetchBovinos();
   }, [isOpen, supabase]);
 
-  // Rellenar datos al editar
+  // Rellenar datos al editar o limpiar al crear
   useEffect(() => {
     if (initialData) {
       reset({
@@ -54,22 +54,27 @@ export default function ProduccionFormModal({ isOpen, onClose, onSave, initialDa
         observaciones: "",
       });
     }
-  }, [initialData, reset]);
+  }, [initialData, reset, isOpen]);
 
   const onSubmit = async (data: ProduccionLeche) => {
     try {
       setSaving(true);
+      console.log("🚀 Datos enviados correctamente por Zod:", data);
       await onSave(data);
       onClose();
     } catch (error) {
-      console.error("Error al guardar:", error);
+      console.error("Error al guardar en Supabase:", error);
       alert("Hubo un error al guardar el registro.");
     } finally {
       setSaving(false);
     }
   };
 
-  // Clases unificadas para inputs y etiquetas del sistema
+  // Función para capturar por qué Zod rechaza el formulario
+  const onInvalid = (errorsList: any) => {
+    console.error("❌ Zod bloqueó el envío debido a estos errores:", errorsList);
+  };
+
   const inputClass = "w-full px-4 py-3 bg-white border border-zinc-200 rounded-xl text-sm placeholder:text-zinc-400 focus:ring-2 focus:ring-[#01684c]/20 focus:border-[#01684c] outline-none transition-all text-zinc-800";
   const labelClass = "block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5";
 
@@ -78,7 +83,7 @@ export default function ProduccionFormModal({ isOpen, onClose, onSave, initialDa
       isOpen={isOpen} 
       onClose={onClose} 
       title={initialData ? "Editar Registro de Ordeño" : "Nuevo Registro de Leche"}
-      onSubmit={handleSubmit(onSubmit)}
+      onSubmit={handleSubmit(onSubmit, onInvalid)} // <-- Aquí agregamos el capturador de errores de Zod
       isSubmitting={saving}
       submitText={initialData ? "Guardar Cambios" : "Guardar Registro"}
     >
@@ -131,7 +136,7 @@ export default function ProduccionFormModal({ isOpen, onClose, onSave, initialDa
             <input 
               type="number" 
               step="0.01" 
-              {...register("litros")}
+              {...register("litros", { valueAsNumber: true })} // <-- Forzar a número para Zod
               placeholder="0.00"
               className={inputClass}
             />
@@ -143,7 +148,7 @@ export default function ProduccionFormModal({ isOpen, onClose, onSave, initialDa
             <input 
               type="number" 
               step="0.01" 
-              {...register("concentrado_kg")}
+              {...register("concentrado_kg", { valueAsNumber: true })} // <-- Forzar a número para Zod
               placeholder="0.00"
               className={inputClass}
             />
