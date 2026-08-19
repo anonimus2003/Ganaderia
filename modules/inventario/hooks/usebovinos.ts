@@ -1,10 +1,12 @@
 'use client';
+
 import { useState, useEffect, useCallback } from "react";
 import { Bovino } from "../schemas";
-import { createClient } from "@/lib/supabase/client"; // Asegúrate de importar tu cliente de supabase si usas llamadas directas, o ajusta según tus actions
+import { createClient } from "@/lib/supabase/client";
 
 export function useBovinos() {
   const [bovinos, setBovinos] = useState<Bovino[]>([]);
+  const [allBovinos, setAllBovinos] = useState<Bovino[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
@@ -14,20 +16,25 @@ export function useBovinos() {
   const fetchBovinos = useCallback(async () => {
     setLoading(true);
     try {
-      // 1. Obtener el conteo total de bovinos
-      const { count, error: countError } = await supabase
+      // 1. Obtener conteo
+      const { count } = await supabase
         .from("bovinos")
         .select("*", { count: 'exact', head: true });
+      setTotal(count || 0);
 
-      if (!countError) {
-        setTotal(count || 0);
-      }
+      // 2. Consulta PLANA (sin JOINs para evitar errores de RLS o Foreign Keys faltantes)
+      const { data: dataAll, error: errorAll } = await supabase
+        .from("bovinos")
+        .select("*")
+        .order("arete", { ascending: true });
 
-      // 2. Calcular rango para la página actual
+      if (errorAll) console.error("Error cargando lista completa:", errorAll);
+      setAllBovinos(dataAll || []);
+
+      // 3. Paginación
       const from = page * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
 
-      // 3. Obtener solo los 10 registros de la página
       const { data, error } = await supabase
         .from("bovinos")
         .select("*")
@@ -49,13 +56,18 @@ export function useBovinos() {
 
   const handleSave = async (bovinoData: Partial<Bovino>) => {
     try {
-      // Aquí puedes seguir usando tu action saveBovino(bovinoData)
-      const { error } = bovinoData.id 
+      const esEdicion = Boolean(bovinoData.id);
+
+      const { error } = esEdicion
         ? await supabase.from("bovinos").update(bovinoData).eq("id", bovinoData.id)
         : await supabase.from("bovinos").insert([bovinoData]);
 
       if (error) throw error;
-      await fetchBovinos(); // Recargar lista y conteo
+
+      // Mensaje dinámico si se editó o se creó nuevo
+      alert(esEdicion ? "¡Bovino actualizado exitosamente!" : "¡Bovino registrado exitosamente!");
+      
+      await fetchBovinos();
     } catch (error: any) {
       alert(`Error al guardar: ${error.message}`);
     }
@@ -66,27 +78,26 @@ export function useBovinos() {
       try {
         const { error } = await supabase.from("bovinos").delete().eq("id", id);
         if (error) throw error;
-        await fetchBovinos(); // Recargar para ajustar la paginación correctamente
+        
+        alert("¡Bovino eliminado exitosamente!");
+        await fetchBovinos();
       } catch (error: any) {
         alert(`Error al eliminar: ${error.message}`);
       }
     }
   };
 
-  // Funciones de navegación
-  const nextPage = () => setPage(p => ((p + 1) * PAGE_SIZE < total ? p + 1 : p));
-  const prevPage = () => setPage(p => Math.max(0, p - 1));
-
   return {
     bovinos,
+    allBovinos,
     loading,
     handleSave,
     handleDelete,
     refresh: fetchBovinos,
     page,
     total,
-    nextPage,
-    prevPage,
+    nextPage: () => setPage(p => ((p + 1) * PAGE_SIZE < total ? p + 1 : p)),
+    prevPage: () => setPage(p => Math.max(0, p - 1)),
     PAGE_SIZE,
   };
 }
