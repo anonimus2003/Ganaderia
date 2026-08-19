@@ -66,7 +66,8 @@ export default function PesajeFormModal({ isOpen, onClose, onSuccess, pesajeAEdi
         bovino_id: bovinoId,
         peso_kgs: parseFloat(peso),
         fecha,
-        condicion_corporal: condicion ? parseInt(condicion) : null,
+        // CORREGIDO: Se cambia parseInt por parseFloat para conservar los decimales
+        condicion_corporal: condicion ? parseFloat(condicion) : null,
         estado_fisiologico: estado || null,
         observaciones: observaciones || null
       };
@@ -144,6 +145,8 @@ export default function PesajeFormModal({ isOpen, onClose, onSuccess, pesajeAEdi
               type="number"
               min="1"
               max="5"
+              step="0.01"
+              inputMode="decimal"
               value={condicion}
               onChange={(e) => setCondicion(e.target.value)}
               className={inputClass}
