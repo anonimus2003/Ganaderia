@@ -135,7 +135,7 @@ export default function InseminacionFormModal({ isOpen, onClose, onSave, initial
           <div>
             <label className={labelClass}>Tipo</label>
             <select {...register("tipo")} className={`${inputClass} cursor-pointer`}>
-              <option value="I.Artificila">I.Artificila</option>
+              <option value="I.Artificial">I.Artificial</option>
               <option value="Monta Natural">Monta Natural</option>
               <option value="Transf.Embrion">Transf.Embrion</option>
               <option value="Celo no servido">Celo no servido</option>
