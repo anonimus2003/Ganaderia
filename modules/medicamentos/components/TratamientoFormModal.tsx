@@ -160,12 +160,7 @@ export default function TratamientoFormModal({ isOpen, onClose, onSave, initialD
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {/* Tiempo Retiro General */}
-          <div>
-            <label className={labelClass}>Retiro (Días)</label>
-            <input type="number" min="0" {...register("tiempo_retiro")} className={inputClass} />
-          </div>
-
+       
           {/* Retiro Leche */}
           <div>
             <label className={labelClass}>Retiro Leche</label>

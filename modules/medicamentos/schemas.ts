@@ -28,7 +28,6 @@ export const tratamientoSchema = z.object({
   retiro_carne: z.coerce.number().min(0).default(0),
   veterinario: z.string().min(1, "El veterinario o responsable es obligatorio"),
   motivo: z.string().optional().nullable(),
-  creado_por: z.string().uuid().optional().nullable(),
 });
 
 export type Tratamiento = z.infer<typeof tratamientoSchema>;

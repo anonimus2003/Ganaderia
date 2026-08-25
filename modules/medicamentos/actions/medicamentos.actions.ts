@@ -30,7 +30,6 @@ export async function saveTratamiento(formData: Tratamiento, editingId: string |
     dosis: formData.dosis,
     via: formData.via,
     fecha_aplicacion: formData.fecha_aplicacion,
-    tiempo_retiro: formData.tiempo_retiro ?? 0,
     retiro_leche: formData.retiro_leche ?? 0,
     retiro_carne: formData.retiro_carne ?? 0,
     veterinario: formData.veterinario,

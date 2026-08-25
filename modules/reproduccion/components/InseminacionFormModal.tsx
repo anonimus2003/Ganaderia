@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { inseminacionSchema, Inseminacion } from "../schemas";
 import { createClient } from "@/lib/supabase/client";
-import FormModal from "@/components/ui/FormModal"; // <--- Componente reutilizable
+import FormModal from "@/components/ui/FormModal";
 
 interface InseminacionFormModalProps {
   isOpen: boolean;
@@ -43,6 +43,8 @@ export default function InseminacionFormModal({ isOpen, onClose, onSave, initial
       setValue("fecha_inseminacion", initialData.fecha_inseminacion);
       setValue("fecha_chequeo", initialData.fecha_chequeo || "");
       setValue("fecha_probable_parto", initialData.fecha_probable_parto || "");
+      // Agregamos la fecha de parto real por si se está editando
+      setValue("fecha_parto", initialData.fecha_parto || "");
       setValue("tecnico", initialData.tecnico);
       setValue("estado", initialData.estado || "Pendiente");
     } else {
@@ -56,6 +58,7 @@ export default function InseminacionFormModal({ isOpen, onClose, onSave, initial
         tecnico: "",
         fecha_chequeo: "",
         fecha_probable_parto: "",
+        fecha_parto: "",
       });
     }
   }, [initialData, reset, setValue]);
@@ -70,7 +73,6 @@ export default function InseminacionFormModal({ isOpen, onClose, onSave, initial
     }
   };
 
-  // Clases unificadas de diseño limpio y corporativo
   const inputClass = "w-full px-4 py-3 bg-white border border-zinc-200 rounded-xl text-sm placeholder:text-zinc-400 focus:ring-2 focus:ring-[#01684c]/20 focus:border-[#01684c] outline-none transition-all text-zinc-800";
   const labelClass = "block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5";
 
@@ -189,6 +191,15 @@ export default function InseminacionFormModal({ isOpen, onClose, onSave, initial
             <input type="date" {...register("fecha_probable_parto")} className={inputClass} />
           </div>
 
+          {/* NUEVO: Fecha Real de Parto (Activa la tabla lactancias) */}
+          <div>
+            <label className={labelClass}>Fecha Real de Parto</label>
+            <input type="date" {...register("fecha_parto")} className={inputClass} />
+            <span className="text-[10px] text-emerald-600 mt-1 block font-medium">Registrar al nacer el ternero para iniciar lactancia.</span>
+          </div>
+        </div>
+
+        <div>
           {/* Técnico */}
           <div>
             <label className={labelClass}>Técnico / Responsable</label>

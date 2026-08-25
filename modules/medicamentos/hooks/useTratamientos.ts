@@ -36,28 +36,23 @@ export function useTratamientos() {
   }, [page, fetchTratamientos]);
 
   const handleSave = async (data: Partial<Tratamiento>) => {
-    const { id, ...rest } = data;
-    
-    let payload: any = { ...rest };
-    if (!id) {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        payload.creado_por = user.id;
-      }
-    }
+    const { id, ...payload } = data; // Extraemos el id y dejamos el resto limpio para la base de datos
 
     if (id) {
+      // Actualizar registro existente
       const { error } = await supabase
         .from("tratamientos")
         .update(payload)
         .eq("id", id);
       if (error) throw error;
     } else {
+      // Insertar nuevo registro (Supabase colocará 'creado_por' y 'created_at' solos)
       const { error } = await supabase
         .from("tratamientos")
         .insert([payload]);
       if (error) throw error;
     }
+    
     fetchTratamientos(page);
   };
 

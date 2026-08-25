@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { string } from "zod/v4";
 
 export const inseminacionSchema = z.object({
   id: z.string().uuid().optional(),
@@ -10,6 +11,7 @@ export const inseminacionSchema = z.object({
   fecha_inseminacion: z.string().min(1, "La fecha es obligatoria"),
   fecha_chequeo: z.string().optional().nullable(),
   fecha_probable_parto: z.string().optional().nullable(),
+  fecha_parto: z.string().optional().nullable(),
   tecnico: z.string().min(1, "El técnico es obligatorio"),
   estado: z.string().optional().nullable(),
   bovinos: z.object({

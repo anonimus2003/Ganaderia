@@ -66,6 +66,7 @@ export function useInseminaciones() {
       fecha_inseminacion: formData.fecha_inseminacion,
       fecha_chequeo: formData.fecha_chequeo || null,
       fecha_probable_parto: formData.fecha_probable_parto || null,
+      fecha_parto: formData.fecha_parto || null, // <--- Aquí se incluye la fecha de parto real
       tecnico: formData.tecnico,
       estado: formData.estado || 'Pendiente',
     };
