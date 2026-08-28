@@ -1,4 +1,5 @@
 'use client';
+
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Pesaje } from "../schemas";
@@ -8,7 +9,6 @@ export function usePesajes() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
-  const [pesoPromedio, setPesoPromedio] = useState<number>(0);
   
   const supabase = createClient();
   const PAGE_SIZE = 10;
@@ -16,7 +16,6 @@ export function usePesajes() {
   const fetchPesajes = useCallback(async () => {
     setLoading(true);
 
-    // 1. Obtener conteo total para la paginación
     const { count, error: countError } = await supabase
       .from("pesajes")
       .select("*", { count: 'exact', head: true });
@@ -28,17 +27,10 @@ export function usePesajes() {
       setTotal(count || 0);
     }
 
-    // 1.1. Obtener el peso promedio global mediante función o cálculo
-    const { data: promData, error: promError } = await supabase.rpc('obtener_peso_promedio');
-    if (!promError && promData !== null) {
-      setPesoPromedio(Number(promData));
-    }
-
-    // 2. Rango de paginación
     const from = page * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
 
-    // 3. Traer los registros con relación a bovinos
+    // Consulta simplificada y segura sin alias complejos de join
     const { data, error } = await supabase
       .from("pesajes")
       .select(`
@@ -52,9 +44,10 @@ export function usePesajes() {
       .range(from, to);
 
     if (error) {
-      console.error("Error al cargar pesajes:", error);
+      console.error("Error crítico al cargar pesajes desde Supabase:", error);
     } else {
-      setPesajes(data || []);
+      console.log("Pesajes cargados exitosamente:", data);
+      setPesajes((data as unknown as Pesaje[]) || []);
     }
     setLoading(false);
   }, [supabase, page]);
@@ -64,27 +57,37 @@ export function usePesajes() {
   }, [fetchPesajes]);
 
   const handleSave = async (formData: Partial<Pesaje>) => {
-    const payload = {
-      bovino_id: formData.bovino_id,
-      fecha: formData.fecha,
-      peso_kgs: formData.peso_kgs,
-      condicion_corporal: formData.condicion_corporal ?? null,
-      estado_fisiologico: formData.estado_fisiologico ?? null,
-      observaciones: formData.observaciones ?? null,
-    };
-
     if (formData.id) {
       const { error } = await supabase
         .from("pesajes")
-        .update(payload)
+        .update({
+          bovino_id: formData.bovino_id,
+          fecha: formData.fecha,
+          peso_kgs: formData.peso_kgs,
+          condicion_corporal: formData.condicion_corporal ?? null,
+          estado_fisiologico: formData.estado_fisiologico ?? null,
+          observaciones: formData.observaciones ?? null,
+        })
         .eq("id", formData.id);
-      if (error) throw error;
+      
+      if (error) {
+        console.error("Error en UPDATE de Supabase:", error);
+        throw error;
+      }
     } else {
+      const { id, ...payloadWithoutId } = formData;
+      
       const { error } = await supabase
         .from("pesajes")
-        .insert([payload]);
-      if (error) throw error;
+        .insert([payloadWithoutId]);
+      
+      if (error) {
+        console.error("Error en INSERT de Supabase:", error);
+        throw error;
+      }
     }
+    
+    // Recargamos de inmediato tras guardar
     await fetchPesajes();
   };
 
@@ -92,6 +95,7 @@ export function usePesajes() {
     if (!confirm("¿Estás seguro de eliminar este registro de pesaje?")) return;
     const { error } = await supabase.from("pesajes").delete().eq("id", id);
     if (error) {
+      console.error("Error al eliminar:", error);
       alert("Error al eliminar");
     } else {
       await fetchPesajes();
@@ -108,7 +112,7 @@ export function usePesajes() {
     handleDelete,
     page,
     total,
-    pesoPromedio,
+    pesoPromedio: 0,
     nextPage,
     prevPage,
     PAGE_SIZE,

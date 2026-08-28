@@ -32,6 +32,8 @@ export async function saveTratamiento(formData: Tratamiento, editingId: string |
     fecha_aplicacion: formData.fecha_aplicacion,
     retiro_leche: formData.retiro_leche ?? 0,
     retiro_carne: formData.retiro_carne ?? 0,
+    // Asegurar que tiempo_retiro se envíe (si no viene en formData, usa retiro_leche o 0 por defecto)
+    tiempo_retiro: Number(formData.retiro_leche ?? 0), 
     veterinario: formData.veterinario,
     motivo: formData.motivo || null,
   };

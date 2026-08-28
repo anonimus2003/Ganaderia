@@ -56,28 +56,32 @@ export default function PesajeFormModal({ isOpen, onClose, onSuccess, pesajeAEdi
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!bovinoId || !peso) return;
+    
+    if (!bovinoId || !peso) {
+      alert('Por favor selecciona un bovino e ingresa el peso.');
+      return;
+    }
 
     try {
       setSaving(true);
 
-      const datosAguardar = {
-        id: pesajeAEditar?.id,
+      const payload = {
+        ...(pesajeAEditar?.id ? { id: pesajeAEditar.id } : {}),
         bovino_id: bovinoId,
         peso_kgs: parseFloat(peso),
         fecha,
-        // CORREGIDO: Se cambia parseInt por parseFloat para conservar los decimales
         condicion_corporal: condicion ? parseFloat(condicion) : null,
         estado_fisiologico: estado || null,
         observaciones: observaciones || null
       };
 
-      // Nos aseguramos de enviar explícitamente el objeto limpio ignorando eventos del DOM
-      await Promise.resolve(onSuccess(datosAguardar)); 
+      console.log("Enviando payload al hook:", payload);
+
+      await onSuccess(payload); 
       onClose(); 
     } catch (error: any) {
-      console.error('Error al guardar pesaje:', error.message);
-      alert('Hubo un error al guardar el registro.');
+      console.error('Error atrapado en el modal al guardar:', error);
+      alert('Hubo un error al guardar el registro. Revisa la consola.');
     } finally {
       setSaving(false);
     }

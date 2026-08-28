@@ -23,10 +23,9 @@ interface TratamientoTableProps {
     puede_crear: boolean;
     puede_editar: boolean;
     puede_eliminar: boolean;
-  }; // 👈 1. Añadido a la interfaz
+  };
 }
 
-// Componente auxiliar actualizado para recibir y aplicar restricciones de permisos
 function ActionMenu({ 
   onEdit, 
   onDelete, 
@@ -79,7 +78,6 @@ function ActionMenu({
             </button>
           )}
           
-          {/* 2. Botón Editar condicionado */}
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -98,7 +96,6 @@ function ActionMenu({
             <span>Editar</span>
           </button>
 
-          {/* 3. Botón Eliminar condicionado */}
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -135,7 +132,7 @@ export default function TratamientoTable({
   nextPage,
   prevPage,
   pageSize,
-  permisos = { puede_ver: true, puede_crear: true, puede_editar: true, puede_eliminar: true }, // 👈 4. Valores por defecto seguros
+  permisos = { puede_ver: true, puede_crear: true, puede_editar: true, puede_eliminar: true },
 }: TratamientoTableProps) {
   
   const { exportAll } = useExportData();
@@ -203,7 +200,7 @@ export default function TratamientoTable({
           <ActionMenu 
             onEdit={() => onEdit(item)} 
             onDelete={() => onDelete(item.id)} 
-            permisos={permisos} // 👈 5. Pasamos los permisos al ActionMenu interno
+            permisos={permisos}
           />
         </div>
       )
@@ -219,10 +216,10 @@ export default function TratamientoTable({
         columns={columns}
         loading={loading}
         onAddRecord={onAddRecord}
-        isAddDisabled={!permisos.puede_crear} // 👈 6. Bloquea el botón principal de agregar si no tiene permiso
+        isAddDisabled={!permisos.puede_crear}
         onFilters={onFilters}
         onRowClick={onView}
-        onExportCSV={() => exportAll('tratamientos', '*, bovinos(arete, nombre)')}
+        onExportCSV={() => exportAll('tratamientos', '*')}
         onDownloadPDF={exportToPDF}
         page={page}
         total={total}

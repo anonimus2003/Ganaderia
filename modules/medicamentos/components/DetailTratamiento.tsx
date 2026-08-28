@@ -2,7 +2,7 @@
 
 import React from "react";
 import DetailModal from "@/components/ui/DetailModal"; 
-import { Calendar, Hash, Pill, Syringe, Activity, User, FileText, Clock, ShieldAlert } from "lucide-react";
+import { Calendar, Hash, Pill, Syringe, Activity, User, FileText, ShieldAlert } from "lucide-react";
 import { Tratamiento } from "../schemas"; 
 
 interface DetailTratamientoProps {
@@ -46,11 +46,6 @@ export default function DetailTratamiento({ isOpen, onClose, tratamiento }: Deta
         label: "Vía de Administración", 
         value: tratamiento.via || "No especificada", 
         icon: <Activity className="w-3.5 h-3.5" /> 
-      },
-      { 
-        label: "Tiempo de Retiro (General)", 
-        value: `${tratamiento.tiempo_retiro ?? 0} días`, 
-        icon: <Clock className="w-3.5 h-3.5" /> 
       },
       { 
         label: "Retiro en Leche", 

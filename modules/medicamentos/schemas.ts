@@ -23,7 +23,6 @@ export const tratamientoSchema = z.object({
   dosis: z.string().min(1, "La dosis es obligatoria"),
   via: z.enum(viasEnum, { errorMap: () => ({ message: "Seleccione una vía válida" }) }),
   fecha_aplicacion: z.string().min(1, "La fecha es obligatoria"),
-  tiempo_retiro: z.coerce.number().min(0, "El tiempo de retiro no puede ser negativo").default(0),
   retiro_leche: z.coerce.number().min(0).default(0),
   retiro_carne: z.coerce.number().min(0).default(0),
   veterinario: z.string().min(1, "El veterinario o responsable es obligatorio"),

@@ -122,7 +122,7 @@ export default function InseminacionTable({
         loading={loading}
         onAddRecord={onAddRecord}
         isAddDisabled={!permisos.puede_crear}
-        onExportCSV={() => exportAll('inseminaciones', '*, bovinos(arete, nombre)')}
+        onExportCSV={() => exportAll('tratamientos', '*')}
         onDownloadPDF={exportToPDF}
         onFilters={onFilters}
         onRowClick={onView}

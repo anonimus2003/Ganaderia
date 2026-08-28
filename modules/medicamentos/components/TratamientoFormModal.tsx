@@ -40,7 +40,6 @@ export default function TratamientoFormModal({ isOpen, onClose, onSave, initialD
       setValue("dosis", initialData.dosis);
       setValue("via", initialData.via);
       setValue("fecha_aplicacion", initialData.fecha_aplicacion);
-      setValue("tiempo_retiro", initialData.tiempo_retiro ?? 0);
       setValue("retiro_leche", initialData.retiro_leche ?? 0);
       setValue("retiro_carne", initialData.retiro_carne ?? 0);
       setValue("veterinario", initialData.veterinario);

@@ -1,33 +1,34 @@
-// Exportar a CSV de forma dinámica y robusta para cualquier tabla o módulo
+// Exportar a CSV estándar en múltiples columnas (Formato nativo de Supabase)
 export function exportToCSV(data: any[], filename = "exportacion.csv") {
   if (!data || data.length === 0) {
     alert("No hay datos para exportar");
     return;
   }
 
-  // Extrae dinámicamente las llaves del primer objeto como cabeceras
+  // Extrae las llaves (columnas) del primer objeto como cabeceras
   const keys = Object.keys(data[0]);
-  const headers = keys.join(";");
+  const headers = keys.join(","); // Separado por coma (estándar Supabase)
 
   // Mapea las filas de forma segura
   const rows = data.map(item => 
     keys.map(key => {
       const val = item[key];
       
-      // Si es un objeto anidado (ej. relaciones de Supabase como 'bovinos'), lo convertimos a texto limpio
+      // Si es un objeto anidado (ej. relación 'bovinos'), extraemos un texto limpio 
+      // o lo convertimos a string para que no rompa la estructura de columnas
       if (typeof val === 'object' && val !== null) {
         return `"${JSON.stringify(val).replace(/"/g, '""')}"`;
       }
       
       return `"${(val || "").toString().replace(/"/g, '""')}"`;
-    }).join(";")
+    }).join(",") // Separado por coma
   );
 
-  // Unir contenido con punto y coma (;) para Excel
+  // Unir cabecera y filas con saltos de línea
   const csvContent = [headers, ...rows].join("\n");
 
-  // Crear un Blob con codificación UTF-8 para reconocer tildes y eñes correctamente
-  const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+  // Crear un Blob con codificación UTF-8 y BOM (\uFEFF) para las tildes
+  const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   
   const link = document.createElement("a");
@@ -36,12 +37,11 @@ export function exportToCSV(data: any[], filename = "exportacion.csv") {
   document.body.appendChild(link);
   link.click();
   
-  // Limpiar el recurso creado
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
 
-// Imprimir / Guardar PDF limpio (solo los datos de la tabla)
+// Imprimir / Guardar PDF limpio
 export function exportToPDF() {
   if (typeof window !== "undefined") {
     window.print();

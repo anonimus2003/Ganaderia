@@ -15,7 +15,7 @@ export default function PesajesPage() {
     page, total, pesoPromedio, nextPage, prevPage, PAGE_SIZE 
   } = usePesajes();
 
-  // 1. Cargamos los permisos reales desde la base de datos para el módulo 'pesaje'
+  // 1. Cargamos los permisos reales desde la base de datos para el módulo 'pesajes'
   const { permisos, loading: loadingPermisos } = useModuloPermissions('pesajes');
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -48,10 +48,20 @@ export default function PesajesPage() {
 
   const filteredRegistros = useMemo(() => {
     return pesajes.filter(item => {
+      const query = filterValues.busqueda?.toLowerCase().trim() || "";
+      
+      // Si no hay texto de búsqueda, evaluamos solo el estado
+      if (!query) {
+        if (!filterValues.estado) return true;
+        return item.estado_fisiologico === filterValues.estado;
+      }
+
       const arete = (item as any).bovinos?.arete?.toLowerCase() || "";
-      const query = filterValues.busqueda.toLowerCase();
-      const coincideBusqueda = arete.includes(query);
+      const nombre = (item as any).bovinos?.nombre?.toLowerCase() || "";
+      
+      const coincideBusqueda = arete.includes(query) || nombre.includes(query);
       const coincideEstado = !filterValues.estado || item.estado_fisiologico === filterValues.estado;
+      
       return coincideBusqueda && coincideEstado;
     });
   }, [pesajes, filterValues]);
@@ -74,7 +84,7 @@ export default function PesajesPage() {
             
             <FilterBar
               filters={[
-                { id: "busqueda", type: "text", placeholder: "Buscar por arete..." },
+                { id: "busqueda", type: "text", placeholder: "Buscar por arete o nombre..." },
                 { 
                   id: "estado", 
                   type: "select", 
