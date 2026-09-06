@@ -35,7 +35,7 @@ export default function UserTable({
   onFilters,
 }: UserTableProps) {
   
-  const { exportAll } = useExportData();
+  const { exportFromTable } = useExportData();
 
   // Función para obtener colores según el rol
   const getRoleBadgeStyle = (rol: string) => {
@@ -91,8 +91,8 @@ export default function UserTable({
         nextPage={nextPage}
         prevPage={prevPage}
         pageSize={pageSize}
-        onExportCSV={() => exportAll('perfiles')}
-        onDownloadPDF={exportToPDF}
+        onExportCSV={() => exportFromTable('perfiles')}
+        onDownloadPDF={() => exportToPDF(users)}
       />
     </div>
   );

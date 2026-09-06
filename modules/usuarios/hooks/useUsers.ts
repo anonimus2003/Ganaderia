@@ -30,7 +30,7 @@ export function useUsers(pageSize: number = 10) {
 
     try {
       const { data, count, error: err } = await supabase
-        .from("perfiles")
+        .from("usuarios")
         .select("*", { count: "exact" })
         .order("creado_en", { ascending: false }) // 👈 Apunta a la columna correcta
         .range(from, to);
@@ -50,7 +50,7 @@ export function useUsers(pageSize: number = 10) {
   }, [pageSize, supabase]);
 
   useEffect(() => { 
-    fetchUsers(page); 
+    queueMicrotask(() => { void fetchUsers(page); });
   }, [fetchUsers, page]);
 
   return { 
@@ -64,7 +64,7 @@ export function useUsers(pageSize: number = 10) {
     prevPage: () => setPage(p => Math.max(1, p - 1)),
     refetch: () => fetchUsers(page),
     deleteUser: async (id: string) => { 
-      await supabase.from("perfiles").delete().eq("id", id);
+      await supabase.from("usuarios").delete().eq("id", id);
       fetchUsers(page);
     }
   };

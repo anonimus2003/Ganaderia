@@ -66,8 +66,9 @@ export default function PotrerosPage() {
     }
   }, [selectedId, supabase]);
 
+  /* eslint-disable react-hooks/set-state-in-effect -- selection changes reset the local pasture controls. */
   useEffect(() => {
-    fetchHistoriales();
+    queueMicrotask(() => { void fetchHistoriales(); });
   }, [fetchHistoriales]);
 
   useEffect(() => {
@@ -79,6 +80,7 @@ export default function PotrerosPage() {
       setAccionActiva(null);
     }
   }, [potreroSeleccionado]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleGuardarPotrero = async (datos: any) => {
     if (!potreroSeleccionado) return;

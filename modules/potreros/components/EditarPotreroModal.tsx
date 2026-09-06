@@ -46,6 +46,7 @@ export default function EditarPotreroModal({
    * ============================================================
    */
 
+  /* eslint-disable react-hooks/set-state-in-effect -- the modal draft follows the selected pasture. */
   useEffect(() => {
     if (potrero) {
       setNombre(potrero.nombre || '');
@@ -64,6 +65,7 @@ export default function EditarPotreroModal({
       setTipoPasto('');
     }
   }, [potrero]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   /*
    * Si el modal está cerrado no renderizamos nada.

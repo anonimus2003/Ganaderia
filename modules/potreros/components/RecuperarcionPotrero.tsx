@@ -15,9 +15,11 @@ export default function RecuperacionPotrero({ potrero, onActualizar }: Recuperac
   const [observacion, setObservacion] = useState('');
   const [loading, setLoading] = useState(false);
 
+  /* eslint-disable react-hooks/set-state-in-effect -- the control initializes from the selected pasture. */
   useEffect(() => {
     setProgreso(potrero.progreso_pasto ?? 0);
   }, [potrero]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const cambiarProgreso = (cantidad: number) => {
     setProgreso((actual) => Math.min(100, Math.max(0, actual + cantidad)));

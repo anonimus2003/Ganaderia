@@ -16,9 +16,9 @@ export default async function DashboardLayout({
     redirect('/login')
   }
 
-  // 2. Consultar el perfil público del usuario
+  // 2. Consultar el perfil en tu tabla 'usuarios'
   const { data: perfil } = await supabase
-    .from('perfiles')
+    .from('usuarios')
     .select('nombre, rol')
     .eq('id', user.id)
     .single()

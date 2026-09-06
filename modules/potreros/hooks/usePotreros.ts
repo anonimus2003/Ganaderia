@@ -25,7 +25,7 @@ export function usePotreros() {
   }, [supabase]);
 
   useEffect(() => {
-    fetchPotreros();
+    queueMicrotask(() => { void fetchPotreros(); });
   }, [fetchPotreros]);
 
   // Ingresar ganado: cambia estado a 'Ocupado' y reinicia el pasto a 0% por el consumo

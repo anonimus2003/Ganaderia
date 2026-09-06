@@ -1,380 +1,506 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from "react";
-import FormModal from "@/components/ui/FormModal";
+import { useState, useEffect } from "react";
 import { Bovino } from "../schemas";
-import { Tag, User, Dna, Calendar, Scale, Activity, ShieldAlert, FileText, HeartPulse } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Hash,
+  Activity,
+  Dna,
+  FileText,
+  ShieldAlert,
+  Loader2,
+} from "lucide-react";
+import { toast } from "sonner";
 
 interface BovinoFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: Partial<Bovino>) => void;
+  onSave: (data: Partial<Bovino>) => Promise<void>;
   initialData?: Bovino | null;
-  bovinosDisponibles?: Bovino[];
+  allBovinos?: Bovino[];
 }
 
-const ESTADOS_VALIDOS = [
+const ETAPAS_HEMBRA: Exclude<Bovino["categoria"], null>[] = [
   "Ternera en lactancia",
   "Destete",
   "Ternera en crecimiento",
   "Levante",
   "Novilla en desarrollo",
   "Novilla de vientre",
-  "En producción",
-  "Seca"
+  "Vaca",
 ];
 
-export default function BovinoFormModal({ 
-  isOpen, 
-  onClose, 
-  onSave, 
-  initialData, 
-  bovinosDisponibles = [] 
-}: BovinoFormModalProps) {
-  const [saving, setSaving] = useState(false);
-  const [formData, setFormData] = useState<Partial<Bovino>>({
-    arete: "",
-    nombre: "",
-    raza: "",
-    genero: "Hembra",
-    peso_inicial: 0,
-    estado: "Ternera en lactancia",
-    fecha_nacimiento: "",
-    proposito: "Doble Propósito",
-    madre_id: null,
-    padre_id: null,
-    observaciones: "",
-    condicion: "Activo",
-    motivo_baja: null,
-    observacion_baja: ""
-  });
+const ETAPAS_MACHO: Exclude<Bovino["categoria"], null>[] = [
+  "Ternera en lactancia",
+  "Destete",
+  "Ternera en crecimiento",
+  "Levante",
+  "Toro",
+];
 
+const PROPOSITOS_DISPONIBLES = [
+  "Doble Propósito",
+  "Carne",
+  "Leche",
+  "Cría y Levante",
+];
+
+const MOTIVOS_BAJA_DISPONIBLES = [
+  "Venta",
+  "Muerte",
+  "Sacrificio / Consumo",
+  "Descarte por infertilidad",
+  "Robo / Pérdida",
+];
+
+export default function BovinoFormModal({
+  isOpen,
+  onClose,
+  onSave,
+  initialData,
+  allBovinos = [],
+}: BovinoFormModalProps) {
+  const [formData, setFormData] = useState<Partial<Bovino>>(
+    initialData || {
+      genero: "Hembra",
+      condicion: "Activo",
+      proposito: "Doble Propósito",
+    }
+  );
+
+  const [activeTab, setActiveTab] = useState("general");
+  const [saving, setSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const isEditing = !!initialData;
+
+  // Sincronizar cuando cambia initialData o se abre/cierra el modal
   useEffect(() => {
     if (initialData) {
-      setFormData({
-        ...initialData,
-        fecha_nacimiento: initialData.fecha_nacimiento || "",
-        proposito: initialData.proposito || "Doble Propósito",
-        madre_id: initialData.madre_id || null,
-        padre_id: initialData.padre_id || null,
-        condicion: initialData.condicion || "Activo",
-        motivo_baja: initialData.motivo_baja || null,
-        observacion_baja: initialData.observacion_baja || ""
-      });
+      setFormData(initialData);
     } else {
       setFormData({
-        arete: "",
-        nombre: "",
-        raza: "",
         genero: "Hembra",
-        peso_inicial: 0,
-        estado: "Ternera en lactancia",
-        fecha_nacimiento: "",
-        proposito: "Doble Propósito",
-        madre_id: null,
-        padre_id: null,
-        observaciones: "",
         condicion: "Activo",
-        motivo_baja: null,
-        observacion_baja: ""
+        proposito: "Doble Propósito",
       });
     }
   }, [initialData, isOpen]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Filtrado seguro asegurando que allBovinos sea un arreglo
+  const listaBovinos = Array.isArray(allBovinos) ? allBovinos : [];
+  
+  const posiblesMadres = listaBovinos.filter(
+    (b) => b.genero === "Hembra" && b.id !== initialData?.id
+  );
+  const posiblesPadres = listaBovinos.filter(
+    (b) => b.genero === "Macho" && b.id !== initialData?.id
+  );
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
       setSaving(true);
-      const dataToSave = {
-        ...formData,
-        madre_id: formData.madre_id || null,
-        padre_id: formData.padre_id || null,
-        motivo_baja: formData.condicion === 'Inactivo' ? formData.motivo_baja : null,
-        observacion_baja: formData.condicion === 'Inactivo' ? formData.observacion_baja : null,
-      };
-      await onSave(dataToSave);
+      setErrorMsg("");
+      await onSave(formData);
+      toast.success(
+        isEditing ? "¡Bovino actualizado!" : "¡Bovino registrado!",
+        {
+          description: `El expediente con arete #${
+            formData.arete || "S/A"
+          } se guardó correctamente.`,
+        }
+      );
       onClose();
-    } catch (error) {
-      console.error("Error al guardar bovino:", error);
+    } catch (err: unknown) {
+      const mensaje =
+        err instanceof Error ? err.message : "Error al guardar el bovino";
+      setErrorMsg(mensaje);
+      toast.error("No se pudo guardar", { description: mensaje });
     } finally {
       setSaving(false);
     }
   };
 
-  const inputClass = "w-full pl-10 pr-4 py-2.5 bg-zinc-50/50 border border-zinc-200 rounded-xl text-sm placeholder:text-zinc-400 focus:bg-white focus:ring-2 focus:ring-[#01684c]/20 focus:border-[#01684c] outline-none transition-all text-zinc-800 font-medium";
-  const selectClass = "w-full pl-10 pr-4 py-2.5 bg-zinc-50/50 border border-zinc-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-[#01684c]/20 focus:border-[#01684c] outline-none transition-all text-zinc-800 font-medium cursor-pointer";
-  const labelClass = "flex items-center gap-1.5 text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5";
+  const madreActual = posiblesMadres.find((m) => m.id === formData.madre_id);
+  const padreActual = posiblesPadres.find((p) => p.id === formData.padre_id);
 
-  const posiblesMadres = bovinosDisponibles.filter(
-    (b) => b.genero === "Hembra" && b.id !== initialData?.id
-  );
-  const posiblesPadres = bovinosDisponibles.filter(
-    (b) => b.genero === "Macho" && b.id !== initialData?.id
-  );
+  const handleGenero = (value: "Hembra" | "Macho" | null) => {
+    if (!value) return;
+    const nuevaCategoria =
+      value === "Hembra" ? ETAPAS_HEMBRA[0] : ETAPAS_MACHO[0];
+    setFormData((prev: Partial<Bovino>) => ({
+      ...prev,
+      genero: value,
+      categoria: nuevaCategoria,
+    }));
+  };
 
   return (
-    <FormModal 
-      isOpen={isOpen} 
-      onClose={onClose} 
-      title={initialData ? "Editar Información de Bovino" : "Registrar Nuevo Bovino"}
-      onSubmit={handleSubmit}
-      isSubmitting={saving}
-      submitText={initialData ? "Guardar Cambios" : "Registrar Bovino"}
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
     >
-      <div className="space-y-6">
-        
-        {/* SECCIÓN 1: Identificación y Características */}
-        <div className="bg-white p-4 rounded-2xl border border-zinc-100 shadow-sm space-y-4">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-[#01684c] flex items-center gap-2 pb-2 border-b border-zinc-100">
-            <Tag className="w-4 h-4" /> Identificación y Raza
-          </h3>
+      <DialogContent className="max-h-[92vh] max-w-3xl overflow-hidden flex flex-col p-0">
+        <DialogHeader className="px-6 pt-6 pb-2 border-b">
+          <DialogTitle className="text-lg font-semibold">
+            {isEditing ? "Editar Expediente de Bovino" : "Nuevo Registro de Bovino"}
+          </DialogTitle>
+          <DialogDescription className="text-xs">
+            Organiza la información zootécnica y genealógica del animal.
+          </DialogDescription>
+        </DialogHeader>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className={labelClass}>Número de Arete *</label>
-              <div className="relative">
-                <Tag className="w-4 h-4 text-zinc-400 absolute left-3 top-3" />
-                <input 
-                  type="text" 
-                  required
-                  value={formData.arete || ""} 
-                  onChange={(e) => setFormData({...formData, arete: e.target.value})}
-                  className={inputClass}
-                  placeholder="Ej: 047"
-                />
-              </div>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <Tabs
+            value={activeTab}
+            onValueChange={setActiveTab}
+            className="flex flex-col flex-1 overflow-hidden"
+          >
+            <div className="px-6 pt-3 bg-muted/20 border-b">
+              <TabsList className="grid grid-cols-3 w-full h-9">
+                <TabsTrigger value="general" className="text-xs flex items-center gap-1.5">
+                  <Hash className="h-3.5 w-3.5" /> General
+                </TabsTrigger>
+                <TabsTrigger value="zootecnia" className="text-xs flex items-center gap-1.5">
+                  <Activity className="h-3.5 w-3.5" /> Zootecnia
+                </TabsTrigger>
+                <TabsTrigger value="genealogia" className="text-xs flex items-center gap-1.5">
+                  <Dna className="h-3.5 w-3.5" /> Genealogía
+                </TabsTrigger>
+              </TabsList>
             </div>
 
-            <div>
-              <label className={labelClass}>Nombre (Opcional)</label>
-              <div className="relative">
-                <User className="w-4 h-4 text-zinc-400 absolute left-3 top-3" />
-                <input 
-                  type="text" 
-                  value={formData.nombre || ""} 
-                  onChange={(e) => setFormData({...formData, nombre: e.target.value})}
-                  className={inputClass}
-                  placeholder="Ej: Lucero"
-                />
-              </div>
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {errorMsg && (
+                <div className="rounded-md bg-destructive/10 p-3 text-xs text-destructive border border-destructive/20">
+                  {errorMsg}
+                </div>
+              )}
+
+              <TabsContent value="general" className="mt-0 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium">Número de Arete *</label>
+                    <Input
+                      required
+                      className="h-9 text-sm"
+                      value={formData.arete || ""}
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, arete: e.target.value }))
+                      }
+                      placeholder="Ej. 001"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium">Nombre Oficial</label>
+                    <Input
+                      className="h-9 text-sm"
+                      value={formData.nombre || ""}
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, nombre: e.target.value }))
+                      }
+                      placeholder="Ej. Lucero"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium">Raza Predominante *</label>
+                    <Input
+                      required
+                      className="h-9 text-sm"
+                      value={formData.raza || ""}
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, raza: e.target.value }))
+                      }
+                      placeholder="Ej. Brahman"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium">Género *</label>
+                    <Select
+                      value={formData.genero || "Hembra"}
+                      onValueChange={handleGenero}
+                    >
+                      <SelectTrigger className="h-9 text-sm w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Hembra">Hembra</SelectItem>
+                        <SelectItem value="Macho">Macho</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {isEditing && (
+                  <div className="rounded-lg border bg-muted/30 p-3 space-y-3 mt-4">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-700">
+                      <ShieldAlert className="h-3.5 w-3.5" /> Estado Operativo
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-medium">Condición *</label>
+                        <Select
+                          value={formData.condicion || "Activo"}
+                          onValueChange={(value) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              condicion: value as "Activo" | "Inactivo",
+                            }))
+                          }
+                        >
+                          <SelectTrigger className="h-8 text-xs w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Activo">Activo</SelectItem>
+                            <SelectItem value="Inactivo">Inactivo (Baja)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {formData.condicion === "Inactivo" && (
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-medium text-destructive">
+                            Motivo *
+                          </label>
+                          <Select
+                            value={formData.motivo_baja || ""}
+                            onValueChange={(value) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                motivo_baja: value as any,
+                              }))
+                            }
+                          >
+                            <SelectTrigger className="h-8 text-xs w-full">
+                              <SelectValue placeholder="Seleccione motivo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {MOTIVOS_BAJA_DISPONIBLES.map((motivo) => (
+                                <SelectItem key={motivo} value={motivo}>
+                                  {motivo}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="zootecnia" className="mt-0 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium">Categoría / Etapa *</label>
+                    <Select
+                      value={formData.categoria || ""}
+                      onValueChange={(value) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          categoria: value as Exclude<Bovino["categoria"], null>,
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="h-9 text-sm w-full">
+                        <SelectValue placeholder="Seleccione etapa" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(formData.genero === "Macho"
+                          ? ETAPAS_MACHO
+                          : ETAPAS_HEMBRA
+                        ).map((etapa) => (
+                          <SelectItem key={etapa} value={etapa}>
+                            {etapa}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium">Propósito Zootécnico</label>
+                    <Select
+                      value={formData.proposito || "Doble Propósito"}
+                      onValueChange={(value) =>
+                        setFormData((prev) => ({ ...prev, proposito: value }))
+                      }
+                    >
+                      <SelectTrigger className="h-9 text-sm w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PROPOSITOS_DISPONIBLES.map((prop) => (
+                          <SelectItem key={prop} value={prop}>
+                            {prop}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium">Fecha de Nacimiento</label>
+                    <Input
+                      type="date"
+                      className="h-9 text-sm"
+                      value={formData.fecha_nacimiento || ""}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          fecha_nacimiento: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium">Origen</label>
+                    <Input
+                      className="h-9 text-sm"
+                      value={formData.origen || ""}
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, origen: e.target.value }))
+                      }
+                      placeholder="Ej. Nacido en finca"
+                    />
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="genealogia" className="mt-0 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium">Madre Registrada</label>
+                    <Select
+                      value={formData.madre_id || "none"}
+                      onValueChange={(value) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          madre_id: value === "none" ? null : value,
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="h-9 text-sm w-full">
+                        <SelectValue placeholder="Sin madre">
+                          {madreActual
+                            ? `Arete: ${madreActual.arete}${
+                                madreActual.nombre ? ` - ${madreActual.nombre}` : ""
+                              }`
+                            : "Sin madre registrada"}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sin madre registrada</SelectItem>
+                        {posiblesMadres.map((madre) => (
+                          <SelectItem key={madre.id} value={madre.id}>
+                            {madre.arete} {madre.nombre ? `- ${madre.nombre}` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium">Padre Registrado</label>
+                    <Select
+                      value={formData.padre_id || "none"}
+                      onValueChange={(value) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          padre_id: value === "none" ? null : value,
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="h-9 text-sm w-full">
+                        <SelectValue placeholder="Sin padre">
+                          {padreActual
+                            ? `Arete: ${padreActual.arete}${
+                                padreActual.nombre ? ` - ${padreActual.nombre}` : ""
+                              }`
+                            : "Sin padre registrado"}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sin padre registrado</SelectItem>
+                        {posiblesPadres.map((padre) => (
+                          <SelectItem key={padre.id} value={padre.id}>
+                            {padre.arete} {padre.nombre ? `- ${padre.nombre}` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 pt-2">
+                  <label className="text-xs font-medium flex items-center gap-1">
+                    <FileText className="h-3.5 w-3.5 text-muted-foreground" /> Notas Adicionales
+                  </label>
+                  <Textarea
+                    rows={2}
+                    className="text-sm resize-none"
+                    value={formData.observaciones || ""}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        observaciones: e.target.value,
+                      }))
+                    }
+                    placeholder="Señas particulares, notas de manejo..."
+                  />
+                </div>
+              </TabsContent>
             </div>
-          </div>
+          </Tabs>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className={labelClass}>Raza *</label>
-              <div className="relative">
-                <Dna className="w-4 h-4 text-zinc-400 absolute left-3 top-3" />
-                <input 
-                  type="text" 
-                  required
-                  value={formData.raza || ""} 
-                  onChange={(e) => setFormData({...formData, raza: e.target.value})}
-                  className={inputClass}
-                  placeholder="Ej: Holstein"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className={labelClass}>Género *</label>
-              <div className="relative">
-                <Activity className="w-4 h-4 text-zinc-400 absolute left-3 top-3" />
-                <select 
-                  value={formData.genero || "Hembra"}
-                  onChange={(e) => setFormData({...formData, genero: e.target.value})}
-                  className={selectClass}
-                >
-                  <option value="Hembra">Hembra</option>
-                  <option value="Macho">Macho</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* SECCIÓN 2: Genealogía y Propósito */}
-        <div className="bg-white p-4 rounded-2xl border border-zinc-100 shadow-sm space-y-4">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-[#01684c] flex items-center gap-2 pb-2 border-b border-zinc-100">
-            <Calendar className="w-4 h-4" /> Ciclo Vital y Genealogía
-          </h3>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className={labelClass}>Fecha de Nacimiento</label>
-              <div className="relative">
-                <Calendar className="w-4 h-4 text-zinc-400 absolute left-3 top-3" />
-                <input 
-                  type="date" 
-                  value={formData.fecha_nacimiento || ""} 
-                  onChange={(e) => setFormData({...formData, fecha_nacimiento: e.target.value})}
-                  className={inputClass}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className={labelClass}>Propósito Zootécnico</label>
-              <div className="relative">
-                <HeartPulse className="w-4 h-4 text-zinc-400 absolute left-3 top-3" />
-                <select 
-                  value={formData.proposito || "Doble Propósito"}
-                  onChange={(e) => setFormData({...formData, proposito: e.target.value})}
-                  className={selectClass}
-                >
-                  <option value="Leche">Leche</option>
-                  <option value="Carne">Carne</option>
-                  <option value="Doble Propósito">Doble Propósito</option>
-                  <option value="Cría">Cría</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className={labelClass}>Madre (Del Hato)</label>
-              <select 
-                value={formData.madre_id || ""}
-                onChange={(e) => setFormData({...formData, madre_id: e.target.value ? e.target.value : null})}
-                className="w-full px-3 py-2.5 bg-zinc-50/50 border border-zinc-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-[#01684c]/20 focus:border-[#01684c] outline-none transition-all text-zinc-800 cursor-pointer font-medium"
-              >
-                <option value="">-- Sin Registro --</option>
-                {posiblesMadres.map((vaca) => (
-                  <option key={vaca.id} value={vaca.id}>
-                    {vaca.arete} {vaca.nombre ? `(${vaca.nombre})` : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className={labelClass}>Padre (Del Hato)</label>
-              <select 
-                value={formData.padre_id || ""}
-                onChange={(e) => setFormData({...formData, padre_id: e.target.value ? e.target.value : null})}
-                className="w-full px-3 py-2.5 bg-zinc-50/50 border border-zinc-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-[#01684c]/20 focus:border-[#01684c] outline-none transition-all text-zinc-800 cursor-pointer font-medium"
-              >
-                <option value="">-- Sin Registro --</option>
-                {posiblesPadres.map((toro) => (
-                  <option key={toro.id} value={toro.id}>
-                    {toro.arete} {toro.nombre ? `(${toro.nombre})` : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* SECCIÓN 3: Estado Productivo y Peso */}
-        <div className="bg-white p-4 rounded-2xl border border-zinc-100 shadow-sm space-y-4">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-[#01684c] flex items-center gap-2 pb-2 border-b border-zinc-100">
-            <Scale className="w-4 h-4" /> Zootecnia y Estado
-          </h3>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className={labelClass}>Peso Inicial (KG) *</label>
-              <div className="relative">
-                <Scale className="w-4 h-4 text-zinc-400 absolute left-3 top-3" />
-                <input 
-                  type="number" 
-                  step="0.01"
-                  required
-                  value={formData.peso_inicial || 0} 
-                  onChange={(e) => setFormData({...formData, peso_inicial: parseFloat(e.target.value)})}
-                  className={inputClass}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className={labelClass}>Estado Productivo</label>
-              <select 
-                value={formData.estado || ""}
-                onChange={(e) => setFormData({...formData, estado: e.target.value})}
-                className="w-full px-3 py-2.5 bg-zinc-50/50 border border-zinc-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-[#01684c]/20 focus:border-[#01684c] outline-none transition-all text-zinc-800 cursor-pointer font-medium"
-              >
-                {ESTADOS_VALIDOS.map((est, idx) => (
-                  <option key={idx} value={est}>{est}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* SECCIÓN 4: Condición e Inactividad */}
-        <div className="bg-white p-4 rounded-2xl border border-zinc-100 shadow-sm space-y-4">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-700 flex items-center gap-2 pb-2 border-b border-zinc-100">
-            <ShieldAlert className="w-4 h-4 text-amber-600" /> Condición Operativa
-          </h3>
-
-          <div>
-            <label className={labelClass}>Estado en el Hato</label>
-            <select 
-              value={formData.condicion || "Activo"}
-              onChange={(e) => setFormData({
-                ...formData, 
-                condicion: e.target.value as 'Activo' | 'Inactivo',
-                motivo_baja: e.target.value === 'Activo' ? null : (formData.motivo_baja || 'Venta')
-              })}
-              className="w-full px-3 py-2.5 bg-zinc-50/50 border border-zinc-200 rounded-xl text-sm font-semibold focus:bg-white focus:ring-2 focus:ring-[#01684c]/20 focus:border-[#01684c] outline-none transition-all text-zinc-800 cursor-pointer"
+          <DialogFooter className="px-6 py-5 min-h-[70px] border-t bg-muted/10 flex flex-row items-center justify-end gap-3 shrink-0">
+            <Button
+              type="button"
+              variant="outline"
+              size="default"
+              onClick={onClose}
+              disabled={saving}
             >
-              <option value="Activo">Activo</option>
-              <option value="Inactivo">Inactivo</option>
-            </select>
-          </div>
-
-          {formData.condicion === 'Inactivo' && (
-            <div className="p-4 bg-rose-50/80 border border-rose-100 rounded-2xl space-y-3 animate-in fade-in duration-200">
-              <label className="block text-[11px] font-bold uppercase text-rose-700 tracking-wider">Motivo de Baja</label>
-              
-              <div className="grid grid-cols-3 gap-2">
-                {(['Muerte', 'Venta', 'Otros'] as const).map((motivo) => (
-                  <button
-                    key={motivo}
-                    type="button"
-                    onClick={() => setFormData({...formData, motivo_baja: motivo})}
-                    className={`py-2 px-3 text-xs font-semibold rounded-xl border transition-all cursor-pointer ${
-                      formData.motivo_baja === motivo 
-                        ? "bg-rose-600 text-white border-rose-600 shadow-sm" 
-                        : "bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-100"
-                    }`}
-                  >
-                    {motivo}
-                  </button>
-                ))}
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold uppercase text-rose-700 tracking-wider mb-1">Detalle de la Baja</label>
-                <input 
-                  type="text"
-                  value={formData.observacion_baja || ""} 
-                  onChange={(e) => setFormData({...formData, observacion_baja: e.target.value})}
-                  className="w-full border border-rose-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-rose-500 bg-white text-zinc-800 placeholder:text-rose-300"
-                  placeholder="Ej: Vendido a ganadería vecina..."
-                />
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* SECCIÓN 5: Observaciones */}
-        <div className="bg-white p-4 rounded-2xl border border-zinc-100 shadow-sm space-y-2">
-          <label className={labelClass}>
-            <FileText className="w-4 h-4 text-zinc-400" /> Observaciones Generales
-          </label>
-          <textarea 
-            rows={2}
-            value={formData.observaciones || ""} 
-            onChange={(e) => setFormData({...formData, observaciones: e.target.value})}
-            className="w-full px-4 py-3 bg-zinc-50/50 border border-zinc-200 rounded-xl text-sm placeholder:text-zinc-400 focus:bg-white focus:ring-2 focus:ring-[#01684c]/20 focus:border-[#01684c] outline-none transition-all text-zinc-800 resize-none font-medium"
-            placeholder="Notas adicionales, historial médico rápido o particularidades..."
-          />
-        </div>
-
-      </div>
-    </FormModal>
+              Cancelar
+            </Button>
+            <Button 
+              type="submit" 
+              size="default"
+              disabled={saving}
+            >
+              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {saving ? "Guardando..." : isEditing ? "Guardar Cambios" : "Registrar"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

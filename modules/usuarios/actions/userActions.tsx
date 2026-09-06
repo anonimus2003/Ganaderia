@@ -22,7 +22,7 @@ export async function createUserAction(data: UserFormValues) {
     if (!userId) throw new Error("No se pudo obtener el ID del usuario creado.");
 
     const { error: profileError } = await supabase
-      .from("perfiles")
+      .from("usuarios")
       .upsert({
         id: userId,
         nombre: data.nombre,
@@ -46,7 +46,7 @@ export async function updateUserAction(id: string, data: UserFormValues) {
 
   try {
     const { error: profileError } = await supabase
-      .from("perfiles")
+      .from("usuarios")
       .update({
         nombre: data.nombre,
         apellidos: data.apellidos,

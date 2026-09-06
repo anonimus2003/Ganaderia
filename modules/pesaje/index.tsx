@@ -1,149 +1,143 @@
-'use client';
-import React, { useState, useMemo } from "react";
-import PesajeTable from "@/modules/pesaje/components/PesajeTable";
-import PesajeFormModal from "@/modules/pesaje/components/PesajeFormModal";
-import DetailPesaje from "@/modules/pesaje/components/DetailPesaje";
-import FilterBar from "@/components/ui/FilterBar";
-import { usePesajes } from "@/modules/pesaje/hooks/usePesajes";
-import { useModuloPermissions } from "@/hooks/useModuloPermissions";
-import { Pesaje } from "@/modules/pesaje/schemas";
-import { X } from "lucide-react";
+"use client";
 
-export default function PesajesPage() {
-  const { 
-    pesajes, loading, handleSave, handleDelete, 
-    page, total, pesoPromedio, nextPage, prevPage, PAGE_SIZE 
-  } = usePesajes();
+import { useState } from 'react';
+import { usePesajes } from './hooks/usePesajes';
+import { useBovinos } from '@/modules/inventario/hooks/useBovinos';
+import PesajeTable from './components/PesajeTable';
+import PesajeFormModal from './components/PesajeFormModal';
+import PesajeFiltersDrawer from './components/PesajeFiltersDrawer';
+import ConfirmModal from '@/components/ui/ConfirmModal';
+import { crearPesaje, actualizarPesaje, eliminarPesaje } from './actions/pesaje.actions';
+import { toast } from 'sonner';
 
-  // 1. Cargamos los permisos reales desde la base de datos para el módulo 'pesajes'
-  const { permisos, loading: loadingPermisos } = useModuloPermissions('pesajes');
+export interface FiltrosPesaje {
+  busqueda: string;
+  metodo: string;
+  condicion: string;
+  fechaInicio: string;
+  fechaFin: string;
+}
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedRegistro, setSelectedRegistro] = useState<Pesaje | null>(null);
-
-  // Estados para el Modal de Detalles (Ver)
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [detailItem, setDetailItem] = useState<Pesaje | null>(null);
+export default function PesajesIndex() {
+  const porPagina = 10;
   
-  const [showFilters, setShowFilters] = useState(false);
-  const [filterValues, setFilterValues] = useState({ busqueda: "", estado: "" });
+  const [filtros, setFiltros] = useState<FiltrosPesaje>({
+    busqueda: '',
+    metodo: 'todos',
+    condicion: 'todas',
+    fechaInicio: '',
+    fechaFin: '',
+  });
 
-  // 2. Funciones protegidas con validación de permisos
-  const handleOpenCreate = () => {
-    if (!permisos.puede_crear) return;
-    setSelectedRegistro(null);
-    setIsModalOpen(true);
-  };
+  const { pesajes, cargando, pagina, setPagina, total, recargar } = usePesajes(porPagina, filtros);
+  const { bovinos } = useBovinos(); // Carga la lista completa de animales para el selector
+  
+  const [modalAbierto, setModalAbierto] = useState(false);
+  const [drawerAbierto, setDrawerAbierto] = useState(false);
+  const [pesajeAEditar, setPesajeAEditar] = useState<any>(null);
+  const [pesajeAEliminar, setPesajeAEliminar] = useState<any>(null);
+  const [deleting, setDeleting] = useState(false);
 
-  const handleOpenEdit = (item: Pesaje) => {
-    if (!permisos.puede_editar) return;
-    setSelectedRegistro(item);
-    setIsModalOpen(true);
-  };
-
-  const handleOpenDetail = (item: Pesaje) => {
-    setDetailItem(item);
-    setIsDetailOpen(true);
-  };
-
-  const filteredRegistros = useMemo(() => {
-    return pesajes.filter(item => {
-      const query = filterValues.busqueda?.toLowerCase().trim() || "";
-      
-      // Si no hay texto de búsqueda, evaluamos solo el estado
-      if (!query) {
-        if (!filterValues.estado) return true;
-        return item.estado_fisiologico === filterValues.estado;
+  const handleGuardarPesaje = async (payload: any) => {
+    try {
+      let resultado;
+      if (pesajeAEditar?.id) {
+        resultado = await actualizarPesaje(pesajeAEditar.id, payload);
+      } else {
+        resultado = await crearPesaje(payload);
       }
-
-      const arete = (item as any).bovinos?.arete?.toLowerCase() || "";
-      const nombre = (item as any).bovinos?.nombre?.toLowerCase() || "";
       
-      const coincideBusqueda = arete.includes(query) || nombre.includes(query);
-      const coincideEstado = !filterValues.estado || item.estado_fisiologico === filterValues.estado;
+      if (resultado && resultado.success === false) {
+        throw new Error("No se pudo completar la operación en la base de datos.");
+      }
       
-      return coincideBusqueda && coincideEstado;
-    });
-  }, [pesajes, filterValues]);
+      toast.success(pesajeAEditar?.id ? 'Pesaje actualizado correctamente' : 'Pesaje creado correctamente');
+      setModalAbierto(false);
+      setPesajeAEditar(null);
+      recargar();
+    } catch (error: any) {
+      console.error("Error al guardar pesaje:", error);
+      toast.error(error.message || 'Ocurrió un error al guardar.');
+    }
+  };
 
-  if (loadingPermisos) return <div className="p-6 text-center">Cargando permisos...</div>;
+  const handleConfirmDelete = async () => {
+    if (!pesajeAEliminar?.id) return;
+
+    try {
+      setDeleting(true);
+      const resultado = await eliminarPesaje(pesajeAEliminar.id);
+      
+      if (resultado && resultado.success === false) {
+        toast.error('Error al eliminar el pesaje');
+        return;
+      }
+      
+      toast.success('Pesaje eliminado correctamente');
+      setPesajeAEliminar(null);
+      recargar();
+    } catch (error) {
+      console.error('Error al eliminar:', error);
+      toast.error('Ocurrió un error al intentar eliminar el registro.');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto relative">
-      
-      {/* Panel de Filtros */}
-      {showFilters && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/25 backdrop-blur-xs transition-all">
-          <div className="w-full max-w-md bg-white h-full shadow-2xl border-l border-slate-200 p-6 flex flex-col animate-in slide-in-from-right duration-200">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-bold text-slate-800">Filtrar Pesajes</h3>
-              <button onClick={() => setShowFilters(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl cursor-pointer">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            
-            <FilterBar
-              filters={[
-                { id: "busqueda", type: "text", placeholder: "Buscar por arete o nombre..." },
-                { 
-                  id: "estado", 
-                  type: "select", 
-                  placeholder: "Estado Fisiológico", 
-                  options: [
-                    {label: "Gestante", value: "Gestante"},
-                    {label: "Vacía", value: "Vacía"},
-                    {label: "Lactancia", value: "Lactancia"},
-                    {label: "Crecimiento", value: "Crecimiento"},
-                    {label: "Engorde", value: "Engorde"}
-                  ] 
-                }
-              ]}
-              values={filterValues}
-              onChange={(id, val) => setFilterValues(prev => ({ ...prev, [id]: val }))}
-              onReset={() => setFilterValues({ busqueda: "", estado: "" })}
-            />
-          </div>
-        </div>
+    <div className="p-6 space-y-6">
+      <PesajeTable 
+        data={pesajes} 
+        loading={cargando} 
+        onAddRecord={() => {
+          setPesajeAEditar(null);
+          setModalAbierto(true);
+        }}
+        onEdit={(pesaje) => {
+          setPesajeAEditar(pesaje);
+          setModalAbierto(true);
+        }}
+        onDelete={(pesaje) => setPesajeAEliminar(pesaje)}
+        onFilters={() => setDrawerAbierto(true)}
+        page={pagina}
+        total={total}
+        pageSize={porPagina}
+        nextPage={() => setPagina(p => p + 1)}
+        prevPage={() => setPagina(p => Math.max(p - 1, 1))}
+      />
+
+      {modalAbierto && (
+        <PesajeFormModal
+          isOpen={modalAbierto}
+          onClose={() => {
+            setModalAbierto(false);
+            setPesajeAEditar(null);
+          }}
+          initialData={pesajeAEditar}
+          onSave={handleGuardarPesaje}
+          bovinos={bovinos} // Se pasa el listado completo para que el formulario liste los animales disponibles
+        />
       )}
 
-      {/* Tabla con la prop permisos conectada */}
-      <PesajeTable 
-        data={filteredRegistros}
-        loading={loading}
-        onAddRecord={handleOpenCreate}
-        onEdit={handleOpenEdit}
-        onDelete={(id) => {
-          if (!permisos.puede_eliminar) return;
-          handleDelete(id);
+      <PesajeFiltersDrawer
+        open={drawerAbierto}
+        onOpenChange={setDrawerAbierto}
+        onApplyFilters={(nuevosFiltros) => {
+          setFiltros(nuevosFiltros);
+          setPagina(1);
         }}
-        onView={handleOpenDetail}
-        onFilters={() => setShowFilters(true)}
-        page={page}
-        total={total}
-        nextPage={nextPage}
-        prevPage={prevPage}
-        pageSize={PAGE_SIZE}
-        pesoPromedio={pesoPromedio}
-        permisos={permisos}
       />
 
-      {/* Modal de Crear / Editar */}
-      <PesajeFormModal 
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSuccess={async (data?: any) => {
-          if (data) {
-            await handleSave(data);
-          }
-        }}
-        pesajeAEditar={selectedRegistro}
-      />
-
-      {/* Modal de Detalles */}
-      <DetailPesaje 
-        isOpen={isDetailOpen}
-        onClose={() => setIsDetailOpen(false)}
-        pesaje={detailItem}
+      <ConfirmModal
+        isOpen={!!pesajeAEliminar}
+        onClose={() => setPesajeAEliminar(null)}
+        onConfirm={handleConfirmDelete}
+        isLoading={deleting}
+        title={`¿Eliminar el registro del arete "${pesajeAEliminar?.bovinos?.arete || 'S/N'}"?`}
+        message={`Estás a punto de eliminar permanentemente el registro de pesaje de "${pesajeAEliminar?.bovinos?.nombre || 'Sin nombre'}" con arete ${pesajeAEliminar?.bovinos?.arete || 'S/N'}. Esta acción no se puede deshacer y borrará su trazabilidad en el hato.`}
+        confirmText="Sí, eliminar registro"
+        cancelText="Cancelar"
+        isDestructive={true}
       />
     </div>
   );

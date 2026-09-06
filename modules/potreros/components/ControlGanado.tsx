@@ -34,6 +34,7 @@ export default function ControlGanado({ potrero, onIngresarGanado, onSacarGanado
   const isOcupado = estado === 'ocupado';
   const estaEnDescanso = estado === 'en descanso';
 
+  /* eslint-disable react-hooks/set-state-in-effect -- availability changes reset the local cattle selection. */
   useEffect(() => {
     if (!isDisponible) {
       setBovinosLista([]);
@@ -59,6 +60,7 @@ export default function ControlGanado({ potrero, onIngresarGanado, onSacarGanado
     fetchBovinos();
     return () => { cancelado = true; };
   }, [isDisponible, supabase]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const toggleBovino = (id: string) => {
     setBovinosSeleccionados(actuales => 

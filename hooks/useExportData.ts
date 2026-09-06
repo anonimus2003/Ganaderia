@@ -4,9 +4,12 @@ import { exportToCSV } from "@/lib/utils/exportUtils";
 
 export function useExportData() {
   const [isExporting, setIsExporting] = useState(false);
-  const supabase = createClient(); // 1. Inicializamos el cliente aquí
+  const supabase = createClient(); 
 
-  const exportAll = async (tableName: string, querySelect: string = '*') => {
+  /**
+   * Opción A: Consulta directo a cualquier tabla de Supabase (ideal para exportaciones masivas).
+   */
+  const exportFromTable = async (tableName: string, querySelect: string = '*', filename?: string) => {
     setIsExporting(true);
     try {
       const { data, error } = await supabase
@@ -15,14 +18,21 @@ export function useExportData() {
 
       if (error) throw error;
       
-      exportToCSV(data as any);
+      exportToCSV(data as any[], `${tableName}_export.csv`);
     } catch (error) {
-      console.error("Error exportando:", error);
-      alert("No se pudieron cargar todos los registros para exportar.");
+      console.error(`Error exportando la tabla ${tableName}:`, error);
     } finally {
       setIsExporting(false);
     }
   };
 
-  return { exportAll, isExporting };
+  /**
+   * Opción B: Exporta los datos que ya están filtrados y en pantalla en el cliente.
+   */
+  const exportLocalData = (data: any[], filename = "datos_filtrados.csv") => {
+    if (!data || data.length === 0) return;
+    exportToCSV(data, filename);
+  };
+
+  return { exportFromTable, exportLocalData, isExporting };
 }

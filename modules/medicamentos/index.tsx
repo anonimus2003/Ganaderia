@@ -1,132 +1,197 @@
 'use client';
-import React, { useState, useMemo } from "react";
-import TratamientoTable from "./components/TratamientosTable";
-import TratamientoFormModal from "./components/TratamientoFormModal";
-import DetailTratamiento from "./components/DetailTratamiento";
-import FilterBar from "@/components/ui/FilterBar";
-import { useTratamientos } from "./hooks/useTratamientos";
-import { useModuloPermissions } from "@/hooks/useModuloPermissions";
-import { Tratamiento, viasEnum } from "./schemas";
-import { X } from "lucide-react";
 
-export default function TratamientosPage() {
-  const { 
-    tratamientos, loading, handleSave, handleDelete, 
-    page, total, nextPage, prevPage, PAGE_SIZE 
-  } = useTratamientos();
+import { useState } from 'react';
+import { useMedicamentos } from './hooks/useMedicamentos';
+import MedicamentosTable from './components/MedicamentosTable';
+import MedicamentoFormModal from './components/MedicamentoFormModal';
+import ConfirmModal from '@/components/ui/ConfirmModal';
+import { crearMedicamento, actualizarMedicamento, eliminarMedicamento } from './actions/medicamentos.actions';
+import { toast } from 'sonner';
+import { MedicamentoRecord } from './components/MedicamentosColumns';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 
-  // 1. Cargamos los permisos reales desde la base de datos para el módulo 'tratamientos'
-  const { permisos, loading: loadingPermisos } = useModuloPermissions('medicamentos');
-
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedRegistro, setSelectedRegistro] = useState<Tratamiento | null>(null);
+export default function MedicamentosIndex() {
+  const porPagina = 10;
   
-  // Estados para el Modal de Detalles (Ver)
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [detailItem, setDetailItem] = useState<Tratamiento | null>(null);
-  
-  const [showFilters, setShowFilters] = useState(false);
-  const [filterValues, setFilterValues] = useState({ busqueda: "", via: "" });
+  const {
+    medicamentos,
+    total,
+    pagina,
+    setPagina,
+    filtros,
+    setFiltros,
+    cargando,
+    cargarMedicamentos,
+  } = useMedicamentos();
 
-  // 2. Funciones protegidas con validación de permisos
-  const handleOpenCreate = () => {
-    if (!permisos.puede_crear) return;
-    setSelectedRegistro(null);
-    setIsModalOpen(true);
-  };
+  const [modalAbierto, setModalAbierto] = useState(false);
+  const [drawerAbierto, setDrawerAbierto] = useState(false);
+  const [medicamentoAEditar, setMedicamentoAEditar] = useState<MedicamentoRecord | null>(null);
+  const [medicamentoAEliminar, setMedicamentoAEliminar] = useState<MedicamentoRecord | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [tempFiltros, setTempFiltros] = useState(filtros);
 
-  const handleOpenEdit = (item: Tratamiento) => {
-    if (!permisos.puede_editar) return;
-    setSelectedRegistro(item);
-    setIsModalOpen(true);
-  };
-
-  // Función para abrir el modal de detalles al hacer clic en una fila o ver
-  const handleOpenDetail = (item: Tratamiento) => {
-    setDetailItem(item);
-    setIsDetailOpen(true);
-  };
-
-  const filteredRegistros = useMemo(() => {
-    return tratamientos.filter(item => {
-      const arete = (item as any).bovinos?.arete?.toLowerCase() || "";
-      const medicamento = item.medicamento?.toLowerCase() || "";
-      const query = filterValues.busqueda.toLowerCase();
+  const handleGuardarMedicamento = async (payload: any) => {
+    try {
+      let resultado;
+      if (payload.id) {
+        resultado = await actualizarMedicamento(payload.id, payload);
+      } else {
+        resultado = await crearMedicamento(payload);
+      }
       
-      const coincideBusqueda = arete.includes(query) || medicamento.includes(query);
-      const coincideVia = !filterValues.via || item.via === filterValues.via;
+      if (resultado && resultado.success === false) {
+        throw new Error("No se pudo completar la operación en la base de datos.");
+      }
       
-      return coincideBusqueda && coincideVia;
-    });
-  }, [tratamientos, filterValues]);
+      toast.success(payload.id ? 'Medicamento actualizado correctamente' : 'Medicamento creado correctamente');
+      setModalAbierto(false);
+      cargarMedicamentos();
+    } catch (error: any) {
+      console.error("Error al guardar medicamento:", error);
+      toast.error(error.message || 'Ocurrió un error al guardar.');
+    }
+  };
 
-  if (loadingPermisos) return <div className="p-6 text-center">Cargando permisos...</div>;
+  const handleConfirmDelete = async () => {
+    if (!medicamentoAEliminar?.id) return;
+
+    try {
+      setDeleting(true);
+      const resultado = await eliminarMedicamento(medicamentoAEliminar.id);
+      
+      if (resultado && resultado.success === false) {
+        toast.error('Error al eliminar el medicamento');
+        return;
+      }
+      
+      toast.success('Medicamento eliminado correctamente');
+      setMedicamentoAEliminar(null);
+      cargarMedicamentos();
+    } catch (error) {
+      console.error('Error al eliminar:', error);
+      toast.error('Ocurrió un error al intentar eliminar el registro.');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto relative">
-      
-      {/* Panel Lateral de Filtros */}
-      {showFilters && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/25 backdrop-blur-xs transition-all">
-          <div className="w-full max-w-md bg-white h-full shadow-2xl border-l border-slate-200 p-6 flex flex-col animate-in slide-in-from-right duration-200">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-bold text-slate-800">Filtrar Tratamientos</h3>
-              <button onClick={() => setShowFilters(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl cursor-pointer">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            
-            <FilterBar
-              filters={[
-                { id: "busqueda", type: "text", placeholder: "Buscar por arete o medicamento..." },
-                { 
-                  id: "via", 
-                  type: "select", 
-                  placeholder: "Vía de aplicación", 
-                  options: viasEnum.map(v => ({ label: v, value: v }))
-                }
-              ]}
-              values={filterValues}
-              onChange={(id, val) => setFilterValues(prev => ({ ...prev, [id]: val }))}
-              onReset={() => setFilterValues({ busqueda: "", via: "" })}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Tabla con permisos conectados */}
-      <TratamientoTable 
-        data={filteredRegistros}
-        loading={loading}
-        onAddRecord={handleOpenCreate}
-        onEdit={handleOpenEdit}
-        onDelete={(id) => {
-          if (!permisos.puede_eliminar) return;
-          handleDelete(id);
+    <div className="p-6 space-y-6">
+      <MedicamentosTable 
+        data={medicamentos} 
+        loading={cargando} 
+        onAddRecord={() => {
+          setMedicamentoAEditar(null);
+          setModalAbierto(true);
         }}
-        onView={handleOpenDetail}
-        onFilters={() => setShowFilters(true)}
-        page={page}
+        onEdit={(item: MedicamentoRecord) => {
+          setMedicamentoAEditar(item);
+          setModalAbierto(true);
+        }}
+        onDelete={(item: MedicamentoRecord) => {
+          if (item) setMedicamentoAEliminar(item);
+        }}
+        onFilters={() => {
+          setTempFiltros(filtros);
+          setDrawerAbierto(true);
+        }}
+        page={pagina}
         total={total}
-        nextPage={nextPage}
-        prevPage={prevPage}
-        pageSize={PAGE_SIZE}
-        permisos={permisos}
+        pageSize={porPagina}
+        nextPage={() => setPagina(p => p + 1)}
+        prevPage={() => setPagina(p => Math.max(p - 1, 1))}
       />
 
-      {/* Modal de Formulario (Crear / Editar) */}
-      <TratamientoFormModal 
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSave={handleSave}
-        initialData={selectedRegistro}
-      />
+      <Sheet open={drawerAbierto} onOpenChange={setDrawerAbierto}>
+        <SheetContent className="w-full sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>Filtrar Medicamentos</SheetTitle>
+          </SheetHeader>
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-700">Bovino (Arete o Nombre)</label>
+              <Input
+                placeholder="Ej. 001, Lucero..."
+                value={tempFiltros.bovino || ""}
+                onChange={(e) => setTempFiltros((prev: any) => ({ ...prev, bovino: e.target.value }))}
+              />
+            </div>
 
-      {/* Modal de Detalles */}
-      <DetailTratamiento 
-        isOpen={isDetailOpen}
-        onClose={() => setIsDetailOpen(false)}
-        tratamiento={detailItem}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-700">Nombre del Medicamento</label>
+              <Input
+                placeholder="Ej. Ivermectina..."
+                value={tempFiltros.medicamento || ""}
+                onChange={(e) => setTempFiltros((prev: any) => ({ ...prev, medicamento: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-700">Fecha Desde</label>
+              <Input
+                type="date"
+                value={tempFiltros.fechaInicio || ""}
+                onChange={(e) => setTempFiltros((prev: any) => ({ ...prev, fechaInicio: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-700">Fecha Hasta</label>
+              <Input
+                type="date"
+                value={tempFiltros.fechaFin || ""}
+                onChange={(e) => setTempFiltros((prev: any) => ({ ...prev, fechaFin: e.target.value }))}
+              />
+            </div>
+
+            <div className="flex gap-2 pt-4">
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  setTempFiltros({});
+                  setFiltros({});
+                  setPagina(1);
+                  setDrawerAbierto(false);
+                }}
+              >
+                Limpiar
+              </Button>
+              <Button
+                className="w-full"
+                onClick={() => {
+                  setFiltros(tempFiltros);
+                  setPagina(1);
+                  setDrawerAbierto(false);
+                }}
+              >
+                Aplicar
+              </Button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <MedicamentoFormModal
+        isOpen={modalAbierto}
+        onClose={() => setModalAbierto(false)}
+        medicamentoAEditar={medicamentoAEditar}
+        onSuccess={handleGuardarMedicamento}
+      />    
+
+      <ConfirmModal
+        isOpen={!!medicamentoAEliminar}
+        onClose={() => setMedicamentoAEliminar(null)}
+        onConfirm={handleConfirmDelete}
+        isLoading={deleting}
+        title={`¿Eliminar registro de ${medicamentoAEliminar?.medicamento || 'Medicamento'}?`}
+        message={`Estás a punto de eliminar permanentemente el tratamiento para el bovino "${medicamentoAEliminar?.bovinos?.nombre || 'Sin nombre'}" con arete "${medicamentoAEliminar?.bovinos?.arete || 'S/N'}". Esta acción no se puede deshacer.`}
+        confirmText="Sí, eliminar registro"
+        cancelText="Cancelar"
+        isDestructive={true}
       />
     </div>
   );

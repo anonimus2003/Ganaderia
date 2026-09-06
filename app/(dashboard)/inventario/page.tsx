@@ -1,5 +1,5 @@
-import InventarioBovinosDashboard from "@/modules/inventario";
+import InventarioPage from "@/modules/inventario";
 
-export default function InventarioPage() {
-  return <InventarioBovinosDashboard />;
+export default function Page() {
+  return <InventarioPage />;
 }

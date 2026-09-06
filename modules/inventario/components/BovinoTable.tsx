@@ -1,25 +1,39 @@
-'use client';
+"use client";
 
-import DataTable, { Column } from "@/components/ui/DataTable";
-import ActionDropdown from "@/components/ui/ActionDropdown";
 import { Bovino } from "../schemas";
-import { Pencil, Trash2 } from "lucide-react";
+import { getBovinoColumns } from "./bovinoColumns";
+
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
+import { Button } from "@/components/ui/button";
+import {
+  Plus,
+  Download,
+  FileText,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
+
 import { exportToPDF } from "@/lib/utils/exportUtils";
 import { useExportData } from "@/hooks/useExportData";
 
 interface BovinoTableProps {
   data: Bovino[];
   loading?: boolean;
+
   onAddRecord?: () => void;
   onEdit?: (bovino: Bovino) => void;
   onDelete?: (id: string, arete: string) => void;
   onRowClick?: (bovino: Bovino) => void;
   onFilters?: () => void;
+
   page: number;
   total: number;
   nextPage: () => void;
   prevPage: () => void;
   pageSize: number;
+
   permisos?: {
     puede_ver: boolean;
     puede_crear: boolean;
@@ -28,169 +42,197 @@ interface BovinoTableProps {
   };
 }
 
-export default function BovinoTable({ 
-  data, 
+export default function BovinoTable({
+  data,
   loading,
-  onAddRecord, 
-  onEdit, 
-  onDelete, 
-  onRowClick, 
+  onAddRecord,
+  onEdit,
+  onDelete,
+  onRowClick,
   onFilters,
   page,
   total,
   nextPage,
   prevPage,
   pageSize,
-  permisos = { puede_ver: true, puede_crear: true, puede_editar: true, puede_eliminar: true }
+  permisos = {
+    puede_ver: true,
+    puede_crear: true,
+    puede_editar: true,
+    puede_eliminar: true,
+  },
 }: BovinoTableProps) {
-  
-  const { exportAll, isExporting } = useExportData();
-  
-  const columns: Column<Bovino>[] = [
-    { 
-      header: "Bovino", 
-      accessor: "arete",
-      render: (_, b) => (
-        <div>
-          <span className="font-semibold text-slate-800 block">{b.arete || "Sin arete"}</span>
-          {b.nombre && <span className="text-xs text-slate-500 block">{b.nombre}</span>}
-        </div>
-      )
-    },
-    { 
-      header: "Género", 
-      accessor: "genero",
-      render: (value) => {
-        const genero = String(value || "").toLowerCase();
-        const esFemenino = genero.includes("femenino") || genero === "f" || genero.includes("hembra");
-        
-        return (
-          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold inline-block border ${
-            esFemenino 
-              ? "bg-rose-100 text-rose-700 border-rose-200" 
-              : "bg-sky-100 text-sky-700 border-sky-200"
-          }`}>
-            {value}
-          </span>
-        );
-      }
-    },
-    { header: "Raza", accessor: "raza" },
-    { 
-      header: "Peso", 
-      accessor: "peso_inicial",
-      render: (value) => value ? `${value} kg` : "-"
-    },
-    { 
-      header: "Estado", 
-      accessor: "estado",
-      render: (value) => {
-        const estado = String(value || "").toLowerCase();
-        let badgeStyle = "bg-slate-100 text-slate-700 border-slate-200";
-        
-        if (estado.includes("producción") || estado.includes("produccion")) {
-          badgeStyle = "bg-emerald-100 text-emerald-700 border-emerald-200";
-        } else if (estado.includes("novilla en desarrollo")) {
-          badgeStyle = "bg-amber-100 text-amber-700 border-amber-200";
-        } else if (estado.includes("novilla de vientre")) {
-          badgeStyle = "bg-pink-100 text-pink-700 border-pink-200";
-        } else if (estado.includes("crecimiento")) {
-          badgeStyle = "bg-blue-100 text-blue-700 border-blue-200";
-        } else if (estado.includes("lactancia")) {
-          badgeStyle = "bg-purple-100 text-purple-700 border-purple-200";
-        } else if (estado.includes("destete") || estado.includes("levante")) {
-          badgeStyle = "bg-indigo-100 text-indigo-700 border-indigo-200";
-        } else if (estado.includes("seca")) {
-          badgeStyle = "bg-orange-100 text-orange-700 border-orange-200";
-        }
+  const { exportFromTable } = useExportData();
 
-        return (
-          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border inline-block ${badgeStyle}`}>
-            {value}
-          </span>
-        );
-      }
-    },
-    { 
-      header: "Condición", 
-      accessor: "condicion",
-      render: (value, b) => {
-        const condicion = String(value || "Activo");
-        const esActivo = condicion === "Activo";
-        
-        return (
-          <div className="flex flex-col gap-1">
-            <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border inline-block w-fit ${
-              esActivo ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-700 border-red-200"
-            }`}>
-              {condicion}
-            </span>
-            {!esActivo && b.motivo_baja && (
-              <span className="text-xs text-slate-500 italic max-w-xs truncate" title={`${b.motivo_baja}${b.observacion_baja ? ` - ${b.observacion_baja}` : ""}`}>
-                <strong>{b.motivo_baja}</strong> {b.observacion_baja ? `- ${b.observacion_baja}` : ""}
-              </span>
-            )}
-          </div>
-        );
-      }
-    },
-    { 
-      header: "Observaciones", 
-      accessor: "observaciones",
-      render: (value) => {
-        const obs = String(value || "").trim();
-        if (!obs) return <span className="text-slate-400 italic">Sin observaciones</span>;
-        
-        return (
-          <span className="text-slate-600 truncate max-w-xs block" title={obs}>
-            {obs}
-          </span>
-        );
-      }
-    },
-    { 
-      header: "", 
-      accessor: "id",
-      render: (_, b) => (
-        <ActionDropdown actions={[
-          { 
-            label: "Editar", 
-            icon: <Pencil className="w-4 h-4"/>, 
-            onClick: () => onEdit?.(b),
-            disabled: !permisos.puede_editar 
-          },
-          { 
-            label: "Eliminar", 
-            icon: <Trash2 className="w-4 h-4"/>, 
-            onClick: () => onDelete?.(b.id, b.arete), 
-            danger: true,
-            disabled: !permisos.puede_eliminar 
-          },
-        ]} />
-      )
-    }
-  ];
+  const columns = getBovinoColumns({
+    onEdit,
+    onDelete,
+    permisos,
+  });
+
+  const totalPages = Math.ceil(total / pageSize);
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-      <DataTable 
-        title="REGISTROS DE ANIMALES" 
-        totalLabel="Total Bovinos:"
-        data={data} 
-        columns={columns} 
-        loading={loading}
-        onAddRecord={onAddRecord}
-        isAddDisabled={!permisos.puede_crear}
-        onRowClick={onRowClick}
-        onExportCSV={() => exportAll('bovinos', '*')} 
-        onDownloadPDF={exportToPDF}
-        onFilters={onFilters}
-        page={page}
-        total={total}
-        nextPage={nextPage}
-        prevPage={prevPage}
-        pageSize={pageSize}
-      />
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+
+      {/* HEADER */}
+
+      <div className="px-6 py-5 border-b flex items-center justify-between">
+
+        <div>
+          <h2 className="font-semibold text-slate-900">
+            REGISTROS DE ANIMALES
+          </h2>
+
+          <p className="text-xs text-slate-500">
+            Total Bovinos: {total}
+          </p>
+        </div>
+
+        <div className="flex gap-2">
+
+          {onFilters && (
+            <Button
+              variant="outline"
+              onClick={onFilters}
+            >
+              <Filter className="w-4 h-4 mr-2" />
+              Filtros
+            </Button>
+          )}
+
+          <Button
+            variant="outline"
+            onClick={() =>
+              exportFromTable("bovinos", "*")
+            }
+          >
+            <Download className="w-4 h-4 mr-2" />
+            CSV
+          </Button>
+
+          <Button
+            variant="outline"
+            onClick={() => exportToPDF(data)}
+          >
+            <FileText className="w-4 h-4 mr-2" />
+            PDF
+          </Button>
+
+          <Button
+            onClick={onAddRecord}
+            disabled={!permisos.puede_crear}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Nuevo bovino
+          </Button>
+
+        </div>
+      </div>
+
+      {/* TABLA */}
+
+      <div className="overflow-x-auto">
+
+        <Table>
+
+          <TableHeader>
+            <TableRow>
+              {columns.map((column) => (
+                <TableHead key={column.header}>
+                  {column.header}
+                </TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+
+          <TableBody>
+
+            {loading ? (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="text-center py-10"
+                >
+                  Cargando bovinos...
+                </TableCell>
+              </TableRow>
+            ) : data.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="text-center py-10"
+                >
+                  No hay bovinos registrados.
+                </TableCell>
+              </TableRow>
+            ) : (
+              data.map((bovino) => (
+                <TableRow
+                  key={bovino.id}
+                  className={
+                    onRowClick
+                      ? "cursor-pointer hover:bg-slate-50"
+                      : ""
+                  }
+                  onClick={() =>
+                    onRowClick?.(bovino)
+                  }
+                >
+                  {columns.map((column) => (
+                    <TableCell
+                      key={String(column.accessor)}
+                      onClick={(event) => {
+                        if (
+                          column.accessor === "acciones"
+                        ) {
+                          event.stopPropagation();
+                        }
+                      }}
+                    >
+                      {column.render(bovino)}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            )}
+
+          </TableBody>
+
+        </Table>
+      </div>
+
+      {/* PAGINACIÓN */}
+
+      <div className="px-6 py-4 border-t flex justify-between items-center">
+
+        <span className="text-xs text-slate-500">
+          Página {page} de {totalPages || 1}
+        </span>
+
+        <div className="flex gap-2">
+
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={prevPage}
+            disabled={page <= 1 || loading}
+          >
+            <ChevronLeft />
+          </Button>
+
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={nextPage}
+            disabled={page >= totalPages || loading}
+          >
+            <ChevronRight />
+          </Button>
+
+        </div>
+      </div>
+
     </div>
   );
 }

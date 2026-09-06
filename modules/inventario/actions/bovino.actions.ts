@@ -1,10 +1,10 @@
-import { createClient } from "@/lib/supabase/client"; // Ajusta según tu configuración de Supabase
+// modules/inventario/actions/bovino.actions.ts
+import { createClient } from "@/lib/supabase/client";
 import { Bovino } from "../schemas";
 
 const supabase = createClient();
 
-// Obtener todos los bovinos
-export async function getBovinos() {
+export async function getBovinosAction(): Promise<Bovino[]> {
   const { data, error } = await supabase
     .from("bovinos")
     .select("*")
@@ -15,42 +15,61 @@ export async function getBovinos() {
     throw new Error(error.message);
   }
 
-  return data as Bovino[];
+  return data || [];
 }
 
-// Crear o actualizar un bovino
-export async function saveBovino(bovino: Partial<Bovino>) {
-  if (bovino.id) {
-    // Actualizar
-    const { data, error } = await supabase
-      .from("bovinos")
-      .update(bovino)
-      .eq("id", bovino.id)
-      .select()
-      .single();
+// Función auxiliar para limpiar cadenas vacías y convertirlas en null
+function limpiarCamposVacios(data: Partial<Bovino>) {
+  const limpio: any = { ...data };
+  Object.keys(limpio).forEach(key => {
+    if (limpio[key] === "" || limpio[key] === undefined) {
+      limpio[key] = null;
+    }
+  });
+  return limpio;
+}
 
-    if (error) throw new Error(error.message);
-    return data;
+export async function saveBovinoAction(dataToSave: Partial<Bovino>): Promise<void> {
+  const datosLimpios = limpiarCamposVacios(dataToSave);
+
+  if (datosLimpios.id) {
+    // Actualizar registro existente
+    const bovinoId = datosLimpios.id;
+    delete datosLimpios.id;
+    delete datosLimpios.created_at;
+    delete datosLimpios.registrado_por;
+
+    const { error } = await supabase
+      .from("bovinos")
+      .update(datosLimpios)
+      .eq("id", bovinoId);
+
+    if (error) {
+      console.error("Error al actualizar bovino:", error.message);
+      throw new Error(error.message);
+    }
   } else {
-    // Insertar nuevo
-    const { data, error } = await supabase
+    // Crear nuevo registro
+    delete datosLimpios.id;
+    const { error } = await supabase
       .from("bovinos")
-      .insert([bovino])
-      .select()
-      .single();
+      .insert([datosLimpios]);
 
-    if (error) throw new Error(error.message);
-    return data;
+    if (error) {
+      console.error("Error al insertar bovino:", error.message);
+      throw new Error(error.message);
+    }
   }
 }
 
-// Eliminar un bovino
-export async function deleteBovino(id: string) {
+export async function deleteBovinoAction(id: string): Promise<void> {
   const { error } = await supabase
     .from("bovinos")
     .delete()
     .eq("id", id);
 
-  if (error) throw new Error(error.message);
-  return true;
+  if (error) {
+    console.error("Error al eliminar bovino:", error.message);
+    throw new Error(error.message);
+  }
 }

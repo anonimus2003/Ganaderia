@@ -1,133 +1,134 @@
+// modules/reproduccion/index.tsx
 'use client';
-import React, { useState, useMemo } from "react";
-import InseminacionTable from "@/modules/reproduccion/components/InseminacionTable";
-import InseminacionFormModal from "@/modules/reproduccion/components/InseminacionFormModal";
-import DetailInseminacion from "@/modules/reproduccion/components/DetailInseminacion";
-import FilterBar from "@/components/ui/FilterBar";
-import { useInseminaciones } from "@/modules/reproduccion/hooks/useInseminacion";
-import { useModuloPermissions } from "@/hooks/useModuloPermissions";
-import { Inseminacion } from "@/modules/reproduccion/schemas";
-import { X } from "lucide-react";
 
-export default function ReproduccionPage() {
-  const { 
-    inseminaciones, loading, handleSave, handleDelete, 
-    page, total, nextPage, prevPage, PAGE_SIZE 
-  } = useInseminaciones();
+import { useState } from 'react';
+import { useReproduccion } from './hooks/useReproduccion';
+import ReproduccionTable from './components/ReproduccionTable';
+import FiltrosReproduccionModal from './components/ReproduccionFiltersDrawer';
+import ReproduccionFormModal from './components/ReproduccionFormModal';
+import ConfirmModal from '@/components/ui/ConfirmModal';
+import { FiltrosReproduccion, Reproduccion } from './schemas';
+import { crearReproduccion, actualizarReproduccion } from './actions/reproduccion.actions';
+import { toast } from 'sonner';
 
-  // 1. Cargamos los permisos reales desde la base de datos para el módulo 'reproduccion'
-  const { permisos, loading: loadingPermisos } = useModuloPermissions('reproduccion');
-
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedRegistro, setSelectedRegistro] = useState<Inseminacion | null>(null);
+export default function ReproduccionIndex() {
+  const porPagina = 10;
   
-  // Estados para el Modal de Detalles (Ver)
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [detailItem, setDetailItem] = useState<Inseminacion | null>(null);
+  const [filtros, setFiltros] = useState<FiltrosReproduccion>({
+    bovino: '',
+    estado: '',
+    tipo: '',
+    fechaInicio: '',
+    fechaFin: '',
+  });
 
-  const [showFilters, setShowFilters] = useState(false);
-  const [filterValues, setFilterValues] = useState({ busqueda: "", estado: "" });
+  const {
+    reproducciones,
+    loading,
+    page,
+    total,
+    recargar,
+    handleEliminar,
+    nextPage,
+    prevPage,
+  } = useReproduccion(porPagina, filtros);
 
-  // 2. Funciones protegidas con validación de permisos
-  const handleOpenCreate = () => {
-    if (!permisos.puede_crear) return;
-    setSelectedRegistro(null);
-    setIsModalOpen(true);
+  const [modalAbierto, setModalAbierto] = useState(false);
+  const [drawerAbierto, setDrawerAbierto] = useState(false);
+  const [reproduccionAEditar, setReproduccionAEditar] = useState<Reproduccion | null>(null);
+  const [reproduccionAEliminar, setReproduccionAEliminar] = useState<any>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleGuardarReproduccion = async (payload: any) => {
+    try {
+      let resultado;
+      if (payload.id) {
+        resultado = await actualizarReproduccion(payload.id, payload);
+      } else {
+        resultado = await crearReproduccion(payload);
+      }
+      
+      if (resultado && resultado.success === false) {
+        throw new Error("No se pudo completar la operación en la base de datos.");
+      }
+      
+      toast.success(payload.id ? 'Registro de reproducción actualizado correctamente' : 'Registro de reproducción creado correctamente');
+      setModalAbierto(false);
+      recargar();
+    } catch (error: any) {
+      console.error("Error al guardar reproducción:", error);
+      toast.error(error.message || 'Ocurrió un error al guardar.');
+    }
   };
 
-  const handleOpenEdit = (item: Inseminacion) => {
-    if (!permisos.puede_editar) return;
-    setSelectedRegistro(item);
-    setIsModalOpen(true);
+  const handleConfirmDelete = async () => {
+    if (!reproduccionAEliminar?.id) return;
+
+    try {
+      setDeleting(true);
+      await handleEliminar(reproduccionAEliminar.id);
+      
+      toast.success('Registro de reproducción eliminado correctamente');
+      setReproduccionAEliminar(null);
+      recargar();
+    } catch (error) {
+      console.error('Error al eliminar:', error);
+      toast.error('Ocurrió un error al intentar eliminar el registro.');
+    } finally {
+      setDeleting(false);
+    }
   };
-
-  // Función para abrir el modal de detalles al hacer clic en una fila o ver
-  const handleOpenDetail = (item: Inseminacion) => {
-    setDetailItem(item);
-    setIsDetailOpen(true);
-  };
-
-  const filteredRegistros = useMemo(() => {
-    return inseminaciones.filter(item => {
-      const arete = (item as any).bovinos?.arete?.toLowerCase() || "";
-      const query = filterValues.busqueda.toLowerCase();
-      const coincideBusqueda = arete.includes(query);
-      const coincideEstado = !filterValues.estado || item.estado === filterValues.estado;
-      return coincideBusqueda && coincideEstado;
-    });
-  }, [inseminaciones, filterValues]);
-
-  if (loadingPermisos) return <div className="p-6 text-center">Cargando permisos...</div>;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto relative">
-      
-      {/* Panel de Filtros */}
-      {showFilters && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/25 backdrop-blur-xs transition-all">
-          <div className="w-full max-w-md bg-white h-full shadow-2xl border-l border-slate-200 p-6 flex flex-col animate-in slide-in-from-right duration-200">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-bold text-slate-800">Filtrar Inseminaciones</h3>
-              <button onClick={() => setShowFilters(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl cursor-pointer">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            
-            <FilterBar
-              filters={[
-                { id: "busqueda", type: "text", placeholder: "Buscar por arete..." },
-                { 
-                  id: "estado", 
-                  type: "select", 
-                  placeholder: "Estado", 
-                  options: [
-                    { label: "Pendiente", value: "Pendiente" },
-                    { label: "Preñada", value: "Preñada" },
-                    { label: "Vacía", value: "Vacía" }
-                  ] 
-                }
-              ]}
-              values={filterValues}
-              onChange={(id, val) => setFilterValues(prev => ({ ...prev, [id]: val }))}
-              onReset={() => setFilterValues({ busqueda: "", estado: "" })}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Tabla con permisos conectados */}
-      <InseminacionTable 
-        data={filteredRegistros}
-        loading={loading}
-        onAddRecord={handleOpenCreate}
-        onEdit={handleOpenEdit}
-        onDelete={(id) => {
-          if (!permisos.puede_eliminar) return;
-          handleDelete(id);
+    <div className="p-6 space-y-6">
+      <ReproduccionTable 
+        data={reproducciones} 
+        loading={loading} 
+        onAddRecord={() => {
+          setReproduccionAEditar(null);
+          setModalAbierto(true);
         }}
-        onView={handleOpenDetail}
-        onFilters={() => setShowFilters(true)}
+        onEdit={(item) => {
+          setReproduccionAEditar(item);
+          setModalAbierto(true);
+        }}
+        onDelete={(item) => setReproduccionAEliminar(item)}
+        onFilters={() => setDrawerAbierto(true)}
         page={page}
         total={total}
+        pageSize={porPagina}
         nextPage={nextPage}
         prevPage={prevPage}
-        pageSize={PAGE_SIZE}
-        permisos={permisos}
       />
 
-      {/* Modal de Crear / Editar */}
-      <InseminacionFormModal 
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSave={handleSave}
-        initialData={selectedRegistro}
+      {modalAbierto && (
+        <ReproduccionFormModal
+          isOpen={modalAbierto}
+          onClose={() => setModalAbierto(false)}
+          reproduccionAEditar={reproduccionAEditar}
+          onSuccess={handleGuardarReproduccion}
+        />
+      )}
+
+      <FiltrosReproduccionModal
+        isOpen={drawerAbierto}
+        onClose={() => setDrawerAbierto(false)}
+        filtrosActuales={filtros}
+        onApplyFilters={(nuevosFiltros) => {
+          setFiltros(nuevosFiltros);
+        }}
       />
 
-      {/* Modal de Detalles */}
-      <DetailInseminacion 
-        isOpen={isDetailOpen}
-        onClose={() => setIsDetailOpen(false)}
-        registro={detailItem}
+      <ConfirmModal
+        isOpen={!!reproduccionAEliminar}
+        onClose={() => setReproduccionAEliminar(null)}
+        onConfirm={handleConfirmDelete}
+        isLoading={deleting}
+        title={`¿Eliminar el registro de reproducción del arete "${reproduccionAEliminar?.bovinos?.arete || 'S/N'}"?`}
+        message={`Estás a punto de eliminar permanentemente el registro reproductivo de "${reproduccionAEliminar?.bovinos?.nombre || 'Sin nombre'}" con arete ${reproduccionAEliminar?.bovinos?.arete || 'S/N'}. Esta acción no se puede deshacer.`}
+        confirmText="Sí, eliminar registro"
+        cancelText="Cancelar"
+        isDestructive={true}
       />
     </div>
   );

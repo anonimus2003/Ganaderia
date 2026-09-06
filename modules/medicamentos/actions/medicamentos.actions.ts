@@ -1,61 +1,160 @@
-import { createClient } from '@/lib/supabase/client';
-import { Tratamiento } from '../schemas';
+'use server';
 
-const supabase = createClient();
+import { createClient } from '@/lib/supabase/server';
+import { revalidatePath } from 'next/cache';
 
-export async function getBovinos() {
-  const { data, error } = await supabase
-    .from('bovinos')
-    .select('id, arete, nombre, raza, estado');
-  if (error) throw error;
-  return data || [];
+export interface FiltrosMedicamento {
+  bovino?: string;
+  medicamento?: string;
+  via?: string;
+  fechaInicio?: string;
+  fechaFin?: string;
 }
 
-export async function getTratamientos() {
+export async function obtenerMedicamentos() {
+  const supabase = await createClient();
+
   const { data, error } = await supabase
-    .from('tratamientos')
+    .from('medicamentos')
     .select(`
       *,
-      bovinos:bovinos (id, arete, nombre, raza, estado)
+      bovinos (
+        id,
+        arete,
+        nombre
+      )
     `)
     .order('fecha_aplicacion', { ascending: false });
-  if (error) throw error;
-  return data || [];
-}
 
-export async function saveTratamiento(formData: Tratamiento, editingId: string | null) {
-  const payload = {
-    bovino_id: formData.bovino_id,
-    medicamento: formData.medicamento,
-    dosis: formData.dosis,
-    via: formData.via,
-    fecha_aplicacion: formData.fecha_aplicacion,
-    retiro_leche: formData.retiro_leche ?? 0,
-    retiro_carne: formData.retiro_carne ?? 0,
-    // Asegurar que tiempo_retiro se envíe (si no viene en formData, usa retiro_leche o 0 por defecto)
-    tiempo_retiro: Number(formData.retiro_leche ?? 0), 
-    veterinario: formData.veterinario,
-    motivo: formData.motivo || null,
-  };
-
-  if (editingId) {
-    const { error } = await supabase
-      .from('tratamientos')
-      .update(payload)
-      .eq('id', editingId);
-    if (error) throw error;
-  } else {
-    const { error } = await supabase
-      .from('tratamientos')
-      .insert([payload]);
-    if (error) throw error;
+  if (error) {
+    throw new Error(`Error al obtener los medicamentos: ${error.message}`);
   }
+
+  return data;
 }
 
-export async function deleteTratamiento(id: string) {
+export async function obtenerMedicamentosPaginados(
+  pagina: number = 1, 
+  porPagina: number = 10, 
+  filtros?: FiltrosMedicamento
+) {
+  const supabase = await createClient();
+  const desde = (pagina - 1) * porPagina;
+  const hasta = desde + porPagina - 1;
+
+  const tieneFiltroBovino = Boolean(filtros?.bovino && filtros.bovino.trim() !== '');
+
+  const relacionBovino = tieneFiltroBovino 
+    ? 'bovinos!inner ( id, arete, nombre )' 
+    : 'bovinos ( id, arete, nombre )';
+
+  let query = supabase
+    .from('medicamentos')
+    .select(`*, ${relacionBovino}`, { count: 'exact' });
+
+  if (filtros) {
+    if (tieneFiltroBovino) {
+      const termino = filtros.bovino!.trim();
+      query = query.or(`arete.ilike.%${termino}%,nombre.ilike.%${termino}%`, { foreignTable: 'bovinos' });
+    }
+    
+    if (filtros.medicamento && filtros.medicamento.trim() !== '') {
+      query = query.ilike('medicamento', `%${filtros.medicamento.trim()}%`);
+    }
+
+    if (filtros.via && filtros.via.trim() !== '') {
+      query = query.eq('via', filtros.via);
+    }
+
+    if (filtros.fechaInicio && filtros.fechaInicio.trim() !== '') {
+      query = query.gte('fecha_aplicacion', filtros.fechaInicio);
+    }
+
+    if (filtros.fechaFin && filtros.fechaFin.trim() !== '') {
+      query = query.lte('fecha_aplicacion', filtros.fechaFin);
+    }
+  }
+
+  query = query.order('fecha_aplicacion', { ascending: false }).range(desde, hasta);
+
+  const { data, error, count } = await query;
+
+  if (error) {
+    throw new Error(`Error al obtener los medicamentos paginados: ${error.message}`);
+  }
+
+  return {
+    medicamentos: data,
+    total: count ?? 0,
+    paginaActual: pagina,
+    porPagina,
+  };
+}
+
+export async function crearMedicamento(nuevoMedicamento: any) {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from('medicamentos')
+    .insert([nuevoMedicamento])
+    .select(`
+      *,
+      bovinos (
+        id,
+        arete,
+        nombre
+      )
+    `)
+    .single();
+
+  if (error) {
+    throw new Error(`Error al crear el medicamento: ${error.message}`);
+  }
+
+  revalidatePath('/medicamentos');
+
+  return data;
+}
+
+export async function actualizarMedicamento(id: string, medicamentoActualizado: any) {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from('medicamentos')
+    .update(medicamentoActualizado)
+    .eq('id', id)
+    .select(`
+      *,
+      bovinos (
+        id,
+        arete,
+        nombre
+      )
+    `)
+    .single();
+
+  if (error) {
+    throw new Error(`Error al actualizar el medicamento: ${error.message}`);
+  }
+
+  revalidatePath('/medicamentos'); 
+
+  return data;
+}
+
+export async function eliminarMedicamento(id: string) {
+  const supabase = await createClient();
+
   const { error } = await supabase
-    .from('tratamientos')
+    .from('medicamentos')
     .delete()
     .eq('id', id);
-  if (error) throw error;
+
+  if (error) {
+    throw new Error(`Error al eliminar el medicamento: ${error.message}`);
+  }
+
+  revalidatePath('/medicamentos');
+
+  return { success: true };
 }

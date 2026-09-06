@@ -1,25 +1,38 @@
-'use client';
-import DataTable, { Column } from "@/components/ui/DataTable";
-import ActionDropdown from "@/components/ui/ActionDropdown";
+"use client";
+
 import { Pesaje } from "../schemas";
-import { Pencil, Trash2 } from "lucide-react";
-import { exportToPDF } from "@/lib/utils/exportUtils"; 
-import { useExportData } from "@/hooks/useExportData"; 
+import getPesajeColumns from "./PesajeColumns";
+
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import {
+  Plus,
+  Download,
+  FileText,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
+
+import { exportToPDF } from "@/lib/utils/exportUtils";
+import { useExportData } from "@/hooks/useExportData";
 
 interface PesajeTableProps {
   data: Pesaje[];
   loading?: boolean;
+
   onAddRecord?: () => void;
-  onEdit?: (item: Pesaje) => void;
-  onDelete?: (id: string) => void;
-  onView?: (item: Pesaje) => void;
+  onEdit?: (pesaje: Pesaje) => void;
+  onDelete?: (pesaje: Pesaje) => void;
+  onRowClick?: (pesaje: Pesaje) => void;
   onFilters?: () => void;
+
   page: number;
   total: number;
   nextPage: () => void;
   prevPage: () => void;
   pageSize: number;
-  pesoPromedio: number;
+
   permisos?: {
     puede_ver: boolean;
     puede_crear: boolean;
@@ -34,100 +47,176 @@ export default function PesajeTable({
   onAddRecord,
   onEdit,
   onDelete,
-  onView,
+  onRowClick,
   onFilters,
   page,
   total,
   nextPage,
   prevPage,
   pageSize,
-  pesoPromedio,
-  permisos = { puede_ver: true, puede_crear: true, puede_editar: true, puede_eliminar: true },
+  permisos = {
+    puede_ver: true,
+    puede_crear: true,
+    puede_editar: true,
+    puede_eliminar: true,
+  },
 }: PesajeTableProps) {
-  
-  const { exportAll } = useExportData();
-  
-  const columns: Column<any>[] = [
-    { header: "Fecha", accessor: "fecha" },
-    { 
-      header: "Bovino", 
-      accessor: "bovino_id",
-      render: (_, item: any) => (
-        <div>
-          <span className="font-semibold text-slate-800 block">
-            {item.bovinos?.arete || "Sin arete"}
-          </span>
-          {item.bovinos?.nombre && (
-            <span className="text-xs text-slate-500 block">
-              {item.bovinos.nombre}
-            </span>
-          )}
-        </div>
-      )
-    },
-    { 
-      header: "Peso (kg)", 
-      accessor: "peso_kgs",
-      render: (value) => <span className="font-bold text-blue-600">{value} kg</span>
-    },
-    { 
-      header: "Cond. Corporal", 
-      accessor: "condicion_corporal",
-      render: (value) => value ? <span className="px-2 py-0.5 bg-slate-100 rounded-md font-medium">{value} / 5</span> : <span className="text-slate-400">N/A</span>
-    },
-    { 
-      header: "Estado Fisiológico", 
-      accessor: "estado_fisiologico",
-      render: (value) => value ? String(value) : <span className="text-slate-400 italic">No especificado</span>
-    },
-    { 
-      header: "Observaciones", 
-      accessor: "observaciones",
-      render: (value) => value ? String(value) : <span className="text-slate-400 italic">Sin novedades</span>
-    },
-    { 
-      header: "", 
-      accessor: "id",
-      render: (_, item) => (
-        <ActionDropdown actions={[
-          { 
-            label: "Editar", 
-            icon: <Pencil className="w-4 h-4"/>, 
-            onClick: () => onEdit?.(item),
-            disabled: !permisos.puede_editar
-          },
-          { 
-            label: "Eliminar", 
-            icon: <Trash2 className="w-4 h-4"/>, 
-            onClick: () => onDelete?.(item.id!), 
-            danger: true,
-            disabled: !permisos.puede_eliminar
-          },
-        ]} />
-      )
-    }
-  ];
+  const { exportFromTable } = useExportData();
+
+  const rawColumns = getPesajeColumns({
+    onEdit,
+    onDelete,
+    permisos,
+  });
+
+  const columns = Array.isArray(rawColumns) ? rawColumns : [];
+
+  const totalPages = Math.ceil(total / pageSize);
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-      <DataTable 
-        title="CONTROL DE PESAJE Y CONDICIÓN CORPORAL" 
-        totalLabel="Registros" 
-        data={data} 
-        columns={columns} 
-        loading={loading}
-        onAddRecord={onAddRecord}
-        isAddDisabled={!permisos.puede_crear}
-        onExportCSV={() => exportAll('pesajes', '*, bovinos(arete, nombre)')}
-        onDownloadPDF={exportToPDF}
-        onFilters={onFilters}
-        onRowClick={onView}
-        page={page}
-        total={total}
-        nextPage={nextPage}
-        prevPage={prevPage}
-        pageSize={pageSize}
-      />
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+
+      {/* HEADER */}
+      <div className="px-6 py-5 border-b flex items-center justify-between">
+        <div>
+          <h2 className="font-semibold text-slate-900">
+            REGISTROS DE PESAJE
+          </h2>
+          <p className="text-xs text-slate-500">
+            Total Pesajes: {total}
+          </p>
+        </div>
+
+        <div className="flex gap-2">
+          {onFilters && (
+            <Button
+              variant="outline"
+              onClick={onFilters}
+            >
+              <Filter className="w-4 h-4 mr-2" />
+              Filtros
+            </Button>
+          )}
+
+          <Button
+            variant="outline"
+            onClick={() =>
+              exportFromTable("pesaje", "*")
+            }
+          >
+            <Download className="w-4 h-4 mr-2" />
+            CSV
+          </Button>
+
+          <Button
+            variant="outline"
+            onClick={() => exportToPDF(data)}
+          >
+            <FileText className="w-4 h-4 mr-2" />
+            PDF
+          </Button>
+
+          <Button
+            onClick={onAddRecord}
+            disabled={!permisos.puede_crear}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Nuevo pesaje
+          </Button>
+        </div>
+      </div>
+
+      {/* TABLA */}
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {columns.map((column, index) => (
+                <TableHead key={String(column.accessor) + index}>
+                  {column.header}
+                </TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+
+          <TableBody>
+            {loading ? (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="text-center py-10"
+                >
+                  Cargando pesajes...
+                </TableCell>
+              </TableRow>
+            ) : data.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="text-center py-10"
+                >
+                  No hay registros de pesaje.
+                </TableCell>
+              </TableRow>
+            ) : (
+              data.map((pesaje) => (
+                <TableRow
+                  key={pesaje.id}
+                  className={
+                    onRowClick
+                      ? "cursor-pointer hover:bg-slate-50"
+                      : ""
+                  }
+                  onClick={() =>
+                    onRowClick?.(pesaje)
+                  }
+                >
+                  {columns.map((column, index) => (
+                    <TableCell
+                      key={String(column.accessor) + index}
+                      onClick={(event) => {
+                        if (column.accessor === "id" || String(column.accessor) === "acciones") {
+                          event.stopPropagation();
+                        }
+                      }}
+                    >
+                      {column.render ? column.render(pesaje[column.accessor as keyof Pesaje], pesaje) : String(pesaje[column.accessor as keyof Pesaje] ?? "")}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* PAGINACIÓN */}
+      <div className="px-6 py-4 border-t flex justify-between items-center">
+        <span className="text-xs text-slate-500">
+          Página {page} de {totalPages || 1}
+        </span>
+
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={prevPage}
+            disabled={page <= 1 || loading}
+          >
+            <ChevronLeft />
+          </Button>
+
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={nextPage}
+            disabled={page >= totalPages || loading}
+          >
+            <ChevronRight />
+          </Button>
+        </div>
+      </div>
+
     </div>
   );
 }
