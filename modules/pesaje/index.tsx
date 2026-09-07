@@ -6,7 +6,7 @@ import PesajeTable from "./components/PesajeTable";
 import PesajeFormModal from "./components/PesajeFormModal";
 import ConfirmModal from "@/components/ui/ConfirmModal";
 import { Pesaje } from "./schemas";
-import { useBovinos } from "@/modules/inventario/hooks/useBovinos";
+import { useBovinos } from "@/modules/inventario/hooks/usebovinos";
 
 export default function PesajesPage() {
   const {

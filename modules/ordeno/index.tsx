@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useOrdeños } from "./hooks/useOrdeno";
-import { useBovinos } from "@/modules/inventario/hooks/useBovinos";
+import { useBovinos } from "@/modules/inventario/hooks/usebovinos";
 import OrdeñoTable from "./components/OrdenoTable";
 import OrdeñoFormModal from "./components/OrdenoFormModal";
 import OrdeñoFiltersDrawer from "./components/OrdenoFiltersDrawer";

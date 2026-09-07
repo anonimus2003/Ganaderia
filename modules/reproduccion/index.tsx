@@ -7,7 +7,7 @@ import { ReproduccionFormModal } from "./components/ReproduccionFormModal";
 import ReproduccionFiltersDrawer from "./components/ReproduccionFiltersDrawer";
 import ConfirmModal from "@/components/ui/ConfirmModal";
 import { Reproduccion } from "./schemas";
-import { useBovinos } from "@/modules/inventario/hooks/useBovinos";
+import { useBovinos } from "@/modules/inventario/hooks/usebovinos";
 
 export default function ReproduccionPage() {
   const {

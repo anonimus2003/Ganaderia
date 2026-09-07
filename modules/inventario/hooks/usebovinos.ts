@@ -12,7 +12,7 @@ export interface FiltrosBovino {
   origen: string;
 }
 
-export function useBovinos() {
+export function usarBovinos() {
   const [allBovinos, setAllBovinos] = useState<Bovino[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);

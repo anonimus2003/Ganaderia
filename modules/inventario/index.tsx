@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useBovinos } from "./hooks/useBovinos";
+import { useBovinos } from "./hooks/usebovinos";
 import BovinoTable from "./components/BovinoTable";
 import BovinoFormModal from "./components/BovinoFormModal";
 import BovinoFiltersDrawer from "./components/BovinoFiltersDrawer";
@@ -19,6 +19,7 @@ export default function InventarioPage() {
     total,
     nextPage,
     prevPage,
+    
     PAGE_SIZE,
     setFiltros,
   } = useBovinos();
