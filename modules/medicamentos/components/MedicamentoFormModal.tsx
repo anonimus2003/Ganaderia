@@ -1,47 +1,38 @@
-// modules/medicamentos/components/MedicamentoFormModal.tsx
 'use client';
 
-import { useEffect, useState } from "react";
-import { useForm, Controller } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { useState, useEffect } from "react";
 import { Medicamento } from "../schemas";
-import { createClient } from "@/lib/supabase/client";
-import FormModal from "@/components/ui/FormModal";
-import { BovinoReference, getErrorMessage } from "@/lib/dataTypes";
-import { 
-  Select, 
-  SelectContent, 
-  SelectGroup, 
-  SelectItem, 
-  SelectLabel, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import {
+  Activity,
+  Calendar,
+  FileText,
+  Loader2,
+  Syringe,
+  User,
+} from "lucide-react";
+import { toast } from "sonner";
+import { createClient } from "@/lib/supabase/client";
+import { BovinoReference } from "@/lib/dataTypes";
 
-const viasEnum = [
-  "Intramuscular",
-  "Subcutánea",
-  "Intravenosa",
-  "Oral",
-  "Tópica",
-  "Intramamaria"
-];
-
-const modalSchema = z.object({
-  id: z.string().optional().nullable(),
-  bovino_id: z.string().min(1, "Seleccione un bovino"),
-  medicamento: z.string().min(1, "Ingrese el medicamento"),
-  dosis: z.string().min(1, "Ingrese la dosis"),
-  via: z.string().min(1, "Seleccione la vía"),
-  fecha_aplicacion: z.string().min(1, "Ingrese la fecha"),
-  veterinario: z.string().min(1, "Ingrese el veterinario"),
-  retiro_leche: z.coerce.number().min(0),
-  retiro_carne: z.coerce.number().min(0),
-  motivo: z.string().optional().nullable(),
-});
-
-interface TratamientoFormModalProps {
+interface MedicamentoFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (data: Partial<Medicamento>) => Promise<void>;
@@ -49,40 +40,53 @@ interface TratamientoFormModalProps {
   saving?: boolean;
 }
 
-export default function MedicamentoFormModal({ 
-  isOpen, 
-  onClose, 
-  onSuccess, 
-  medicamentoAEditar, 
-  saving = false 
-}: TratamientoFormModalProps) {
+const VIAS_APLICACION = [
+  "Intramuscular",
+  "Subcutánea",
+  "Endovenosa",
+  "Tópica",
+  "Oral",
+];
+
+export default function MedicamentoFormModal({
+  isOpen,
+  onClose,
+  onSuccess,
+  medicamentoAEditar,
+  saving = false,
+}: MedicamentoFormModalProps) {
   const [bovinos, setBovinos] = useState<BovinoReference[]>([]);
   const supabase = createClient();
 
-  const { register, handleSubmit, reset, setValue, control, formState: { errors, isSubmitting } } = useForm<any>({
-    resolver: zodResolver(modalSchema),
-    defaultValues: {
-      bovino_id: "",
+  const [formData, setFormData] = useState<Partial<Medicamento>>(
+    medicamentoAEditar || {
       via: "Intramuscular",
-      medicamento: "",
-      dosis: "",
-      veterinario: "",
-      motivo: "",
+      fecha_aplicacion: new Date().toISOString().split("T")[0],
       retiro_leche: 0,
       retiro_carne: 0,
-      fecha_aplicacion: new Date().toISOString().split("T")[0]
     }
-  });
+  );
 
-  useEffect(() => {
-    register("id");
-  }, [register]);
+  const [loadingBovinos, setLoadingBovinos] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const isEditing = !!medicamentoAEditar;
 
   useEffect(() => {
     if (isOpen) {
       async function fetchBovinos() {
-        const { data } = await supabase.from("bovinos").select("id, arete, nombre").order("arete");
-        setBovinos((data ?? []) as unknown as BovinoReference[]);
+        try {
+          setLoadingBovinos(true);
+          const { data } = await supabase
+            .from("bovinos")
+            .select("id, arete, nombre")
+            .order("arete");
+          setBovinos((data ?? []) as unknown as BovinoReference[]);
+        } catch (err) {
+          console.error("Error al cargar bovinos:", err);
+        } finally {
+          setLoadingBovinos(false);
+        }
       }
       fetchBovinos();
     }
@@ -90,187 +94,266 @@ export default function MedicamentoFormModal({
 
   useEffect(() => {
     if (medicamentoAEditar) {
-      setValue("id", medicamentoAEditar.id);
-      setValue("bovino_id", medicamentoAEditar.bovino_id);
-      setValue("medicamento", medicamentoAEditar.medicamento);
-      setValue("dosis", medicamentoAEditar.dosis);
-      setValue("via", medicamentoAEditar.via);
-      setValue("fecha_aplicacion", medicamentoAEditar.fecha_aplicacion);
-      setValue("retiro_leche", medicamentoAEditar.retiro_leche ?? 0);
-      setValue("retiro_carne", medicamentoAEditar.retiro_carne ?? 0);
-      setValue("veterinario", medicamentoAEditar.veterinario);
-      setValue("motivo", medicamentoAEditar.motivo || "");
+      setFormData(medicamentoAEditar);
     } else {
-      reset({
-        id: null,
+      setFormData({
+        via: "Intramuscular",
         fecha_aplicacion: new Date().toISOString().split("T")[0],
         retiro_leche: 0,
         retiro_carne: 0,
-        via: "Intramuscular",
+        bovino_id: "",
         medicamento: "",
         dosis: "",
         veterinario: "",
         motivo: "",
-        bovino_id: ""
       });
     }
-  }, [medicamentoAEditar, reset, setValue]);
+  }, [medicamentoAEditar, isOpen]);
 
-  const onSubmit = async (data: any) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     try {
-      const payload = { ...data };
-      if (!payload.id || payload.id === "") {
+      setErrorMsg("");
+      const payload = { ...formData };
+      if (!payload.id) {
         delete payload.id;
       }
 
       await onSuccess(payload);
+      toast.success(
+        isEditing ? "¡Tratamiento actualizado!" : "¡Tratamiento registrado!",
+        {
+          description: `El medicamento ${
+            formData.medicamento || ""
+          } se guardó correctamente.`,
+        }
+      );
       onClose();
-    } catch (error: unknown) {
-      console.error("Error al guardar tratamiento:", getErrorMessage(error));
+    } catch (err: unknown) {
+      const mensaje =
+        err instanceof Error ? err.message : "Error al guardar el tratamiento";
+      setErrorMsg(mensaje);
+      toast.error("No se pudo guardar", { description: mensaje });
     }
   };
 
-  const inputClass = "w-full px-4 py-3 bg-white border border-zinc-200 rounded-xl text-sm placeholder:text-zinc-400 focus:ring-2 focus:ring-[#01684c]/20 focus:border-[#01684c] outline-none transition-all text-zinc-800";
-  const labelClass = "block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5";
+  const bovinoActual = bovinos.find((b) => b.id === formData.bovino_id);
 
   return (
-    <FormModal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={medicamentoAEditar ? "Editar Tratamiento" : "Registrar Tratamiento Médico"}
-      onSubmit={handleSubmit(onSubmit)}
-      isSubmitting={saving || isSubmitting}
-      submitText={medicamentoAEditar ? "Guardar Cambios" : "Guardar Tratamiento"}
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
     >
-      <div className="space-y-4">
-        {/* Bovino con Select UI */}
-        <div>
-          <label className={labelClass}>Bovino</label>
-          <Controller
-            name="bovino_id"
-            control={control}
-            render={({ field }) => {
-              const bovinoActual = bovinos.find(b => b.id === field.value);
-              return (
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger className="w-full bg-white border-zinc-200 rounded-xl h-12 text-sm text-zinc-800 font-medium opacity-100">
-                    <SelectValue placeholder="Seleccione un animal...">
-                      {bovinoActual ? `${bovinoActual.arete} ${bovinoActual.nombre ? `- ${bovinoActual.nombre}` : ""}` : "Seleccione un animal..."}
+      <DialogContent className="max-h-[92vh] max-w-2xl overflow-hidden flex flex-col p-0">
+        <DialogHeader className="px-6 pt-6 pb-2 border-b">
+          <DialogTitle className="text-lg font-semibold">
+            {isEditing ? "Editar Tratamiento Médico" : "Registrar Tratamiento Médico"}
+          </DialogTitle>
+          <DialogDescription className="text-xs">
+            Lleva el control de aplicaciones veterinarias y periodos de retiro.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            {errorMsg && (
+              <div className="rounded-md bg-destructive/10 p-3 text-xs text-destructive border border-destructive/20">
+                {errorMsg}
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium flex items-center gap-1">
+                  <Activity className="h-3.5 w-3.5 text-muted-foreground" /> Bovino *
+                </label>
+                <Select
+                  value={formData.bovino_id || ""}
+                  onValueChange={(value) =>
+                    setFormData((prev) => ({ 
+                      ...prev, 
+                      bovino_id: value || undefined // Cambiado de null a undefined para coincidir con el tipo
+                    }))
+                  }
+                
+                >
+                  <SelectTrigger className="h-9 text-sm w-full">
+                    <SelectValue placeholder={loadingBovinos ? "Cargando bovinos..." : "Seleccione un animal..."}>
+                      {bovinoActual
+                        ? `Arete: ${bovinoActual.arete}${
+                            bovinoActual.nombre ? ` - ${bovinoActual.nombre}` : ""
+                          }`
+                        : undefined}
                     </SelectValue>
                   </SelectTrigger>
-                  <SelectContent className="bg-white opacity-100 max-h-60">
-                    <SelectGroup>
-                      <SelectLabel>Bovinos</SelectLabel>
-                      {bovinos.map(b => (
-                        <SelectItem key={b.id} value={b.id} className="text-zinc-900 opacity-100 font-medium cursor-pointer">
-                          {b.arete} {b.nombre ? `- ${b.nombre}` : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
+                  <SelectContent>
+                    {bovinos.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>
+                        {b.arete} {b.nombre ? `- ${b.nombre}` : ""}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-              );
-            }}
-          />
-          {errors.bovino_id?.message && (
-            <span className="text-rose-500 text-xs mt-1 block">{String(errors.bovino_id.message)}</span>
-          )}
-        </div>
+              </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className={labelClass}>Medicamento</label>
-            <input 
-              type="text" 
-              {...register("medicamento")} 
-              className={inputClass}
-              placeholder="Ej. Oxitetraciclina"
-            />
-            {errors.medicamento?.message && (
-              <span className="text-rose-500 text-xs mt-1 block">{String(errors.medicamento.message)}</span>
-            )}
-          </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium flex items-center gap-1">
+                    <Syringe className="h-3.5 w-3.5 text-muted-foreground" /> Medicamento *
+                  </label>
+                  <Input
+                    required
+                    className="h-9 text-sm"
+                    value={formData.medicamento || ""}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, medicamento: e.target.value }))
+                    }
+                    placeholder="Ej. Oxitetraciclina"
+                  />
+                </div>
 
-          <div>
-            <label className={labelClass}>Dosis</label>
-            <input 
-              type="text" 
-              {...register("dosis")} 
-              className={inputClass}
-              placeholder="Ej. 10 ml"
-            />
-            {errors.dosis?.message && (
-              <span className="text-rose-500 text-xs mt-1 block">{String(errors.dosis.message)}</span>
-            )}
-          </div>
-        </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium">Dosis *</label>
+                  <Input
+                    required
+                    className="h-9 text-sm"
+                    value={formData.dosis || ""}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, dosis: e.target.value }))
+                    }
+                    placeholder="Ej. 10 ml"
+                  />
+                </div>
+              </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {/* Vía de Aplicación con Select UI */}
-          <div>
-            <label className={labelClass}>Vía de Aplicación</label>
-            <Controller
-              name="via"
-              control={control}
-              render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger className="w-full bg-white border-zinc-200 rounded-xl h-12 text-sm text-zinc-800 font-medium opacity-100">
-                    <SelectValue placeholder="Seleccione la vía..." />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white opacity-100 max-h-60">
-                    <SelectGroup>
-                      <SelectLabel>Vías de Aplicación</SelectLabel>
-                      {viasEnum.map(v => (
-                        <SelectItem key={v} value={v} className="text-zinc-900 opacity-100 font-medium cursor-pointer">
-                          {v}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium">Vía de Aplicación *</label>
+                  <Select
+                  value={formData.via || "Intramuscular"}
+                  onValueChange={(value) =>
+                    setFormData((prev) => ({ 
+                      ...prev, 
+                      via: value || undefined // Cambiado de null a undefined para coincidir con el tipo
+                    }))
+                  }
+                
+                  >
+                    <SelectTrigger className="h-9 text-sm w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {VIAS_APLICACION.map((via) => (
+                        <SelectItem key={via} value={via}>
+                          {via}
                         </SelectItem>
                       ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              )}
-            />
-            {errors.via?.message && (
-              <span className="text-rose-500 text-xs mt-1 block">{String(errors.via.message)}</span>
-            )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium flex items-center gap-1">
+                    <Calendar className="h-3.5 w-3.5 text-muted-foreground" /> Fecha de Aplicación *
+                  </label>
+                  <Input
+                    type="date"
+                    required
+                    className="h-9 text-sm"
+                    value={formData.fecha_aplicacion || ""}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, fecha_aplicacion: e.target.value }))
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium">Retiro Leche (Días)</label>
+                  <Input
+                    type="number"
+                    min="0"
+                    className="h-9 text-sm"
+                    value={formData.retiro_leche ?? 0}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        retiro_leche: Number(e.target.value),
+                      }))
+                    }
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium">Retiro Carne (Días)</label>
+                  <Input
+                    type="number"
+                    min="0"
+                    className="h-9 text-sm"
+                    value={formData.retiro_carne ?? 0}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        retiro_carne: Number(e.target.value),
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium flex items-center gap-1">
+                    <User className="h-3.5 w-3.5 text-muted-foreground" /> Veterinario / Responsable *
+                  </label>
+                  <Input
+                    required
+                    className="h-9 text-sm"
+                    value={formData.veterinario || ""}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, veterinario: e.target.value }))
+                    }
+                    placeholder="Nombre del responsable"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium flex items-center gap-1">
+                    <FileText className="h-3.5 w-3.5 text-muted-foreground" /> Motivo / Diagnóstico
+                  </label>
+                  <Input
+                    className="h-9 text-sm"
+                    value={formData.motivo || ""}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, motivo: e.target.value }))
+                    }
+                    placeholder="Ej. Mastitis, Infección"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div>
-            <label className={labelClass}>Fecha de Aplicación</label>
-            <input type="date" {...register("fecha_aplicacion")} className={inputClass} />
-            {errors.fecha_aplicacion?.message && (
-              <span className="text-rose-500 text-xs mt-1 block">{String(errors.fecha_aplicacion.message)}</span>
-            )}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className={labelClass}>Retiro Leche (Días)</label>
-            <input type="number" min="0" {...register("retiro_leche")} className={inputClass} />
-          </div>
-
-          <div>
-            <label className={labelClass}>Retiro Carne (Días)</label>
-            <input type="number" min="0" {...register("retiro_carne")} className={inputClass} />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className={labelClass}>Veterinario / Responsable</label>
-            <input type="text" {...register("veterinario")} className={inputClass} placeholder="Nombre" />
-            {errors.veterinario?.message && (
-              <span className="text-rose-500 text-xs mt-1 block">{String(errors.veterinario.message)}</span>
-            )}
-          </div>
-
-          <div>
-            <label className={labelClass}>Motivo / Diagnóstico</label>
-            <input type="text" {...register("motivo")} className={inputClass} placeholder="Ej. Mastitis, Infección" />
-          </div>
-        </div>
-      </div>
-    </FormModal>
+          <DialogFooter className="px-6 py-5 min-h-[70px] border-t bg-muted/10 flex flex-row items-center justify-end gap-3 shrink-0">
+            <Button
+              type="button"
+              variant="outline"
+              size="default"
+              onClick={onClose}
+              disabled={saving}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" size="default" disabled={saving}>
+              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {saving ? "Guardando..." : isEditing ? "Guardar Cambios" : "Guardar Tratamiento"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

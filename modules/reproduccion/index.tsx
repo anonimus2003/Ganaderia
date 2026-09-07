@@ -1,122 +1,101 @@
-// modules/reproduccion/index.tsx
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useReproduccion } from './hooks/useReproduccion';
-import ReproduccionTable from './components/ReproduccionTable';
-import FiltrosReproduccionModal from './components/ReproduccionFiltersDrawer';
-import ReproduccionFormModal from './components/ReproduccionFormModal';
-import ConfirmModal from '@/components/ui/ConfirmModal';
-import { FiltrosReproduccion, Reproduccion } from './schemas';
-import { crearReproduccion, actualizarReproduccion } from './actions/reproduccion.actions';
-import { toast } from 'sonner';
+import { useState } from "react";
+import { useReproduccion } from "./hooks/useReproduccion";
+import { ReproduccionTable } from "./components/ReproduccionTable";
+import { ReproduccionFormModal } from "./components/ReproduccionFormModal";
+import ReproduccionFiltersDrawer from "./components/ReproduccionFiltersDrawer";
+import ConfirmModal from "@/components/ui/ConfirmModal";
+import { Reproduccion } from "./schemas";
+import { useBovinos } from "@/modules/inventario/hooks/useBovinos";
 
-export default function ReproduccionIndex() {
-  const porPagina = 10;
-  
-  const [filtros, setFiltros] = useState<FiltrosReproduccion>({
-    bovino: '',
-    estado: '',
-    tipo: '',
-    fechaInicio: '',
-    fechaFin: '',
-  });
-
+export default function ReproduccionPage() {
   const {
     reproducciones,
+    allReproducciones, // <--- Extraemos la lista completa sin paginar del hook
     loading,
+    handleSave,
+    handleDelete,
     page,
     total,
-    recargar,
-    handleEliminar,
     nextPage,
     prevPage,
-  } = useReproduccion(porPagina, filtros);
+    PAGE_SIZE,
+    setFiltros,
+  } = useReproduccion();
 
-  const [modalAbierto, setModalAbierto] = useState(false);
-  const [drawerAbierto, setDrawerAbierto] = useState(false);
-  const [reproduccionAEditar, setReproduccionAEditar] = useState<Reproduccion | null>(null);
-  const [reproduccionAEliminar, setReproduccionAEliminar] = useState<any>(null);
+  const { allBovinos } = useBovinos();
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedReproduccion, setSelectedReproduccion] = useState<Reproduccion | null>(null);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [reproduccionAEliminar, setReproduccionAEliminar] = useState<Reproduccion | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const handleGuardarReproduccion = async (payload: any) => {
-    try {
-      let resultado;
-      if (payload.id) {
-        resultado = await actualizarReproduccion(payload.id, payload);
-      } else {
-        resultado = await crearReproduccion(payload);
-      }
-      
-      if (resultado && resultado.success === false) {
-        throw new Error("No se pudo completar la operación en la base de datos.");
-      }
-      
-      toast.success(payload.id ? 'Registro de reproducción actualizado correctamente' : 'Registro de reproducción creado correctamente');
-      setModalAbierto(false);
-      recargar();
-    } catch (error: any) {
-      console.error("Error al guardar reproducción:", error);
-      toast.error(error.message || 'Ocurrió un error al guardar.');
-    }
+  const handleOpenCreate = () => {
+    setSelectedReproduccion(null);
+    setIsModalOpen(true);
+  };
+
+  const handleEdit = (reproduccion: Reproduccion) => {
+    setSelectedReproduccion(reproduccion);
+    setIsModalOpen(true);
+  };
+
+  const handleApplyFilters = (nuevosFiltros: {
+    busqueda: string;
+    tipo: string;
+    estado: string;
+    fechaInicio: string;
+    fechaFin: string;
+  }) => {
+    setFiltros(nuevosFiltros);
   };
 
   const handleConfirmDelete = async () => {
-    if (!reproduccionAEliminar?.id) return;
+    if (!reproduccionAEliminar) return;
 
     try {
       setDeleting(true);
-      await handleEliminar(reproduccionAEliminar.id);
-      
-      toast.success('Registro de reproducción eliminado correctamente');
+      await handleDelete(reproduccionAEliminar.id);
       setReproduccionAEliminar(null);
-      recargar();
     } catch (error) {
-      console.error('Error al eliminar:', error);
-      toast.error('Ocurrió un error al intentar eliminar el registro.');
+      console.error("Error al eliminar el registro de reproducción:", error);
     } finally {
       setDeleting(false);
     }
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <ReproduccionTable 
-        data={reproducciones} 
-        loading={loading} 
-        onAddRecord={() => {
-          setReproduccionAEditar(null);
-          setModalAbierto(true);
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
+      <ReproduccionTable
+        data={reproducciones}
+        loading={loading}
+        onAddRecord={handleOpenCreate}
+        onEdit={handleEdit}
+        onDelete={(item) => {
+          setReproduccionAEliminar(item);
         }}
-        onEdit={(item) => {
-          setReproduccionAEditar(item);
-          setModalAbierto(true);
-        }}
-        onDelete={(item) => setReproduccionAEliminar(item)}
-        onFilters={() => setDrawerAbierto(true)}
         page={page}
         total={total}
-        pageSize={porPagina}
         nextPage={nextPage}
         prevPage={prevPage}
+        pageSize={PAGE_SIZE}
+        onFilters={() => setIsFilterOpen(true)}
       />
 
-      {modalAbierto && (
-        <ReproduccionFormModal
-          isOpen={modalAbierto}
-          onClose={() => setModalAbierto(false)}
-          reproduccionAEditar={reproduccionAEditar}
-          onSuccess={handleGuardarReproduccion}
-        />
-      )}
+      <ReproduccionFormModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSave={handleSave}
+        initialData={selectedReproduccion}
+        bovinosList={allBovinos} // <--- Pasamos la lista completa real aquí
+      />
 
-      <FiltrosReproduccionModal
-        isOpen={drawerAbierto}
-        onClose={() => setDrawerAbierto(false)}
-        filtrosActuales={filtros}
-        onApplyFilters={(nuevosFiltros) => {
-          setFiltros(nuevosFiltros);
-        }}
+      <ReproduccionFiltersDrawer
+        open={isFilterOpen}
+        onOpenChange={setIsFilterOpen}
+        onApplyFilters={handleApplyFilters}
       />
 
       <ConfirmModal
@@ -125,7 +104,9 @@ export default function ReproduccionIndex() {
         onConfirm={handleConfirmDelete}
         isLoading={deleting}
         title={`¿Eliminar el registro de reproducción del arete "${reproduccionAEliminar?.bovinos?.arete || 'S/N'}"?`}
-        message={`Estás a punto de eliminar permanentemente el registro reproductivo de "${reproduccionAEliminar?.bovinos?.nombre || 'Sin nombre'}" con arete ${reproduccionAEliminar?.bovinos?.arete || 'S/N'}. Esta acción no se puede deshacer.`}
+        message={`Estás a punto de eliminar permanentemente el registro de reproducción de "${
+          reproduccionAEliminar?.bovinos?.nombre || "Sin nombre"
+        }" con arete ${reproduccionAEliminar?.bovinos?.arete || 'S/N'}. Esta acción no se puede deshacer.`}
         confirmText="Sí, eliminar registro"
         cancelText="Cancelar"
         isDestructive={true}

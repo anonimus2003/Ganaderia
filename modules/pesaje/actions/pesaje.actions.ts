@@ -1,142 +1,81 @@
-'use server';
+// modules/pesajes/actions/pesaje.actions.ts
+import { createClient } from "@/lib/supabase/client";
+import { Pesaje } from "../schemas";
 
-import { createClient } from '@/lib/supabase/server';
-import { revalidatePath } from 'next/cache';
-import { FiltrosPesaje } from '../components/PesajeFiltersDrawer';
+const supabase = createClient();
 
-export async function obtenerPesajes() {
-  const supabase = await createClient();
-
+export async function getPesajesAction(): Promise<Pesaje[]> {
   const { data, error } = await supabase
-    .from('pesajes')
+    .from("pesajes")
     .select(`
       *,
-      bovinos (
+      bovinos:bovino_id (
         id,
         arete,
         nombre
       )
     `)
-    .order('fecha', { ascending: false });
+    .order("fecha", { ascending: false });
 
   if (error) {
-    throw new Error(`Error al obtener los pesajes: ${error.message}`);
+    console.error("Error al obtener pesajes:", error.message);
+    throw new Error(error.message);
   }
 
-  return data;
+  return data || [];
 }
 
-export async function obtenerPesajesPaginados(
-  pagina: number = 1, 
-  porPagina: number = 10, 
-  filtros?: FiltrosPesaje
-) {
-  const supabase = await createClient();
-  const desde = (pagina - 1) * porPagina;
-  const hasta = desde + porPagina - 1;
-
-  const tieneFiltroBusqueda = Boolean(filtros?.busqueda && filtros.busqueda.trim() !== '');
-
-  const relacionBovino = tieneFiltroBusqueda 
-    ? 'bovinos!inner ( id, arete, nombre )' 
-    : 'bovinos ( id, arete, nombre )';
-
-  let query = supabase
-    .from('pesajes')
-    .select(`*, ${relacionBovino}`, { count: 'exact' });
-
-  if (filtros) {
-    if (tieneFiltroBusqueda) {
-      const termino = filtros.busqueda.trim();
-      query = query.or(`arete.ilike.%${termino}%,nombre.ilike.%${termino}%`, { foreignTable: 'bovinos' });
+function limpiarCamposVacios(data: Partial<Pesaje>) {
+  const limpio: any = { ...data };
+  Object.keys(limpio).forEach(key => {
+    if (limpio[key] === "" || limpio[key] === undefined) {
+      limpio[key] = null;
     }
-    
-    if (filtros.metodo && filtros.metodo !== 'todos') {
-      query = query.eq('metodo_pesaje', filtros.metodo);
-    }
-
-    if (filtros.condicion && filtros.condicion !== 'todas') {
-      query = query.eq('condicion_corporal', parseFloat(filtros.condicion));
-    }
-
-    if (filtros.fechaInicio && filtros.fechaInicio.trim() !== '') {
-      query = query.gte('fecha', filtros.fechaInicio);
-    }
-
-    if (filtros.fechaFin && filtros.fechaFin.trim() !== '') {
-      query = query.lte('fecha', filtros.fechaFin);
-    }
-  }
-
-  query = query.order('fecha', { ascending: false }).range(desde, hasta);
-
-  const { data, error, count } = await query;
-
-  if (error) {
-    throw new Error(`Error al obtener los pesajes paginados: ${error.message}`);
-  }
-
-  return {
-    pesajes: data,
-    total: count ?? 0,
-    paginaActual: pagina,
-    porPagina,
-  };
+  });
+  return limpio;
 }
 
-export async function crearPesaje(nuevoPesaje: any) {
-  const supabase = await createClient();
+export async function savePesajeAction(dataToSave: Partial<Pesaje>): Promise<void> {
+  const datosLimpios = limpiarCamposVacios(dataToSave);
 
-  const { data, error } = await supabase
-    .from('pesajes')
-    .insert([nuevoPesaje])
-    .select()
-    .single();
+  if (datosLimpios.id) {
+    const pesajeId = datosLimpios.id;
+    delete datosLimpios.id;
+    delete datosLimpios.created_at;
+    delete datosLimpios.bovinos; // Remover relación de lectura antes de actualizar
 
-  if (error) {
-    throw new Error(`Error al crear el pesaje: ${error.message}`);
+    const { error } = await supabase
+      .from("pesajes")
+      .update(datosLimpios)
+      .eq("id", pesajeId);
+
+    if (error) {
+      console.error("Error al actualizar pesaje:", error.message);
+      throw new Error(error.message);
+    }
+  } else {
+    delete datosLimpios.id;
+    delete datosLimpios.bovinos; // Remover relación de lectura antes de insertar
+
+    const { error } = await supabase
+      .from("pesajes")
+      .insert([datosLimpios]);
+
+    if (error) {
+      console.error("Error al insertar pesaje:", error.message);
+      throw new Error(error.message);
+    }
   }
-
-  revalidatePath('/pesaje');
-  revalidatePath('/pesajes');
-
-  return data;
 }
 
-export async function actualizarPesaje(id: string, pesajeActualizado: any) {
-  const supabase = await createClient();
-
-  const { data, error } = await supabase
-    .from('pesajes')
-    .update(pesajeActualizado)
-    .eq('id', id)
-    .select()
-    .single();
-
-  if (error) {
-    throw new Error(`Error al actualizar el pesaje: ${error.message}`);
-  }
-
-  revalidatePath('/pesaje'); 
-  revalidatePath('/pesajes');
-
-  return data;
-}
-
-export async function eliminarPesaje(id: string) {
-  const supabase = await createClient();
-
+export async function deletePesajeAction(id: string): Promise<void> {
   const { error } = await supabase
-    .from('pesajes')
+    .from("pesajes")
     .delete()
-    .eq('id', id);
+    .eq("id", id);
 
   if (error) {
-    throw new Error(`Error al eliminar el pesaje: ${error.message}`);
+    console.error("Error al eliminar pesaje:", error.message);
+    throw new Error(error.message);
   }
-
-  revalidatePath('/pesaje');
-  revalidatePath('/pesajes');
-
-  return { success: true };
 }

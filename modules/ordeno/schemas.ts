@@ -6,7 +6,7 @@ export interface Bovino {
   genero?: string;
 }
 
-export interface Ordeno {
+export interface Ordeño {
   id: string;
   bovino_id: string | null; // <--- Cambiado a "string | null" para evitar el error con Partial
   fecha: string;

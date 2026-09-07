@@ -42,7 +42,7 @@ export default function OrdeñoFiltersDrawer({
     }
 
     toast("Filtros de ordeño aplicados", {
-      description: `Búsqueda: "${busqueda || "General"}" | Jornada: ${jornada}`,
+      description: `Búsqueda: "${busqueda || "General"}" | Turno: ${jornada}`,
     });
   }
 
@@ -79,15 +79,14 @@ export default function OrdeñoFiltersDrawer({
             Filtrar Registros de Ordeño
           </DrawerTitle>
           <DrawerDescription className="text-sm text-muted-foreground mt-1">
-            Refina la búsqueda por arete del animal, jornada de ordeño y rango de fechas.
+            Refina la búsqueda por arete del animal, turno y rango de fechas.
           </DrawerDescription>
         </DrawerHeader>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Bloque 1: Búsqueda por Arete o Nombre */}
           <div className="space-y-2">
             <Label htmlFor="busqueda-arete-ordeno" className="text-sm font-medium text-foreground">
-              Número de Arete o Nombre
+              Número de Arete o Nombre de la Vaca
             </Label>
             <Input
               id="busqueda-arete-ordeno"
@@ -98,27 +97,28 @@ export default function OrdeñoFiltersDrawer({
             />
           </div>
 
-          {/* Bloque 2: Jornada de Ordeño */}
-          <div className="space-y-2">
-            <Label htmlFor="select-jornada" className="text-sm font-medium text-foreground">
-              Jornada
-            </Label>
-            <Select 
-              value={jornada} 
-              onValueChange={(v) => setJornada(v ?? "todas")}
-            >
-              <SelectTrigger id="select-jornada" className="h-10 w-full">
-                <SelectValue placeholder="Seleccionar jornada" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todas">Todas las jornadas</SelectItem>
-                <SelectItem value="Mañana">Mañana</SelectItem>
-                <SelectItem value="Tarde">Tarde</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-1 sm:grid-cols-1 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="select-jornada" className="text-sm font-medium text-foreground">
+                Turno / Jornada
+              </Label>
+              <Select 
+                value={jornada} 
+                onValueChange={(v) => setJornada(v ?? "todas")}
+              >
+                <SelectTrigger id="select-jornada" className="h-10 w-full">
+                  <SelectValue placeholder="Seleccionar turno" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todas">Todos los turnos</SelectItem>
+                  <SelectItem value="Mañana">Mañana</SelectItem>
+                  <SelectItem value="Tarde">Tarde</SelectItem>
+                  <SelectItem value="Único">Único</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          {/* Bloque 3: Rango de Fechas (Inicio y Fin) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="fecha-inicio" className="text-sm font-medium text-foreground">

@@ -15,7 +15,7 @@ export interface Column {
 
 interface GetMedicamentosColumnsProps {
   onEdit?: (item: MedicamentoRecord) => void;
-  onDelete?: (item: MedicamentoRecord) => void;
+  onDelete?: (itemOrId: MedicamentoRecord | string) => void;
   onViewDetails?: (item: MedicamentoRecord) => void;
   permisos?: {
     puede_ver: boolean;

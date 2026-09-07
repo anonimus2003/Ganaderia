@@ -1,25 +1,38 @@
-'use client';
+"use client";
 
-import { MedicamentoRecord, getMedicamentosColumns } from "./MedicamentosColumns";
+import { Medicamento } from "../schemas";
+import { getMedicamentosColumns } from "./MedicamentosColumns";
+
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Plus, SlidersHorizontal, Pill, ChevronLeft, ChevronRight, Download, FileText } from "lucide-react";
+import {
+  Plus,
+  Download,
+  FileText,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
+
 import { exportToPDF } from "@/lib/utils/exportUtils";
 import { useExportData } from "@/hooks/useExportData";
 
-interface MedicamentosTableProps {
-  data: MedicamentoRecord[];
-  loading: boolean;
-  onAddRecord: () => void;
-  onEdit: (item: MedicamentoRecord) => void;
-  onDelete: (item: MedicamentoRecord) => void;
-  onFilters: () => void;
+interface MedicamentoTableProps {
+  data: Medicamento[];
+  loading?: boolean;
+
+  onAddRecord?: () => void;
+  onEdit?: (medicamento: Medicamento) => void;
+  onDelete?: (itemOrId: string | Medicamento) => void; // <-- Actualizado aquí
+  onRowClick?: (medicamento: Medicamento) => void;
+  onFilters?: () => void;
+
   page: number;
   total: number;
-  pageSize: number;
   nextPage: () => void;
   prevPage: () => void;
-  onRowClick?: (item: MedicamentoRecord) => void;
+  pageSize: number;
+
   permisos?: {
     puede_ver: boolean;
     puede_crear: boolean;
@@ -28,21 +41,26 @@ interface MedicamentosTableProps {
   };
 }
 
-export default function MedicamentosTable({
+export default function MedicamentoTable({
   data,
   loading,
   onAddRecord,
   onEdit,
   onDelete,
+  onRowClick,
   onFilters,
   page,
   total,
-  pageSize,
   nextPage,
   prevPage,
-  onRowClick,
-  permisos = { puede_ver: true, puede_crear: true, puede_editar: true, puede_eliminar: true },
-}: MedicamentosTableProps) {
+  pageSize,
+  permisos = {
+    puede_ver: true,
+    puede_crear: true,
+    puede_editar: true,
+    puede_eliminar: true,
+  },
+}: MedicamentoTableProps) {
   const { exportFromTable } = useExportData();
 
   const columns = getMedicamentosColumns({
@@ -54,149 +72,145 @@ export default function MedicamentosTable({
   const totalPages = Math.ceil(total / pageSize);
 
   return (
-    <div className="space-y-4">
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+
       {/* HEADER */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-4 rounded-xl border shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-lg bg-primary/10 text-primary">
-            <Pill className="h-6 w-6" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-800 tracking-tight">Control de Medicamentos</h1>
-            <p className="text-xs text-slate-500">Registro histórico de aplicaciones sanitarias y periodos de retiro. Total: {total}</p>
-          </div>
+      <div className="px-6 py-5 border-b flex items-center justify-between">
+        <div>
+          <h2 className="font-semibold text-slate-900">
+            INVENTARIO DE MEDICAMENTOS
+          </h2>
+          <p className="text-xs text-slate-500">
+            Total Medicamentos: {total}
+          </p>
         </div>
 
-        <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap">
+        <div className="flex gap-2">
           {onFilters && (
             <Button
               variant="outline"
-              size="sm"
               onClick={onFilters}
-              className="flex items-center gap-1.5 text-xs h-9"
             >
-              <SlidersHorizontal className="h-3.5 w-3.5" />
+              <Filter className="w-4 h-4 mr-2" />
               Filtros
             </Button>
           )}
 
           <Button
             variant="outline"
-            size="sm"
             onClick={() => exportFromTable("medicamentos", "*")}
-            className="text-xs h-9"
           >
-            <Download className="h-3.5 w-3.5 mr-1.5" />
+            <Download className="w-4 h-4 mr-2" />
             CSV
           </Button>
 
           <Button
             variant="outline"
-            size="sm"
             onClick={() => exportToPDF(data)}
-            className="text-xs h-9"
           >
-            <FileText className="h-3.5 w-3.5 mr-1.5" />
+            <FileText className="w-4 h-4 mr-2" />
             PDF
           </Button>
 
           <Button
-            size="sm"
             onClick={onAddRecord}
             disabled={!permisos.puede_crear}
-            className="flex items-center gap-1.5 text-xs h-9 bg-primary text-primary-foreground hover:bg-primary/90"
           >
-            <Plus className="h-4 w-4" />
-            Nueva Aplicación
+            <Plus className="w-4 h-4 mr-2" />
+            Nuevo medicamento
           </Button>
         </div>
       </div>
 
-      {/* TABLE CONTAINER */}
-      <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
+      {/* TABLA */}
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {columns.map((column) => (
+                <TableHead key={column.header}>
+                  {column.header}
+                </TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+
+          <TableBody>
+            {loading ? (
               <TableRow>
-                {columns.map((column, index) => (
-                  <TableHead key={index}>
-                    {column.header}
-                  </TableHead>
-                ))}
+                <TableCell
+                  colSpan={columns.length}
+                  className="text-center py-10"
+                >
+                  Cargando medicamentos...
+                </TableCell>
               </TableRow>
-            </TableHeader>
-
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={columns.length} className="text-center py-10 text-slate-400">
-                    Cargando registros de medicamentos...
-                  </TableCell>
+            ) : data.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="text-center py-10"
+                >
+                  No hay medicamentos registrados.
+                </TableCell>
+              </TableRow>
+            ) : (
+              data.map((medicamento) => (
+                <TableRow
+                  key={medicamento.id}
+                  className={
+                    onRowClick
+                      ? "cursor-pointer hover:bg-slate-50"
+                      : ""
+                  }
+                  onClick={() => onRowClick?.(medicamento)}
+                >
+                  {columns.map((column) => (
+                    <TableCell
+                      key={String(column.accessor)}
+                      onClick={(event) => {
+                        if (column.accessor === "acciones") {
+                          event.stopPropagation();
+                        }
+                      }}
+                    >
+                      {column.render ? column.render(medicamento) : String(medicamento[column.accessor as keyof Medicamento] ?? "")}
+                    </TableCell>
+                  ))}
                 </TableRow>
-              ) : data.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={columns.length} className="text-center py-10 text-slate-400">
-                    No hay registros de medicamentos disponibles.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                data.map((item, rowIndex) => (
-                  <TableRow
-                    key={item.id || rowIndex}
-                    className={onRowClick ? "cursor-pointer hover:bg-slate-50" : ""}
-                    onClick={() => onRowClick?.(item)}
-                  >
-                    {columns.map((column, colIndex) => {
-                      const value = item[column.accessor as keyof MedicamentoRecord];
-                      return (
-                        <TableCell
-                          key={colIndex}
-                          onClick={(event) => {
-                            if (column.accessor === "acciones" || column.accessor === "id") {
-                              event.stopPropagation();
-                            }
-                          }}
-                        >
-                          {column.render ? column.render(item) : (value as React.ReactNode)}
-                        </TableCell>
-                      );
-                    })}
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
-        {/* PAGINACIÓN */}
-        <div className="px-6 py-4 border-t flex justify-between items-center bg-slate-50/50">
-          <span className="text-xs text-slate-500">
-            Página {page} de {totalPages || 1}
-          </span>
+      {/* PAGINACIÓN */}
+      <div className="px-6 py-4 border-t flex justify-between items-center">
+        <span className="text-xs text-slate-500">
+          Página {page} de {totalPages || 1}
+        </span>
 
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={prevPage}
-              disabled={page <= 1 || loading}
-              className="h-8 w-8"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={prevPage}
+            disabled={page <= 1 || loading}
+          >
+            <ChevronLeft />
+          </Button>
 
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={nextPage}
-              disabled={page >= totalPages || loading}
-              className="h-8 w-8"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={nextPage}
+            disabled={page >= totalPages || loading}
+          >
+            <ChevronRight />
+          </Button>
         </div>
       </div>
+
     </div>
   );
 }

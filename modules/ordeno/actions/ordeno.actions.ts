@@ -1,139 +1,83 @@
-// modules/ordeno/actions/ordeno.actions.ts
-'use server';
+// modules/ordeño/actions/ordeno.actions.ts
+import { createClient } from "@/lib/supabase/client";
+import { Ordeño } from "../schemas";
 
-import { createClient } from '@/lib/supabase/server';
-import { revalidatePath } from 'next/cache';
-import { Ordeno, FiltrosOrdeno } from '../schemas';
+const supabase = createClient();
 
-export async function obtenerOrdenosPaginados(
-  pagina: number = 1, 
-  porPagina: number = 10, 
-  filtros?: FiltrosOrdeno & { busqueda?: string }
-) {
-  const supabase = await createClient();
-  const desde = (pagina - 1) * porPagina;
-  const hasta = desde + porPagina - 1;
-
-  const terminoBusqueda = filtros?.bovino || filtros?.busqueda;
-  const tieneFiltroBovino = Boolean(terminoBusqueda && terminoBusqueda.trim() !== '');
-  
-  const relacionBovino = tieneFiltroBovino 
-    ? 'bovinos!inner ( id, arete, nombre )' 
-    : 'bovinos ( id, arete, nombre )';
-
-  let query = supabase
-    .from('ordeño')
-    .select(`*, ${relacionBovino}`, { count: 'exact' });
-
-  if (filtros) {
-    if (tieneFiltroBovino) {
-      const termino = terminoBusqueda!.trim();
-      query = query.or(`arete.ilike.%${termino}%,nombre.ilike.%${termino}%`, { foreignTable: 'bovinos' });
-    }
-    if (filtros.jornada && filtros.jornada.trim() !== '' && filtros.jornada !== 'todas') {
-      query = query.eq('jornada', filtros.jornada);
-    }
-    if (filtros.fechaInicio && filtros.fechaInicio.trim() !== '') {
-      query = query.gte('fecha', filtros.fechaInicio);
-    }
-    if (filtros.fechaFin && filtros.fechaFin.trim() !== '') {
-      query = query.lte('fecha', filtros.fechaFin);
-    }
-  }
-
-  query = query.order('fecha', { ascending: false }).range(desde, hasta);
-
-  const { data, error, count } = await query;
-
-  if (error) {
-    console.error("Error en Supabase:", error.message);
-    throw new Error(`Error al obtener los registros de ordeño: ${error.message}`);
-  }
-
-  return {
-    ordenos: data as Ordeno[],
-    total: count ?? 0,
-    paginaActual: pagina,
-    porPagina,
-  };
-}
-
-export async function crearOrdeno(nuevoOrdeno: Partial<Ordeno>) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  // Limpiamos la propiedad 'bovinos' para que Supabase no intente guardarla como columna
-  const { bovinos, ...restoDatos } = nuevoOrdeno;
-
-  const payload = {
-    ...restoDatos,
-    registrado_por: user?.id || null,
-  };
-
+export async function getOrdeñosAction(): Promise<Ordeño[]> {
   const { data, error } = await supabase
-    .from('ordeño')
-    .insert([payload])
+    .from("ordeño")
     .select(`
       *,
       bovinos (
         id,
         arete,
-        nombre
+        nombre,
+        genero,
+        raza
       )
     `)
-    .single();
+    .order("fecha", { ascending: false });
 
   if (error) {
-    throw new Error(`Error al registrar el ordeño: ${error.message}`);
+    console.error("Error al obtener ordeños:", error.message);
+    throw new Error(error.message);
   }
 
-  revalidatePath('/dashboard/ordeno');
-
-  return data;
+  return data || [];
 }
 
-export async function actualizarOrdeno(id: string, ordenoActualizado: Partial<Ordeno>) {
-  const supabase = await createClient();
+function limpiarCamposVacios(data: Partial<Ordeño>) {
+  const limpio: any = { ...data };
+  Object.keys(limpio).forEach((key) => {
+    if (limpio[key] === "" || limpio[key] === undefined) {
+      limpio[key] = null;
+    }
+  });
+  return limpio;
+}
 
-  // Limpiamos la propiedad 'bovinos' antes de actualizar para evitar el error de esquema
-  const { bovinos, ...datosAActualizar } = ordenoActualizado;
+export async function saveOrdeñoAction(dataToSave: Partial<Ordeño>): Promise<void> {
+  const datosLimpios = limpiarCamposVacios(dataToSave);
 
-  const { data, error } = await supabase
-    .from('ordeño')
-    .update(datosAActualizar)
-    .eq('id', id)
-    .select(`
-      *,
-      bovinos (
-        id,
-        arete,
-        nombre
-      )
-    `)
-    .single();
+  if (datosLimpios.id) {
+    const ordeñoId = datosLimpios.id;
+    delete datosLimpios.id;
+    delete datosLimpios.created_at;
+    delete datosLimpios.bovinos;
 
-  if (error) {
-    throw new Error(`Error al actualizar el ordeño: ${error.message}`);
+    const { error } = await supabase
+      .from("ordeño")
+      .update(datosLimpios)
+      .eq("id", ordeñoId);
+
+    if (error) {
+      console.error("Error al actualizar ordeño:", error.message);
+      throw new Error(error.message);
+    }
+  } else {
+    delete datosLimpios.id;
+    delete datosLimpios.bovinos;
+
+    const { error } = await supabase
+      .from("ordeño")
+      .insert([datosLimpios]);
+
+    if (error) {
+      console.error("Error al insertar ordeño:", error.message);
+      throw new Error(error.message);
+    }
   }
-
-  revalidatePath('/dashboard/ordeno'); 
-
-  return data;
 }
 
-export async function eliminarOrdeno(id: string) {
-  const supabase = await createClient();
-
+export async function deleteOrdeñoAction(id: string): Promise<void> {
   const { error } = await supabase
-    .from('ordeño')
+    .from("ordeño")
     .delete()
-    .eq('id', id);
+    .eq("id", id);
 
   if (error) {
-    throw new Error(`Error al eliminar el ordeño: ${error.message}`);
+    console.error("Error al eliminar ordeño:", error.message);
+    throw new Error(error.message);
   }
-
-  revalidatePath('/dashboard/ordeno');
-
-  return { success: true };
 }

@@ -1,41 +1,96 @@
-// modules/pesaje/hooks/usePesajes.ts
-import { useState, useEffect, useCallback } from 'react';
-import { obtenerPesajesPaginados } from '../actions/pesaje.actions';
-import { Pesaje } from '../schemas';
-import { FiltrosPesaje } from '../components/PesajeFiltersDrawer';
+import { useState, useEffect, useCallback } from "react";
+import { Pesaje } from "../schemas";
+import { getPesajesAction, savePesajeAction, deletePesajeAction } from "../actions/pesaje.actions";
 
-export function usePesajes(porPagina: number = 10, filtros: FiltrosPesaje) {
-  const [pesajes, setPesajes] = useState<Pesaje[]>([]);
-  const [cargando, setCargando] = useState(false);
-  const [pagina, setPagina] = useState(1);
-  const [total, setTotal] = useState(0);
+export const PAGE_SIZE = 10;
+
+export interface FiltrosPesaje {
+  busqueda: string;
+  fechaInicio: string;
+  fechaFin: string;
+}
+
+export function usePesajes() {
+  const [allPesajes, setAllPesajes] = useState<Pesaje[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
   
-  const [actualizarTrigger, setActualizarTrigger] = useState(0);
+  const [filtros, setFiltros] = useState<FiltrosPesaje>({
+    busqueda: "",
+    fechaInicio: "",
+    fechaFin: "",
+  });
 
-  const cargarPesajes = useCallback(async (numeroPagina: number, filtrosActuales: FiltrosPesaje) => {
+  const fetchPesajes = useCallback(async () => {
     try {
-      setCargando(true);
-      // Envía la página, la cantidad por página y el objeto completo de filtros actualizado
-      const resultado = await obtenerPesajesPaginados(numeroPagina, porPagina, filtrosActuales);
-      setPesajes(resultado.pesajes as Pesaje[]);
-      setTotal(resultado.total);
+      setLoading(true);
+      const data = await getPesajesAction();
+      setAllPesajes(data || []);
     } catch (error) {
-      console.error("Error al obtener pesajes:", error);
+      console.error("Error al cargar pesajes:", error);
     } finally {
-      setCargando(false);
+      setLoading(false);
     }
-  }, [porPagina]);
+  }, []);
 
   useEffect(() => {
-    cargarPesajes(pagina, filtros);
-  }, [pagina, filtros, actualizarTrigger, cargarPesajes]);
+    fetchPesajes();
+  }, [fetchPesajes]);
+
+  const filteredPesajes = allPesajes.filter(p => {
+    const areteBovino = p.bovinos?.arete || "";
+    const nombreBovino = p.bovinos?.nombre || "";
+    
+    const cumpleBusqueda = !filtros.busqueda || 
+      areteBovino.toLowerCase().includes(filtros.busqueda.toLowerCase()) || 
+      nombreBovino.toLowerCase().includes(filtros.busqueda.toLowerCase());
+
+    const fechaPesajeStr = p.fecha ? p.fecha.split("T")[0] : "";
+
+    const cumpleFechaInicio = !filtros.fechaInicio || fechaPesajeStr >= filtros.fechaInicio;
+    const cumpleFechaFin = !filtros.fechaFin || fechaPesajeStr <= filtros.fechaFin;
+
+    return cumpleBusqueda && cumpleFechaInicio && cumpleFechaFin;
+  });
+
+  const total = filteredPesajes.length;
+  const paginatedPesajes = filteredPesajes.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const nextPage = () => {
+    if (page * PAGE_SIZE < total) setPage(p => p + 1);
+  };
+
+  const prevPage = () => {
+    if (page > 1) setPage(p => p - 1);
+  };
+
+  const handleSave = async (dataToSave: Partial<Pesaje>) => {
+    await savePesajeAction(dataToSave);
+    await fetchPesajes();
+  };
+
+  const handleDelete = async (id: string) => {
+    await deletePesajeAction(id);
+    await fetchPesajes();
+  };
+
+  const handleSetFiltros = (nuevosFiltros: FiltrosPesaje) => {
+    setFiltros(nuevosFiltros);
+    setPage(1);
+  };
 
   return {
-    pesajes,
-    cargando,
-    pagina,
-    setPagina,
+    pesajes: paginatedPesajes,
+    allPesajes,
+    loading,
+    handleSave,
+    handleDelete,
+    page,
     total,
-    recargar: () => setActualizarTrigger(prev => prev + 1),
+    nextPage,
+    prevPage,
+    PAGE_SIZE,
+    filtros,
+    setFiltros: handleSetFiltros,
   };
 }

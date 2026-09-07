@@ -1,6 +1,6 @@
 // app/dashboard/ordeno/page.tsx
-import  OrdenoPage from '@/modules/ordeno';
+import  OrdeñoPage from '@/modules/ordeno';
 
 export default function Page() {
-  return < OrdenoPage />;
+  return < OrdeñoPage />;
 }

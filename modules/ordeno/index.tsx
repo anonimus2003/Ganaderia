@@ -1,139 +1,116 @@
 "use client";
 
-import { useState } from 'react';
-import { useOrdeno } from './hooks/useOrdeno';
-import { useBovinos } from '@/modules/inventario/hooks/useBovinos';
-import OrdenoTable from './components/OrdenoTable';
-import OrdenoFormModal from './components/OrdenoFormModal';
-import OrdenoFiltersDrawer from './components/OrdenoFiltersDrawer';
-import ConfirmModal from '@/components/ui/ConfirmModal';
-import { crearOrdeno, actualizarOrdeno, eliminarOrdeno } from './actions/ordeno.actions';
-import { Ordeno } from './schemas';
-import { toast } from 'sonner';
+import { useState } from "react";
+import { useOrdeños } from "./hooks/useOrdeno";
+import { useBovinos } from "@/modules/inventario/hooks/useBovinos";
+import OrdeñoTable from "./components/OrdenoTable";
+import OrdeñoFormModal from "./components/OrdenoFormModal";
+import OrdeñoFiltersDrawer from "./components/OrdenoFiltersDrawer";
+import ConfirmModal from "@/components/ui/ConfirmModal";
+import { Ordeño } from "./schemas";
 
-export default function OrdenoPage() {
-  const { allBovinos } = useBovinos(); // <--- Usamos allBovinos para traer absolutamente todos sin importar la paginación
-  
-  // Filtramos todas las hembras de la lista global
-  const bovinosHembras = allBovinos.filter(
-    (b) => b.genero?.toLowerCase().trim() === "hembra"
-  );
+export default function OrdeñoPage() {
+  const {
+    ordeños,
+    allOrdeños,
+    loading,
+    handleSave,
+    handleDelete,
+    page,
+    total,
+    nextPage,
+    prevPage,
+    PAGE_SIZE,
+    setFiltros,
+  } = useOrdeños();
 
-  const porPagina = 10;
-  
-  const [filtros, setFiltros] = useState({
-    busqueda: '',
-    bovino: '',
-    jornada: 'todas',
-    fechaInicio: '',
-    fechaFin: '',
-  });
+  const { allBovinos } = useBovinos();
 
-  const { ordenos, cargando, pagina, setPagina, total, recargar } = useOrdeno(porPagina, filtros);
-  
-  const [modalAbierto, setModalAbierto] = useState(false);
-  const [drawerAbierto, setDrawerAbierto] = useState(false);
-  const [ordenoAEditar, setOrdenoAEditar] = useState<Ordeno | null>(null);
-  const [ordenoAEliminar, setOrdenoAEliminar] = useState<Ordeno | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedOrdeño, setSelectedOrdeño] = useState<Ordeño | null>(null);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [ordeñoAEliminar, setOrdeñoAEliminar] = useState<Ordeño | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const handleGuardarOrdeno = async (payload: any) => {
-    try {
-      let resultado;
-      if (payload.id) {
-        resultado = await actualizarOrdeno(payload.id, payload);
-      } else {
-        resultado = await crearOrdeno(payload);
-      }
-      
-      if (resultado && resultado.success === false) {
-        throw new Error("No se pudo completar la operación en la base de datos.");
-      }
-      
-      toast.success(payload.id ? 'Ordeño actualizado correctamente' : 'Ordeño creado correctamente');
-      setModalAbierto(false);
-      recargar();
-    } catch (error: any) {
-      console.error("Error al guardar ordeño:", error);
-      toast.error(error.message || 'Ocurrió un error al guardar.');
-    }
+  const handleOpenCreate = () => {
+    setSelectedOrdeño(null);
+    setIsModalOpen(true);
+  };
+
+  const handleEdit = (ordeño: Ordeño) => {
+    setSelectedOrdeño(ordeño);
+    setIsModalOpen(true);
+  };
+
+const handleApplyFilters = (nuevosFiltros: {
+    busqueda: string;
+    jornada: string;
+    fechaInicio: string;
+    fechaFin: string;
+  }) => {
+    setFiltros({
+      busqueda: nuevosFiltros.busqueda,
+      turno: nuevosFiltros.jornada,
+      fecha: nuevosFiltros.fechaInicio,
+    });
   };
 
   const handleConfirmDelete = async () => {
-    if (!ordenoAEliminar?.id) return;
+    if (!ordeñoAEliminar) return;
 
     try {
       setDeleting(true);
-      const resultado = await eliminarOrdeno(ordenoAEliminar.id);
-      
-      if (resultado && resultado.success === false) {
-        toast.error('Error al eliminar el registro de ordeño');
-        return;
-      }
-      
-      toast.success('Ordeño eliminado correctamente');
-      setOrdenoAEliminar(null);
-      recargar();
+      await handleDelete(ordeñoAEliminar.id);
+      setOrdeñoAEliminar(null);
     } catch (error) {
-      console.error('Error al eliminar:', error);
-      toast.error('Ocurrió un error al intentar eliminar el registro.');
+      console.error("Error al eliminar el registro de ordeño:", error);
     } finally {
       setDeleting(false);
     }
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <OrdenoTable 
-        data={ordenos} 
-        loading={cargando} 
-        onAddRecord={() => {
-          setOrdenoAEditar(null);
-          setModalAbierto(true);
-        }}
-        onEdit={(ordeno) => {
-          setOrdenoAEditar(ordeno);
-          setModalAbierto(true);
-        }}
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
+      <OrdeñoTable
+        data={ordeños}
+        loading={loading}
+        onAddRecord={handleOpenCreate}
+        onEdit={handleEdit}
         onDelete={(id) => {
-          const itemEncontrado = ordenos.find(o => o.id === id);
-          if (itemEncontrado) setOrdenoAEliminar(itemEncontrado);
+          const registro = allOrdeños.find((o) => o.id === id);
+          if (registro) setOrdeñoAEliminar(registro);
         }}
-        onFilters={() => setDrawerAbierto(true)}
-        page={pagina}
+        page={page}
         total={total}
-        pageSize={porPagina}
-        nextPage={() => setPagina(p => p + 1)}
-        prevPage={() => setPagina(p => Math.max(p - 1, 1))}
+        nextPage={nextPage}
+        prevPage={prevPage}
+        pageSize={PAGE_SIZE}
+        onFilters={() => setIsFilterOpen(true)}
       />
 
-      <OrdenoFormModal
-        isOpen={modalAbierto}
-        onClose={() => setModalAbierto(false)}
-        onSave={handleGuardarOrdeno}
-        initialData={ordenoAEditar}
-        bovinos={bovinosHembras} // <--- Pasamos la lista completa de hembras sin restricciones de paginación
+      <OrdeñoFormModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSave={handleSave}
+        initialData={selectedOrdeño}
+        bovinos={allBovinos}
       />
 
-      <OrdenoFiltersDrawer
-        open={drawerAbierto}
-        onOpenChange={setDrawerAbierto}
-        onApplyFilters={(nuevosFiltros) => {
-          setFiltros({
-            ...nuevosFiltros,
-            bovino: nuevosFiltros.busqueda,
-          });
-          setPagina(1);
-        }}
+      <OrdeñoFiltersDrawer
+        open={isFilterOpen}
+        onOpenChange={setIsFilterOpen}
+        onApplyFilters={handleApplyFilters}
       />
 
       <ConfirmModal
-        isOpen={!!ordenoAEliminar}
-        onClose={() => setOrdenoAEliminar(null)}
+        isOpen={!!ordeñoAEliminar}
+        onClose={() => setOrdeñoAEliminar(null)}
         onConfirm={handleConfirmDelete}
         isLoading={deleting}
-        title={`¿Eliminar el registro del arete "${ordenoAEliminar?.bovinos?.arete || 'S/N'}"?`}
-        message={`Estás a punto de eliminar permanentemente el registro de ordeño de "${ordenoAEliminar?.bovinos?.nombre || 'Sin nombre'}" con arete ${ordenoAEliminar?.bovinos?.arete || 'S/N'}. Esta acción no se puede deshacer.`}
+        title="¿Eliminar este registro de ordeño?"
+        message={`Estás a punto de eliminar permanentemente el registro de ordeño del ${
+          ordeñoAEliminar?.fecha || ""
+        } (${ordeñoAEliminar?.jornada || ""}). Esta acción no se puede deshacer.`}
         confirmText="Sí, eliminar registro"
         cancelText="Cancelar"
         isDestructive={true}

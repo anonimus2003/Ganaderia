@@ -1,19 +1,11 @@
 "use client";
 
-import { Ordeno } from "../schemas";
-import { getOrdenoColumns } from "./OrdenoColumns";
+import { Ordeño } from "../schemas";
+import { getOrdeñoColumns } from "./OrdenoColumns";
 
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 import { Button } from "@/components/ui/button";
-
 import {
   Plus,
   Download,
@@ -26,22 +18,20 @@ import {
 import { exportToPDF } from "@/lib/utils/exportUtils";
 import { useExportData } from "@/hooks/useExportData";
 
-interface OrdenoTableProps {
-  data: Ordeno[];
+interface OrdeñoTableProps {
+  data: Ordeño[];
   loading?: boolean;
 
   onAddRecord?: () => void;
-  onEdit?: (item: Ordeno) => void;
+  onEdit?: (ordeño: Ordeño) => void;
   onDelete?: (id: string) => void;
-  onView?: (item: Ordeno) => void;
+  onRowClick?: (ordeño: Ordeño) => void;
   onFilters?: () => void;
 
   page: number;
   total: number;
-
   nextPage: () => void;
   prevPage: () => void;
-
   pageSize: number;
 
   permisos?: {
@@ -52,13 +42,13 @@ interface OrdenoTableProps {
   };
 }
 
-export default function OrdenoTable({
+export default function OrdeñoTable({
   data,
   loading,
   onAddRecord,
   onEdit,
   onDelete,
-  onView,
+  onRowClick,
   onFilters,
   page,
   total,
@@ -71,10 +61,10 @@ export default function OrdenoTable({
     puede_editar: true,
     puede_eliminar: true,
   },
-}: OrdenoTableProps) {
+}: OrdeñoTableProps) {
   const { exportFromTable } = useExportData();
 
-  const columns = getOrdenoColumns({
+  const columns = getOrdeñoColumns({
     onEdit,
     onDelete,
     permisos,
@@ -87,18 +77,15 @@ export default function OrdenoTable({
 
       {/* HEADER */}
 
-      <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
+      <div className="px-6 py-5 border-b flex items-center justify-between">
 
         <div>
           <h2 className="font-semibold text-slate-900">
-            CONTROL DE ORDEÑO
+            REGISTROS DE ORDEÑO
           </h2>
 
-          <p className="text-xs text-slate-500 mt-1">
-            Total Registros:{" "}
-            <span className="font-semibold text-slate-700">
-              {total}
-            </span>
+          <p className="text-xs text-slate-500">
+            Total Ordeños: {total}
           </p>
         </div>
 
@@ -115,7 +102,6 @@ export default function OrdenoTable({
           )}
 
           <Button
-            type="button"
             variant="outline"
             onClick={() =>
               exportFromTable("ordeño", "*")
@@ -126,7 +112,6 @@ export default function OrdenoTable({
           </Button>
 
           <Button
-            type="button"
             variant="outline"
             onClick={() => exportToPDF(data)}
           >
@@ -135,7 +120,6 @@ export default function OrdenoTable({
           </Button>
 
           <Button
-            type="button"
             onClick={onAddRecord}
             disabled={!permisos.puede_crear}
           >
@@ -154,11 +138,8 @@ export default function OrdenoTable({
 
           <TableHeader>
             <TableRow>
-              {columns.map((column) => (
-                <TableHead
-                  key={String(column.accessor)}
-                  className="text-xs font-semibold text-slate-600 whitespace-nowrap"
-                >
+              {columns.map((column, index) => (
+                <TableHead key={column.header || index}>
                   {column.header}
                 </TableHead>
               ))}
@@ -171,42 +152,45 @@ export default function OrdenoTable({
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
-                  className="text-center py-10 text-sm text-slate-500"
+                  className="text-center py-10"
                 >
-                  Cargando registros...
+                  Cargando ordeños...
                 </TableCell>
               </TableRow>
             ) : data.length === 0 ? (
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
-                  className="text-center py-10 text-sm text-slate-500"
+                  className="text-center py-10"
                 >
-                  No hay registros de ordeño.
+                  No hay ordeños registrados.
                 </TableCell>
               </TableRow>
             ) : (
-              data.map((item) => (
+              data.map((ordeño) => (
                 <TableRow
-                  key={item.id}
+                  key={ordeño.id}
                   className={
-                    onView
+                    onRowClick
                       ? "cursor-pointer hover:bg-slate-50"
-                      : "hover:bg-slate-50"
+                      : ""
                   }
-                  onClick={() => onView?.(item)}
+                  onClick={() =>
+                    onRowClick?.(ordeño)
+                  }
                 >
-                  {columns.map((column) => (
+                  {columns.map((column, index) => (
                     <TableCell
-                      key={`${item.id}-${String(column.accessor)}`}
-                      className="text-xs"
+                      key={String(column.accessor || index)}
                       onClick={(event) => {
-                        if (column.header === "Acciones") {
+                        if (
+                          column.accessor === "acciones"
+                        ) {
                           event.stopPropagation();
                         }
                       }}
                     >
-                      {column.render(item)}
+                      {column.render(ordeño)}
                     </TableCell>
                   ))}
                 </TableRow>
@@ -216,60 +200,37 @@ export default function OrdenoTable({
           </TableBody>
 
         </Table>
-
       </div>
 
       {/* PAGINACIÓN */}
 
-      <div className="px-6 py-4 border-t border-slate-100 flex justify-between items-center">
+      <div className="px-6 py-4 border-t flex justify-between items-center">
 
         <span className="text-xs text-slate-500">
-          Página{" "}
-          <span className="font-semibold text-slate-700">
-            {page}
-          </span>{" "}
-          de{" "}
-          <span className="font-semibold text-slate-700">
-            {totalPages || 1}
-          </span>
+          Página {page} de {totalPages || 1}
         </span>
 
         <div className="flex gap-2">
 
           <Button
-            type="button"
             variant="outline"
             size="icon"
             onClick={prevPage}
             disabled={page <= 1 || loading}
-            className="h-8 w-8"
           >
-            <ChevronLeft className="h-4 w-4" />
-
-            <span className="sr-only">
-              Página anterior
-            </span>
+            <ChevronLeft />
           </Button>
 
           <Button
-            type="button"
             variant="outline"
             size="icon"
             onClick={nextPage}
-            disabled={
-              page >= totalPages || loading
-            }
-            className="h-8 w-8"
+            disabled={page >= totalPages || loading}
           >
-            <ChevronRight className="h-4 w-4" />
-
-            <span className="sr-only">
-              Página siguiente
-            </span>
+            <ChevronRight />
           </Button>
 
         </div>
-
       </div>
 
     </div>

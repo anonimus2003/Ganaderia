@@ -1,25 +1,39 @@
-// modules/reproduccion/components/ReproduccionTable.tsx
-'use client';
+"use client";
 
-import DataTable from "@/components/ui/DataTable";
 import { Reproduccion } from "../schemas";
 import { getReproduccionColumns } from "./ReproduccionColumns";
-import { exportToPDF } from "@/lib/utils/exportUtils"; 
-import { useExportData } from "@/hooks/useExportData"; 
+
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
+import { Button } from "@/components/ui/button";
+import {
+  Plus,
+  Download,
+  FileText,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
+
+import { exportToPDF } from "@/lib/utils/exportUtils";
+import { useExportData } from "@/hooks/useExportData";
 
 interface ReproduccionTableProps {
   data: Reproduccion[];
   loading?: boolean;
+
   onAddRecord?: () => void;
-  onEdit?: (item: Reproduccion) => void;
-  onDelete?: (item: Reproduccion) => void;
-  onView?: (item: Reproduccion) => void;
+  onEdit?: (reproduccion: Reproduccion) => void;
+  onDelete?: (reproduccion: Reproduccion) => void;
+  onRowClick?: (reproduccion: Reproduccion) => void;
   onFilters?: () => void;
+
   page: number;
   total: number;
   nextPage: () => void;
   prevPage: () => void;
   pageSize: number;
+
   permisos?: {
     puede_ver: boolean;
     puede_crear: boolean;
@@ -28,55 +42,203 @@ interface ReproduccionTableProps {
   };
 }
 
-export default function ReproduccionTable({
+export function ReproduccionTable({
   data,
   loading,
   onAddRecord,
   onEdit,
   onDelete,
-  onView,
+  onRowClick,
   onFilters,
   page,
   total,
   nextPage,
   prevPage,
   pageSize,
-  permisos = { puede_ver: true, puede_crear: true, puede_editar: true, puede_eliminar: true },
+  permisos = {
+    puede_ver: true,
+    puede_crear: true,
+    puede_editar: true,
+    puede_eliminar: true,
+  },
 }: ReproduccionTableProps) {
-  
   const { exportFromTable } = useExportData();
-  
+
   const columns = getReproduccionColumns({
     onEdit,
     onDelete,
-    permisos: {
-      puede_editar: permisos.puede_editar,
-      puede_eliminar: permisos.puede_eliminar,
-    }
+    permisos,
   });
 
+  const totalPages = Math.ceil(total / pageSize) || 1;
+
   return (
-    <div className="space-y-4">
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <DataTable 
-          title="CONTROL REPRODUCTIVO" 
-          totalLabel="total registros"
-          data={data} 
-          columns={columns} 
-          loading={loading}
-          onAddRecord={onAddRecord}
-          isAddDisabled={!permisos.puede_crear}
-          onExportCSV={() => exportFromTable('reproducciones', '*, bovinos(arete, nombre)', 'reproducciones_completo.csv')}
-          onDownloadPDF={() => exportToPDF(data)}
-          onFilters={onFilters}
-          onRowClick={onView}
-          page={page}
-          total={total}
-          nextPage={nextPage}
-          prevPage={prevPage}
-          pageSize={pageSize}
-        />
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+
+      {/* HEADER */}
+
+      <div className="px-6 py-5 border-b flex items-center justify-between">
+
+        <div>
+          <h2 className="font-semibold text-slate-900">
+            REGISTROS DE REPRODUCCIÓN
+          </h2>
+
+          <p className="text-xs text-slate-500">
+            Total Registros: {total}
+          </p>
+        </div>
+
+        <div className="flex gap-2">
+
+          {onFilters && (
+            <Button
+              variant="outline"
+              onClick={onFilters}
+              className="text-xs h-9"
+            >
+              <Filter className="w-4 h-4 mr-2" />
+              Filtros
+            </Button>
+          )}
+
+          <Button
+            variant="outline"
+            onClick={() =>
+              exportFromTable("reproduccion", "*")
+            }
+            className="text-xs h-9"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            CSV
+          </Button>
+
+          <Button
+            variant="outline"
+            onClick={() => exportToPDF(data)}
+            className="text-xs h-9"
+          >
+            <FileText className="w-4 h-4 mr-2" />
+            PDF
+          </Button>
+
+          <Button
+            onClick={onAddRecord}
+            disabled={!permisos.puede_crear}
+            className="text-xs h-9 bg-emerald-600 hover:bg-emerald-700 text-white"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Nueva inseminación
+          </Button>
+
+        </div>
       </div>
+
+      {/* TABLA */}
+
+      <div className="overflow-x-auto">
+
+        <Table>
+
+          <TableHeader className="bg-slate-50">
+            <TableRow>
+              {columns.map((column, index) => (
+                <TableHead key={index} className="text-xs font-semibold text-slate-700">
+                  {column.header}
+                </TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+
+          <TableBody>
+
+            {loading ? (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="text-center py-10 text-xs text-slate-500"
+                >
+                  Cargando registros de reproducción...
+                </TableCell>
+              </TableRow>
+            ) : data.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="text-center py-10 text-xs text-slate-500"
+                >
+                  No hay registros de reproducción encontrados.
+                </TableCell>
+              </TableRow>
+            ) : (
+              data.map((item, rowIndex) => (
+                <TableRow
+                  key={item.id || rowIndex}
+                  className={
+                    onRowClick
+                      ? "cursor-pointer hover:bg-slate-50/50"
+                      : "hover:bg-slate-50/50"
+                  }
+                  onClick={() =>
+                    onRowClick?.(item)
+                  }
+                >
+                  {columns.map((column, colIndex) => (
+                    <TableCell
+                      key={colIndex}
+                      className="py-3 text-xs"
+                      onClick={(event) => {
+                        // Prevenir row click si se da click en la columna de acciones o botones
+                        if (colIndex === columns.length - 1) {
+                          event.stopPropagation();
+                        }
+                      }}
+                    >
+                      {column.render(item)}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            )}
+
+          </TableBody>
+
+        </Table>
+      </div>
+
+      {/* PAGINACIÓN */}
+
+      <div className="px-6 py-4 border-t flex justify-between items-center">
+
+        <span className="text-xs text-slate-500">
+          Página {page} de {totalPages}
+        </span>
+
+        <div className="flex gap-2">
+
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={prevPage}
+            disabled={page <= 1 || loading}
+            className="h-8 w-8"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={nextPage}
+            disabled={page >= totalPages || loading}
+            className="h-8 w-8"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+
+        </div>
+      </div>
+
     </div>
   );
 }

@@ -1,133 +1,79 @@
-// modules/reproduccion/actions/reproduccion.actions.ts
-'use server';
+import { createClient } from "@/lib/supabase/client";
+import { Reproduccion } from "../schemas";
 
-import { createClient } from '@/lib/supabase/server';
-import { revalidatePath } from 'next/cache';
-import { Reproduccion, FiltrosReproduccion } from '../schemas';
+const supabase = createClient();
 
-export async function obtenerReproduccionesPaginadas(
-  pagina: number = 1,
-  porPagina: number = 10,
-  filtros?: FiltrosReproduccion
-) {
-  const supabase = await createClient();
-  const desde = (pagina - 1) * porPagina;
-  const hasta = desde + porPagina - 1;
-
-  const tieneFiltroBovino = Boolean(filtros?.bovino && filtros.bovino.trim() !== '');
-  const relacionBovino = tieneFiltroBovino
-    ? 'bovinos!inner ( id, arete, nombre )'
-    : 'bovinos ( id, arete, nombre )';
-
-  let query = supabase
-    .from('reproducciones')
-    .select(`*, ${relacionBovino}`, { count: 'exact' });
-
-  if (filtros) {
-    if (tieneFiltroBovino) {
-      const termino = filtros.bovino!.trim();
-      query = query.or(`arete.ilike.%${termino}%,nombre.ilike.%${termino}%`, { foreignTable: 'bovinos' });
-    }
-    if (filtros.estado && filtros.estado.trim() !== '') {
-      query = query.eq('estado', filtros.estado);
-    }
-    if (filtros.tipo && filtros.tipo.trim() !== '') {
-      query = query.eq('tipo', filtros.tipo);
-    }
-    if (filtros.fechaInicio && filtros.fechaInicio.trim() !== '') {
-      query = query.gte('fecha_inseminacion', filtros.fechaInicio);
-    }
-    if (filtros.fechaFin && filtros.fechaFin.trim() !== '') {
-      query = query.lte('fecha_inseminacion', filtros.fechaFin);
-    }
-  }
-
-  query = query.order('fecha_inseminacion', { ascending: false }).range(desde, hasta);
-
-  const { data, error, count } = await query;
-
-  if (error) {
-    throw new Error(`Error al obtener los registros de reproducción: ${error.message}`);
-  }
-
-  return {
-    reproducciones: data as Reproduccion[],
-    total: count ?? 0,
-    paginaActual: pagina,
-    porPagina,
-  };
-}
-
-export async function crearReproduccion(nuevaReproduccion: Partial<Reproduccion>) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  const payload = {
-    ...nuevaReproduccion,
-    registrado_por: user?.id || null,
-  };
-
+export async function getReproduccionesAction(): Promise<Reproduccion[]> {
   const { data, error } = await supabase
-    .from('reproducciones')
-    .insert([payload])
-    .select(`
-      *,
-      bovinos (
-        id,
-        arete,
-        nombre
-      )
-    `)
-    .single();
+    .from("reproducciones")
+    .select("*, bovinos(id, arete, nombre)")
+    .order("created_at", { ascending: false });
 
   if (error) {
-    throw new Error(`Error al registrar la reproducción: ${error.message}`);
+    console.error("Error al obtener reproducciones:", error.message);
+    throw new Error(error.message);
   }
 
-  revalidatePath('/dashboard/reproduccion');
-
-  return data;
+  return data || [];
 }
 
-export async function actualizarReproduccion(id: string, reproduccionActualizada: Partial<Reproduccion>) {
-  const supabase = await createClient();
+// Función auxiliar para limpiar cadenas vacías y convertirlas en null
+function limpiarCamposVacios(data: Partial<Reproduccion>) {
+  const limpio: any = { ...data };
+  Object.keys(limpio).forEach(key => {
+    if (limpio[key] === "" || limpio[key] === undefined) {
+      limpio[key] = null;
+    }
+  });
+  return limpio;
+}
 
-  const { data, error } = await supabase
-    .from('reproducciones')
-    .update(reproduccionActualizada)
-    .eq('id', id)
-    .select(`
-      *,
-      bovinos (
-        id,
-        arete,
-        nombre
-      )
-    `)
-    .single();
+export async function saveReproduccionAction(dataToSave: Partial<Reproduccion>): Promise<void> {
+  const datosLimpios = limpiarCamposVacios(dataToSave);
+  // Evitamos enviar la relación anidada de bovinos a supabase al insertar/actualizar
+  delete datosLimpios.bovinos;
 
-  if (error) {
-    throw new Error(`Error al actualizar la reproducción: ${error.message}`);
+  if (datosLimpios.id) {
+    // Actualizar registro existente
+    const reproduccionId = datosLimpios.id;
+    delete datosLimpios.id;
+    delete datosLimpios.created_at;
+
+    const { error } = await supabase
+      .from("reproduccion")
+      .update(datosLimpios)
+      .eq("id", reproduccionId);
+
+    if (error) {
+      console.error("Error al actualizar reproducción:", error.message);
+      throw new Error(error.message);
+    }
+  } else {
+    // Crear nuevo registro
+    delete datosLimpios.id;
+    const { error } = await supabase
+      .from("reproduccion")
+      .insert([datosLimpios]);
+
+    if (error) {
+      console.error("Error al insertar reproducción:", error.message);
+      throw new Error(error.message);
+    }
   }
-
-  revalidatePath('/dashboard/reproduccion');
-
-  return data;
 }
 
-export async function eliminarReproduccion(id: string) {
-  const supabase = await createClient();
+export async function deleteReproduccionAction(id: string | undefined): Promise<void> {
+  if (!id) {
+    throw new Error("El ID de reproducción es obligatorio para eliminar.");
+  }
 
   const { error } = await supabase
-    .from('reproducciones')
+    .from("reproduccion")
     .delete()
-    .eq('id', id);
+    .eq("id", id);
 
   if (error) {
-    throw new Error(`Error al eliminar el registro de reproducción: ${error.message}`);
+    console.error("Error al eliminar reproducción:", error.message);
+    throw new Error(error.message);
   }
-
-  revalidatePath('/dashboard/reproduccion');
-
-  return { success: true };
 }

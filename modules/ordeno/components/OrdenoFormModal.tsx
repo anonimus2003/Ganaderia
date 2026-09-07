@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Ordeno, Bovino } from "../schemas";
+import { Ordeño, Bovino } from "../schemas";
 import {
   Dialog,
   DialogContent,
@@ -20,42 +20,35 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import {
-  Calendar,
-  Clock,
-  Droplets,
-  FileText,
-  Loader2,
-  Milk,
-} from "lucide-react";
+import { Milk, Calendar, Clock, FileText, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-interface OrdenoFormModalProps {
+interface OrdeñoFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: Partial<Ordeno>) => Promise<void>;
-  initialData?: Ordeno | null;
+  onSave: (data: Partial<Ordeño>) => Promise<void>;
+  initialData?: Ordeño | null;
   bovinos?: Bovino[];
 }
 
 const JORNADAS_DISPONIBLES = [
-  { value: "Mañana", label: "Mañana" },
-  { value: "Tarde", label: "Tarde" },
-];
+  "Mañana",
+  "Tarde",
+  "Único",
+] as const;
 
-export default function OrdenoFormModal({
+export default function OrdeñoFormModal({
   isOpen,
   onClose,
   onSave,
   initialData,
   bovinos = [],
-}: OrdenoFormModalProps) {
-  const [formData, setFormData] = useState<Partial<Ordeno>>(
+}: OrdeñoFormModalProps) {
+  const [formData, setFormData] = useState<Partial<Ordeño>>(
     initialData || {
-      fecha: new Date().toISOString().split("T")[0],
       jornada: "Mañana",
+      fecha: new Date().toISOString().split("T")[0],
       litros: 0,
-      observaciones: "",
     }
   );
 
@@ -66,38 +59,33 @@ export default function OrdenoFormModal({
 
   useEffect(() => {
     if (initialData) {
-      setFormData({
-        ...initialData,
-        fecha: initialData.fecha ? initialData.fecha.split("T")[0] : new Date().toISOString().split("T")[0],
-      });
+      setFormData(initialData);
     } else {
       setFormData({
-        fecha: new Date().toISOString().split("T")[0],
         jornada: "Mañana",
+        fecha: new Date().toISOString().split("T")[0],
         litros: 0,
-        observaciones: "",
       });
     }
   }, [initialData, isOpen]);
 
   const listaBovinos = Array.isArray(bovinos) ? bovinos : [];
-  const bovinosHembras = listaBovinos.filter((b) => b.genero === "Hembra");
+  const vacasDisponibles = listaBovinos.filter(
+    (b) => b.genero === "Hembra" 
+  );
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
       setSaving(true);
       setErrorMsg("");
-      
-      if (!formData.bovino_id) {
-        throw new Error("Debe seleccionar un bovino para registrar el ordeño.");
-      }
-      if (formData.litros === undefined || formData.litros < 0) {
-        throw new Error("Ingrese una cantidad válida de litros.");
-      }
-
       await onSave(formData);
-    
+      toast.success(
+        isEditing ? "¡Ordeño actualizado!" : "¡Ordeño registrado!",
+        {
+          description: `Se registró el ordeño correctamente.`,
+        }
+      );
       onClose();
     } catch (err: unknown) {
       const mensaje =
@@ -109,7 +97,9 @@ export default function OrdenoFormModal({
     }
   };
 
-  const bovinoSeleccionado = listaBovinos.find((b) => b.id === formData.bovino_id);
+  const vacaSeleccionada = vacasDisponibles.find(
+    (v) => v.id === formData.bovino_id
+  );
 
   return (
     <Dialog
@@ -118,144 +108,140 @@ export default function OrdenoFormModal({
         if (!open) onClose();
       }}
     >
-      <DialogContent className="max-w-lg overflow-hidden flex flex-col p-0">
-        <DialogHeader className="px-6 pt-6 pb-4 border-b">
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-full bg-primary/10 text-primary">
-              <Milk className="h-5 w-5" />
-            </div>
-            <div>
-              <DialogTitle className="text-base font-semibold">
-                {isEditing ? "Editar Registro de Ordeño" : "Nuevo Registro de Ordeño"}
-              </DialogTitle>
-              <DialogDescription className="text-xs">
-                Control de producción lechera por animal y jornada.
-              </DialogDescription>
-            </div>
-          </div>
+      <DialogContent className="max-h-[92vh] max-w-xl overflow-hidden flex flex-col p-0">
+        <DialogHeader className="px-6 pt-6 pb-2 border-b">
+          <DialogTitle className="text-lg font-semibold flex items-center gap-2">
+            <Milk className="h-5 w-5 text-sky-600" />
+            {isEditing ? "Editar Registro de Ordeño" : "Nuevo Registro de Ordeño"}
+          </DialogTitle>
+          <DialogDescription className="text-xs">
+            Registra la producción de leche individual de las vacas en producción.
+          </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1">
-          <div className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
             {errorMsg && (
               <div className="rounded-md bg-destructive/10 p-3 text-xs text-destructive border border-destructive/20">
                 {errorMsg}
               </div>
             )}
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium flex items-center gap-1.5">
-                Bovino / Vaca *
-              </label>
-             <Select
-  value={formData.bovino_id || ""}
-  onValueChange={(value) =>
-    setFormData((prev: Partial<Ordeno>) => ({ 
-      ...prev, 
-      bovino_id: value 
-    }))
-  }
->
-                <SelectTrigger className="h-9 text-sm w-full">
-                  <SelectValue placeholder="Seleccione el bovino (Arete / Nombre)">
-                    {bovinoSeleccionado
-                      ? `Arete: ${bovinoSeleccionado.arete}${
-                          bovinoSeleccionado.nombre ? ` - ${bovinoSeleccionado.nombre}` : ""
-                        }`
-                      : "Seleccione el bovino"}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {bovinosHembras.map((bovino) => (
-                    <SelectItem key={bovino.id} value={bovino.id}>
-                      Arete: {bovino.arete} {bovino.nombre ? `- ${bovino.nombre}` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium flex items-center gap-1">
-                  <Calendar className="h-3.5 w-3.5 text-muted-foreground" /> Fecha *
-                </label>
-                <Input
-                  type="date"
-                  required
-                  className="h-9 text-sm"
-                  value={formData.fecha || ""}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, fecha: e.target.value }))
-                  }
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium flex items-center gap-1">
-                  <Clock className="h-3.5 w-3.5 text-muted-foreground" /> Jornada *
-                </label>
+                <label className="text-xs font-medium">Vaca / Bovino *</label>
                 <Select
-                  value={formData.jornada || "Mañana"}
+                  value={formData.bovino_id || ""}
                   onValueChange={(value) =>
-                    setFormData((prev) => ({ ...prev, jornada: value as any }))
+                    setFormData((prev) => ({ ...prev, bovino_id: value }))
                   }
                 >
                   <SelectTrigger className="h-9 text-sm w-full">
-                    <SelectValue />
+                    <SelectValue placeholder="Seleccione una vaca en producción">
+                      {vacaSeleccionada
+                        ? `Arete: ${vacaSeleccionada.arete}${
+                            vacaSeleccionada.nombre ? ` - ${vacaSeleccionada.nombre}` : ""
+                          }`
+                        : "Seleccione una vaca"}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {JORNADAS_DISPONIBLES.map((j) => (
-                      <SelectItem key={j.value} value={j.value}>
-                        {j.label}
+                    {vacasDisponibles.map((vaca) => (
+                      <SelectItem key={vaca.id} value={vaca.id}>
+                        Arete: {vaca.arete} {vaca.nombre ? `- ${vaca.nombre}` : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-            </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium flex items-center gap-1">
-                <Droplets className="h-3.5 w-3.5 text-muted-foreground" /> Producción en Litros *
-              </label>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                required
-                className="h-9 text-sm"
-                value={formData.litros ?? ""}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    litros: e.target.value === "" ? 0 : parseFloat(e.target.value),
-                  }))
-                }
-                placeholder="Ej. 12.5"
-              />
-            </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium flex items-center gap-1">
+                    <Calendar className="h-3.5 w-3.5 text-muted-foreground" /> Fecha *
+                  </label>
+                  <Input
+                    type="date"
+                    required
+                    className="h-9 text-sm"
+                    value={formData.fecha || ""}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        fecha: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium flex items-center gap-1">
-                <FileText className="h-3.5 w-3.5 text-muted-foreground" /> Observaciones
-              </label>
-              <Textarea
-                rows={3}
-                className="text-sm resize-none"
-                value={formData.observaciones || ""}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    observaciones: e.target.value,
-                  }))
-                }
-                placeholder="Novedades de la ubre, comportamiento, etc..."
-              />
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium flex items-center gap-1">
+                    <Clock className="h-3.5 w-3.5 text-muted-foreground" /> Turno *
+                  </label>
+                  <Select
+                    value={formData.jornada || "Mañana"}
+                    onValueChange={(value) =>
+                      setFormData((prev) => ({ ...prev, jornada: value as any }))
+                    }
+                  >
+                    <SelectTrigger className="h-9 text-sm w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {JORNADAS_DISPONIBLES.map((jornada) => (
+                        <SelectItem key={jornada} value={jornada}>
+                          {jornada}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-1 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium flex items-center gap-1">
+                    <Milk className="h-3.5 w-3.5 text-muted-foreground" /> Cantidad (Litros) *
+                  </label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    required
+                    className="h-9 text-sm"
+                    value={formData.litros ?? ""}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        litros: parseFloat(e.target.value) || 0,
+                      }))
+                    }
+                    placeholder="Ej. 6.5"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5 pt-1">
+                <label className="text-xs font-medium flex items-center gap-1">
+                  <FileText className="h-3.5 w-3.5 text-muted-foreground" /> Observaciones
+                </label>
+                <Textarea
+                  rows={3}
+                  className="text-sm resize-none"
+                  value={formData.observaciones || ""}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      observaciones: e.target.value,
+                    }))
+                  }
+                  placeholder="Detalles sobre la calidad de la leche, mastitis, etc..."
+                />
+              </div>
             </div>
           </div>
 
-          <DialogFooter className="px-6 py-4 border-t bg-muted/10 flex flex-row items-center justify-end gap-2">
+          <DialogFooter className="px-6 py-4 border-t bg-muted/10 flex flex-row items-center justify-end gap-3 shrink-0">
             <Button
               type="button"
               variant="outline"
@@ -267,7 +253,7 @@ export default function OrdenoFormModal({
             </Button>
             <Button type="submit" size="default" disabled={saving}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {saving ? "Guardando..." : isEditing ? "Guardar Cambios" : "Registrar"}
+              {saving ? "Guardando..." : isEditing ? "Guardar Cambios" : "Registrar Ordeño"}
             </Button>
           </DialogFooter>
         </form>
