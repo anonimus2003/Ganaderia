@@ -11,7 +11,7 @@ export default function MantenimientoPage() {
       </div>
       
       <span className="px-3.5 py-1.5 bg-amber-50 text-amber-700 border border-amber-200/60 text-xs font-semibold rounded-full uppercase tracking-wider mb-4">
-        Módulo en construcción
+        Módulo en construcción nnn
       </span>
 
       <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight mb-2">
