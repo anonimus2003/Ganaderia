@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Milk, Calendar, Clock, FileText, Loader2 } from "lucide-react";
+import { Milk, Calendar, Clock, FileText, Loader2, Package } from "lucide-react";
 import { toast } from "sonner";
 
 interface OrdeñoFormModalProps {
@@ -31,10 +31,14 @@ interface OrdeñoFormModalProps {
   bovinos?: Bovino[];
 }
 
+type OrdeñoFormState = Omit<Partial<Ordeño>, "litros" | "concentrado_kg"> & {
+  litros: number | string;
+  concentrado_kg: number | string;
+};
+
 const JORNADAS_DISPONIBLES = [
   "Mañana",
   "Tarde",
-  "Único",
 ] as const;
 
 export default function OrdeñoFormModal({
@@ -44,12 +48,15 @@ export default function OrdeñoFormModal({
   initialData,
   bovinos = [],
 }: OrdeñoFormModalProps) {
-  const [formData, setFormData] = useState<Partial<Ordeño>>(
-    initialData || {
-      jornada: "Mañana",
-      fecha: new Date().toISOString().split("T")[0],
-      litros: 0,
-    }
+  const [formData, setFormData] = useState<OrdeñoFormState>(
+    initialData
+      ? (initialData as OrdeñoFormState)
+      : {
+          jornada: "Mañana",
+          fecha: new Date().toISOString().split("T")[0],
+          litros: "",
+          concentrado_kg: "",
+        }
   );
 
   const [saving, setSaving] = useState(false);
@@ -59,12 +66,13 @@ export default function OrdeñoFormModal({
 
   useEffect(() => {
     if (initialData) {
-      setFormData(initialData);
+      setFormData(initialData as OrdeñoFormState);
     } else {
       setFormData({
         jornada: "Mañana",
         fecha: new Date().toISOString().split("T")[0],
-        litros: 0,
+        litros: "",
+        concentrado_kg: "",
       });
     }
   }, [initialData, isOpen]);
@@ -79,7 +87,15 @@ export default function OrdeñoFormModal({
     try {
       setSaving(true);
       setErrorMsg("");
-      await onSave(formData);
+      
+      // Aseguramos que se envíe como número si tiene valor, o 0/undefined si está vacío
+      const dataToSave: Partial<Ordeño> = {
+        ...formData,
+        litros: formData.litros === "" ? 0 : Number(formData.litros),
+        concentrado_kg: formData.concentrado_kg === "" ? 0 : Number(formData.concentrado_kg),
+      };
+
+      await onSave(dataToSave);
       toast.success(
         isEditing ? "¡Ordeño actualizado!" : "¡Ordeño registrado!",
         {
@@ -115,7 +131,7 @@ export default function OrdeñoFormModal({
             {isEditing ? "Editar Registro de Ordeño" : "Nuevo Registro de Ordeño"}
           </DialogTitle>
           <DialogDescription className="text-xs">
-            Registra la producción de leche individual de las vacas en producción.
+            Registra la producción de leche y consumo de concentrado individual de las vacas.
           </DialogDescription>
         </DialogHeader>
 
@@ -129,7 +145,7 @@ export default function OrdeñoFormModal({
 
             <div className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium">Vaca / Bovino *</label>
+                <label className="text-xs font-medium">Bovino *</label>
                 <Select
                   value={formData.bovino_id || ""}
                   onValueChange={(value) =>
@@ -137,7 +153,7 @@ export default function OrdeñoFormModal({
                   }
                 >
                   <SelectTrigger className="h-9 text-sm w-full">
-                    <SelectValue placeholder="Seleccione una vaca en producción">
+                    <SelectValue placeholder="Seleccione un bovino">
                       {vacaSeleccionada
                         ? `Arete: ${vacaSeleccionada.arete}${
                             vacaSeleccionada.nombre ? ` - ${vacaSeleccionada.nombre}` : ""
@@ -198,7 +214,7 @@ export default function OrdeñoFormModal({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-1 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium flex items-center gap-1">
                     <Milk className="h-3.5 w-3.5 text-muted-foreground" /> Cantidad (Litros) *
@@ -213,10 +229,30 @@ export default function OrdeñoFormModal({
                     onChange={(e) =>
                       setFormData((prev) => ({
                         ...prev,
-                        litros: parseFloat(e.target.value) || 0,
+                        litros: e.target.value === "" ? "" : parseFloat(e.target.value),
                       }))
                     }
                     placeholder="Ej. 6.5"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium flex items-center gap-1">
+                    <Package className="h-3.5 w-3.5 text-muted-foreground" /> Concentrado (Kg)
+                  </label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    className="h-9 text-sm"
+                    value={formData.concentrado_kg ?? ""}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        concentrado_kg: e.target.value === "" ? "" : parseFloat(e.target.value),
+                      }))
+                    }
+                    placeholder="Ej. 2.0"
                   />
                 </div>
               </div>

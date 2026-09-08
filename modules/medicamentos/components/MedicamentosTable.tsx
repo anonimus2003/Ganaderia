@@ -23,7 +23,7 @@ interface MedicamentoTableProps {
 
   onAddRecord?: () => void;
   onEdit?: (medicamento: Medicamento) => void;
-  onDelete?: (itemOrId: string | Medicamento) => void; // <-- Actualizado aquí
+  onDelete?: (itemOrId: string | Medicamento) => void;
   onRowClick?: (medicamento: Medicamento) => void;
   onFilters?: () => void;
 
@@ -127,8 +127,8 @@ export default function MedicamentoTable({
         <Table>
           <TableHeader>
             <TableRow>
-              {columns.map((column) => (
-                <TableHead key={column.header}>
+              {columns.map((column, index) => (
+                <TableHead key={`${String(column.header || column.accessor)}-${index}`}>
                   {column.header}
                 </TableHead>
               ))}
@@ -165,9 +165,9 @@ export default function MedicamentoTable({
                   }
                   onClick={() => onRowClick?.(medicamento)}
                 >
-                  {columns.map((column) => (
+                  {columns.map((column, index) => (
                     <TableCell
-                      key={String(column.accessor)}
+                      key={`${String(column.accessor)}-${index}`}
                       onClick={(event) => {
                         if (column.accessor === "acciones") {
                           event.stopPropagation();

@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { Pesaje } from "../schemas";
 import { Bovino } from "@/modules/inventario/schemas";
 
-
 import {
   Dialog,
   DialogContent,
@@ -34,17 +33,37 @@ interface PesajeFormModalProps {
   bovinosList: Bovino[];
 }
 
+type PesajeFormState = Omit<Partial<Pesaje>, "peso_kgs" | "condicion_corporal"> & {
+  peso_kgs: number | string;
+  condicion_corporal: number | string | null;
+};
+
+const METODOS_PESAJE = [
+  "Báscula Mecánica",
+  "Báscula Digital",
+  "Cinta Métrica (Estimado)",
+  "Ojo / Visual",
+] as const;
+
 export default function PesajeFormModal({
   isOpen,
   onClose,
   onSuccess,
   pesajeAEditar,
-  bovinosList  = [],
+  bovinosList = [],
 }: PesajeFormModalProps) {
-  const [formData, setFormData] = useState<Partial<Pesaje>>(
-    pesajeAEditar || {
-      fecha: new Date().toISOString().split("T")[0],
-    }
+  const [formData, setFormData] = useState<PesajeFormState>(
+    pesajeAEditar
+      ? (pesajeAEditar as PesajeFormState)
+      : {
+          fecha: new Date().toISOString().split("T")[0],
+          peso_kgs: "",
+          condicion_corporal: "",
+          metodo_pesaje: "Báscula Digital",
+          estado_fisiologico: "",
+          responsable: "",
+          observaciones: "",
+        }
   );
 
   const [saving, setSaving] = useState(false);
@@ -55,15 +74,20 @@ export default function PesajeFormModal({
   useEffect(() => {
     if (pesajeAEditar) {
       setFormData({
-        ...pesajeAEditar,
-        fecha: pesajeAEditar.fecha ? pesajeAEditar.fecha.split("T")[0] : new Date().toISOString().split("T")[0],
+        ...(pesajeAEditar as PesajeFormState),
+        fecha: pesajeAEditar.fecha
+          ? pesajeAEditar.fecha.split("T")[0]
+          : new Date().toISOString().split("T")[0],
       });
     } else {
       setFormData({
         fecha: new Date().toISOString().split("T")[0],
         bovino_id: undefined,
-        peso_kgs: undefined,
-        condicion_corporal: undefined,
+        peso_kgs: "",
+        condicion_corporal: "",
+        metodo_pesaje: "Báscula Digital",
+        estado_fisiologico: "",
+        responsable: "",
         observaciones: "",
       });
     }
@@ -77,7 +101,18 @@ export default function PesajeFormModal({
     try {
       setSaving(true);
       setErrorMsg("");
-      await onSuccess(formData);
+
+      // Aseguramos formato numérico correcto antes de enviar a la base de datos
+      const dataToSave: Partial<Pesaje> = {
+        ...formData,
+        peso_kgs: formData.peso_kgs === "" ? 0 : Number(formData.peso_kgs),
+        condicion_corporal:
+          formData.condicion_corporal === "" || formData.condicion_corporal === null
+            ? null
+            : Number(formData.condicion_corporal),
+      };
+
+      await onSuccess(dataToSave);
       toast.success(
         isEditing ? "¡Pesaje actualizado!" : "¡Pesaje registrado!",
         {
@@ -102,14 +137,14 @@ export default function PesajeFormModal({
         if (!open) onClose();
       }}
     >
-      <DialogContent className="max-h-[92vh] max-w-lg overflow-hidden flex flex-col p-0">
+      <DialogContent className="max-h-[92vh] max-w-xl overflow-hidden flex flex-col p-0">
         <DialogHeader className="px-6 pt-6 pb-4 border-b">
           <DialogTitle className="text-lg font-semibold flex items-center gap-2">
             <Scale className="h-5 w-5 text-primary" />
             {isEditing ? "Editar Registro de Pesaje" : "Nuevo Registro de Pesaje"}
           </DialogTitle>
           <DialogDescription className="text-xs">
-            Registra el control de peso periódico y la condición corporal del animal.
+            Registra el control de peso periódico, condición corporal y método de pesaje.
           </DialogDescription>
         </DialogHeader>
 
@@ -153,61 +188,124 @@ export default function PesajeFormModal({
               </Select>
             </div>
 
-            {/* Fecha del pesaje */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium">Fecha de Pesaje *</label>
-              <Input
-                required
-                type="date"
-                className="h-9 text-sm"
-                value={formData.fecha || ""}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    fecha: e.target.value,
-                  }))
-                }
-              />
+            {/* Fila: Fecha y Método de Pesaje */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium">Fecha de Pesaje *</label>
+                <Input
+                  required
+                  type="date"
+                  className="h-9 text-sm"
+                  value={formData.fecha || ""}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      fecha: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium">Método de Pesaje</label>
+                <Select
+                  value={formData.metodo_pesaje || ""}
+                  onValueChange={(value) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      metodo_pesaje: value,
+                    }))
+                  }
+                >
+                  <SelectTrigger className="h-9 text-sm w-full">
+                    <SelectValue placeholder="Seleccione método" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {METODOS_PESAJE.map((metodo) => (
+                      <SelectItem key={metodo} value={metodo}>
+                        {metodo}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            {/* Peso */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium">Peso (kg) *</label>
-              <Input
-                required
-                type="number"
-                step="0.01"
-                min="0"
-                className="h-9 text-sm"
-                value={formData.peso_kgs !== undefined ? formData.peso_kgs : ""}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    peso_kgs : e.target.value === "" ? undefined : Number(e.target.value),
-                  }))
-                }
-                placeholder="Ej. 350.5"
-              />
+            {/* Fila: Peso y Condición Corporal */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium">Peso (kg) *</label>
+                <Input
+                  required
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className="h-9 text-sm"
+                  value={formData.peso_kgs ?? ""}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      peso_kgs: e.target.value === "" ? "" : parseFloat(e.target.value),
+                    }))
+                  }
+                  placeholder="Ej. 350.5"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium">Condición Corporal (1 - 5)</label>
+                <Input
+                  type="number"
+                  step="0.5"
+                  min="1"
+                  max="5"
+                  className="h-9 text-sm"
+                  value={formData.condicion_corporal ?? ""}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      condicion_corporal:
+                        e.target.value === "" ? "" : parseFloat(e.target.value),
+                    }))
+                  }
+                  placeholder="Ej. 3.5"
+                />
+              </div>
             </div>
 
-            {/* Condición Corporal */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium">Condición Corporal (1 - 5)</label>
-              <Input
-                type="number"
-                step="0.5"
-                min="1"
-                max="5"
-                className="h-9 text-sm"
-                value={formData.condicion_corporal !== undefined && formData.condicion_corporal !== null ? formData.condicion_corporal : ""}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    condicion_corporal: e.target.value === "" ? null : Number(e.target.value),
-                  }))
-                }
-                placeholder="Ej. 3.5"
-              />
+            {/* Fila: Estado Fisiológico y Responsable */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium">Estado Fisiológico</label>
+                <Input
+                  type="text"
+                  className="h-9 text-sm"
+                  value={formData.estado_fisiologico || ""}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      estado_fisiologico: e.target.value,
+                    }))
+                  }
+                  placeholder="Ej. Gestante, Lechera, Destete..."
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium">Responsable</label>
+                <Input
+                  type="text"
+                  className="h-9 text-sm"
+                  value={formData.responsable || ""}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      responsable: e.target.value,
+                    }))
+                  }
+                  placeholder="Nombre del encargado"
+                />
+              </div>
             </div>
 
             {/* Observaciones */}

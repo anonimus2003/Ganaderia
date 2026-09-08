@@ -40,7 +40,7 @@ export async function saveReproduccionAction(dataToSave: Partial<Reproduccion>):
     delete datosLimpios.created_at;
 
     const { error } = await supabase
-      .from("reproduccion")
+      .from("reproducciones")
       .update(datosLimpios)
       .eq("id", reproduccionId);
 
@@ -52,7 +52,7 @@ export async function saveReproduccionAction(dataToSave: Partial<Reproduccion>):
     // Crear nuevo registro
     delete datosLimpios.id;
     const { error } = await supabase
-      .from("reproduccion")
+      .from("reproducciones")
       .insert([datosLimpios]);
 
     if (error) {
@@ -68,7 +68,7 @@ export async function deleteReproduccionAction(id: string | undefined): Promise<
   }
 
   const { error } = await supabase
-    .from("reproduccion")
+    .from("reproducciones")
     .delete()
     .eq("id", id);
 

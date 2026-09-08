@@ -1,19 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Reproduccion} from "../schemas";
+import { useState, useEffect } from "react";
+import { Reproduccion } from "../schemas";
 import { Bovino } from "@/modules/inventario/schemas";
-
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -21,214 +20,423 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Activity,
+  Calendar,
+  FileText,
+  Loader2,
+} from "lucide-react";
+import { toast } from "sonner";
 
 interface ReproduccionFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (data: Partial<Reproduccion>) => Promise<void>;
   initialData?: Reproduccion | null;
-  bovinosList: Bovino[];
-  isLoading?: boolean;
+  allBovinos?: Bovino[];
 }
 
-export function ReproduccionFormModal({
+const TIPOS_REPRODUCCION = [
+  "I.Artificial",
+  "Monta Natural",
+  "Transferencia de Embriones",
+];
+
+const ESTADOS_INSEMINACION = [
+  "Pendiente",
+  "Preñada",
+  "Vacía",
+  "Aborto",
+  "Parto Registrado",
+];
+
+// Función auxiliar para sumar días a una fecha base (formato YYYY-MM-DD) sin problemas de zona horaria
+function sumarDiasAFecha(fechaStr: string, dias: number): string {
+  if (!fechaStr) return "";
+  const [year, month, day] = fechaStr.split("-").map(Number);
+  const fecha = new Date(year, month - 1, day);
+  fecha.setDate(fecha.getDate() + dias);
+  
+  const y = fecha.getFullYear();
+  const m = String(fecha.getMonth() + 1).padStart(2, "0");
+  const d = String(fecha.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+export default function ReproduccionFormModal({
   isOpen,
   onClose,
   onSave,
   initialData,
-  bovinosList,
-  isLoading = false,
+  allBovinos = [],
 }: ReproduccionFormModalProps) {
-  const [formData, setFormData] = useState<Partial<Reproduccion>>({
-    bovino_id: "",
-    tipo: "Inseminación",
-    fecha_inseminacion: new Date().toISOString().split("T")[0],
-    toro_pajilla: "",
-    tecnico: "",
-    estado: "Gestante",
-    observaciones: "",
-  });
+  const hoyStr = new Date().toISOString().split("T")[0];
+
+  const [formData, setFormData] = useState<Partial<Reproduccion>>(
+    initialData || {
+      tipo: "I.Artificial",
+      estado: "Pendiente",
+      numero_servicios: 1,
+      fecha_inseminacion: hoyStr,
+      fecha_chequeo: sumarDiasAFecha(hoyStr, 60),
+      fecha_probable_parto: sumarDiasAFecha(hoyStr, 283),
+    }
+  );
+
+  const [activeTab, setActiveTab] = useState("general");
+  const [saving, setSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const isEditing = !!initialData;
 
   useEffect(() => {
     if (initialData) {
-      setFormData({
-        ...initialData,
-        fecha_inseminacion: initialData.fecha_inseminacion 
-          ? initialData.fecha_inseminacion.split("T")[0] 
-          : new Date().toISOString().split("T")[0],
-      });
+      setFormData(initialData);
     } else {
       setFormData({
-        bovino_id: "",
-        tipo: "Inseminación",
-        fecha_inseminacion: new Date().toISOString().split("T")[0],
-        toro_pajilla: "",
-        tecnico: "",
-        estado: "Gestante",
-        observaciones: "",
+        tipo: "I.Artificial",
+        estado: "Pendiente",
+        numero_servicios: 1,
+        fecha_inseminacion: hoyStr,
+        fecha_chequeo: sumarDiasAFecha(hoyStr, 60),
+        fecha_probable_parto: sumarDiasAFecha(hoyStr, 283),
       });
     }
-  }, [initialData, isOpen]);
+  }, [initialData, isOpen, hoyStr]);
 
-  const handleChange = (field: keyof Reproduccion, value: any) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+  // Manejador especial para actualizar la fecha de inseminación y recalcular las demás automáticamente
+  const handleFechaInseminacionChange = (nuevaFecha: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      fecha_inseminacion: nuevaFecha,
+      // Solo recalculamos automáticamente si el usuario no ha puesto una fecha manual previa (o al crear nuevo)
+      fecha_chequeo: sumarDiasAFecha(nuevaFecha, 60),
+      fecha_probable_parto: sumarDiasAFecha(nuevaFecha, 283),
+    }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const listaBovinos = Array.isArray(allBovinos) ? allBovinos : [];
+  const posiblesHembras = listaBovinos.filter((b) => b.genero === "Hembra");
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    await onSave(formData);
+    try {
+      setSaving(true);
+      setErrorMsg("");
+      await onSave(formData);
+      toast.success(
+        isEditing ? "¡Registro de reproducción actualizado!" : "¡Reproducción registrada!",
+        {
+          description: `El evento reproductivo se guardó correctamente.`,
+        }
+      );
+      onClose();
+    } catch (err: unknown) {
+      const mensaje =
+        err instanceof Error ? err.message : "Error al guardar el registro";
+      setErrorMsg(mensaje);
+      toast.error("No se pudo guardar", { description: mensaje });
+    } finally {
+      setSaving(false);
+    }
   };
+
+  const hembraActual = posiblesHembras.find((h) => h.id === formData.bovino_id);
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-lg font-semibold text-slate-900">
-            {initialData ? "Editar Registro de Reproducción" : "Nueva Inseminación / Reproducción"}
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <DialogContent className="max-h-[92vh] max-w-3xl overflow-hidden flex flex-col p-0">
+        <DialogHeader className="px-6 pt-6 pb-2 border-b">
+          <DialogTitle className="text-lg font-semibold">
+            {isEditing ? "Editar Registro Reproductivo" : "Nuevo Registro Reproductivo"}
           </DialogTitle>
+          <DialogDescription className="text-xs">
+            Control de servicios, inseminaciones, diagnóstico y seguimiento gestacional.
+          </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 py-4">
-          
-          {/* Selección de Bovino (Vaca) */}
-          <div className="space-y-2">
-            <Label htmlFor="bovino_id" className="text-xs font-medium text-slate-700">
-              Bovino (Hembra) *
-            </Label>
-            <Select
-              value={formData.bovino_id || ""}
-              onValueChange={(value) => handleChange("bovino_id", value)}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Seleccione una vaca o arete..." />
-              </SelectTrigger>
-              <SelectContent>
-                {bovinosList
-                  .filter((b) => !b.genero || b.genero.toLowerCase() === "hembra")
-                  .map((bovino) => (
-                    <SelectItem key={bovino.id} value={bovino.id}>
-                      Arete: {bovino.arete} {bovino.nombre ? `- ${bovino.nombre}` : ""}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Tipo de Reproducción */}
-            <div className="space-y-2">
-              <Label htmlFor="tipo" className="text-xs font-medium text-slate-700">
-                Tipo de Servicio
-              </Label>
-              <Select
-                value={formData.tipo || "Inseminación"}
-                onValueChange={(value) => handleChange("tipo", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccione tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Inseminación">Inseminación Artificial</SelectItem>
-                  <SelectItem value="Monta natural">Monta Natural</SelectItem>
-                  <SelectItem value="Transferecia de embriones">Transferencia de Embriones</SelectItem>
-                </SelectContent>
-              </Select>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <Tabs
+            value={activeTab}
+            onValueChange={setActiveTab}
+            className="flex flex-col flex-1 overflow-hidden"
+          >
+            <div className="px-6 pt-3 bg-muted/20 border-b">
+              <TabsList className="grid grid-cols-2 w-full h-9">
+                <TabsTrigger value="general" className="text-xs flex items-center gap-1.5">
+                  <Activity className="h-3.5 w-3.5" /> Datos del Servicio
+                </TabsTrigger>
+                <TabsTrigger value="fechas" className="text-xs flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5" /> Fechas y Seguimiento
+                </TabsTrigger>
+              </TabsList>
             </div>
 
-            {/* Fecha de Inseminación */}
-            <div className="space-y-2">
-              <Label htmlFor="fecha_inseminacion" className="text-xs font-medium text-slate-700">
-                Fecha de Inseminación *
-              </Label>
-              <Input
-                id="fecha_inseminacion"
-                type="date"
-                value={formData.fecha_inseminacion || ""}
-                onChange={(e) => handleChange("fecha_inseminacion", e.target.value)}
-                required
-              />
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {errorMsg && (
+                <div className="rounded-md bg-destructive/10 p-3 text-xs text-destructive border border-destructive/20">
+                  {errorMsg}
+                </div>
+              )}
+
+              <TabsContent value="general" className="mt-0 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <label className="text-xs font-medium">Hembra (Vaca / Novilla) *</label>
+                    <Select
+                      value={formData.bovino_id || "none"}
+                      onValueChange={(value) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          bovino_id: (value === "none" ? "" : value) as string,
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="h-9 text-sm w-full">
+                        <SelectValue placeholder="Seleccione una hembra">
+                          {hembraActual
+                            ? `Arete: ${hembraActual.arete}${
+                                hembraActual.nombre ? ` - ${hembraActual.nombre}` : ""
+                              }`
+                            : "Seleccione una hembra"}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none" disabled>
+                          Seleccione una hembra
+                        </SelectItem>
+                        {posiblesHembras.map((hembra) => (
+                          <SelectItem key={hembra.id} value={hembra.id}>
+                            {hembra.arete} {hembra.nombre ? `- ${hembra.nombre}` : ""} ({hembra.raza})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium">Tipo de Reproducción *</label>
+                    <Select
+                      value={formData.tipo || "I.Artificial"}
+                      onValueChange={(value) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          tipo: value as any,
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="h-9 text-sm w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TIPOS_REPRODUCCION.map((tipo) => (
+                          <SelectItem key={tipo} value={tipo}>
+                            {tipo}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium">Estado *</label>
+                    <Select
+                      value={formData.estado || "Pendiente"}
+                      onValueChange={(value) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          estado: value as any,
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="h-9 text-sm w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ESTADOS_INSEMINACION.map((estado) => (
+                          <SelectItem key={estado} value={estado}>
+                            {estado}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium">Toro o Código de Pajilla *</label>
+                    <Input
+                      required
+                      className="h-9 text-sm"
+                      value={formData.toro_pajilla || ""}
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, toro_pajilla: e.target.value }))
+                      }
+                      placeholder="Ej. Pajilla Brahman Rojo #45"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium">Raza del Toro</label>
+                    <Input
+                      className="h-9 text-sm"
+                      value={formData.raza_toro || ""}
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, raza_toro: e.target.value }))
+                      }
+                      placeholder="Ej. Gyr Lechero"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium">Número de Servicios</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      className="h-9 text-sm"
+                      value={formData.numero_servicios ?? 1}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          numero_servicios: parseInt(e.target.value) || 1,
+                        }))
+                      }
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium">Técnico / Responsable *</label>
+                    <Input
+                      required
+                      className="h-9 text-sm"
+                      value={formData.tecnico || ""}
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, tecnico: e.target.value }))
+                      }
+                      placeholder="Nombre del veterinario"
+                    />
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="fechas" className="mt-0 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium">Fecha de Inseminación *</label>
+                    <Input
+                      type="date"
+                      required
+                      className="h-9 text-sm"
+                      value={formData.fecha_inseminacion || ""}
+                      onChange={(e) => handleFechaInseminacionChange(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium">Fecha Probable de Parto</label>
+                    <Input
+                      type="date"
+                      className="h-9 text-sm"
+                      value={formData.fecha_probable_parto || ""}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          fecha_probable_parto: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium">Fecha de Chequeo</label>
+                    <Input
+                      type="date"
+                      className="h-9 text-sm"
+                      value={formData.fecha_chequeo || ""}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          fecha_chequeo: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium">Fecha de Secado</label>
+                    <Input
+                      type="date"
+                      className="h-9 text-sm"
+                      value={formData.fecha_secado || ""}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          fecha_secado: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <label className="text-xs font-medium">Fecha de Parto (Real)</label>
+                    <Input
+                      type="date"
+                      className="h-9 text-sm"
+                      value={formData.fecha_parto || ""}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          fecha_parto: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 pt-2">
+                  <label className="text-xs font-medium flex items-center gap-1">
+                    <FileText className="h-3.5 w-3.5 text-muted-foreground" /> Observaciones
+                  </label>
+                  <Textarea
+                    rows={3}
+                    className="text-sm resize-none"
+                    value={formData.observaciones || ""}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        observaciones: e.target.value,
+                      }))
+                    }
+                    placeholder="Detalles sobre el diagnóstico, celo, etc..."
+                  />
+                </div>
+              </TabsContent>
             </div>
-          </div>
+          </Tabs>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Toro o Pajilla */}
-            <div className="space-y-2">
-              <Label htmlFor="toro_o_pajilla" className="text-xs font-medium text-slate-700">
-                Toro / Pajilla (Código o Nombre)
-              </Label>
-              <Input
-                id="toro_o_pajilla"
-                placeholder="Ej. Pajilla Brahman Rojo #45"
-                value={formData.toro_pajilla || ""}
-                onChange={(e) => handleChange("toro_pajilla", e.target.value)}
-              />
-            </div>
-
-            {/* Inseminador / Técnico */}
-            <div className="space-y-2">
-              <Label htmlFor="inseminador" className="text-xs font-medium text-slate-700">
-                Inseminador / Técnico
-              </Label>
-              <Input
-                id="inseminador"
-                placeholder="Nombre del técnico o veterinario"
-                value={formData.tecnico || ""}
-                onChange={(e) => handleChange("tecnico", e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* Estado de la reproducción */}
-          <div className="space-y-2">
-            <Label htmlFor="estado" className="text-xs font-medium text-slate-700">
-              Estado del Proceso
-            </Label>
-            <Select
-              value={formData.estado || "Gestante"}
-              onValueChange={(value) => handleChange("estado", value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccione estado" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Pendiente de diagnóstico">Pendiente de Diagnóstico</SelectItem>
-                <SelectItem value="Gestante">Gestante / Preñada</SelectItem>
-                <SelectItem value="Vacía">Vacía / Fallida</SelectItem>
-                <SelectItem value="Parida">Parida</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Observaciones */}
-          <div className="space-y-2">
-            <Label htmlFor="observaciones" className="text-xs font-medium text-slate-700">
-              Observaciones
-            </Label>
-            <Textarea
-              id="observaciones"
-              placeholder="Detalles adicionales, tratamientos o notas de palpación..."
-              value={formData.observaciones || ""}
-              onChange={(e) => handleChange("observaciones", e.target.value)}
-              rows={3}
-            />
-          </div>
-
-          <DialogFooter className="pt-4">
+          <DialogFooter className="px-6 py-5 min-h-[70px] border-t bg-muted/10 flex flex-row items-center justify-end gap-3 shrink-0">
             <Button
               type="button"
               variant="outline"
+              size="default"
               onClick={onClose}
-              disabled={isLoading}
+              disabled={saving}
             >
               Cancelar
             </Button>
-            <Button
-              type="submit"
-              disabled={isLoading}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            <Button 
+              type="submit" 
+              size="default"
+              disabled={saving}
             >
-              {isLoading ? "Guardando..." : initialData ? "Actualizar Registro" : "Guardar Registro"}
+              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {saving ? "Guardando..." : isEditing ? "Guardar Cambios" : "Registrar"}
             </Button>
           </DialogFooter>
         </form>

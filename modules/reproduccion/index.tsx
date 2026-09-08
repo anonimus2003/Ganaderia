@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useReproduccion } from "./hooks/useReproduccion";
 import { ReproduccionTable } from "./components/ReproduccionTable";
-import { ReproduccionFormModal } from "./components/ReproduccionFormModal";
+import ReproduccionFormModal from "./components/ReproduccionFormModal";
 import ReproduccionFiltersDrawer from "./components/ReproduccionFiltersDrawer";
 import ConfirmModal from "@/components/ui/ConfirmModal";
 import { Reproduccion } from "./schemas";
@@ -89,7 +89,7 @@ export default function ReproduccionPage() {
         onClose={() => setIsModalOpen(false)}
         onSave={handleSave}
         initialData={selectedReproduccion}
-        bovinosList={allBovinos} // <--- Pasamos la lista completa real aquí
+        allBovinos={allBovinos} // <--- Corregido para usar allBovinos
       />
 
       <ReproduccionFiltersDrawer

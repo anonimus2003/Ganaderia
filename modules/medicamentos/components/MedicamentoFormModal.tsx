@@ -43,9 +43,18 @@ interface MedicamentoFormModalProps {
 const VIAS_APLICACION = [
   "Intramuscular",
   "Subcutánea",
-  "Endovenosa",
-  "Tópica",
   "Oral",
+  "Tópica",
+  "Intrauterina",
+  "Local",
+  "Intravenosa",
+  "Endovenosa",
+  "Rectal",
+  "Intramamaria",
+  "Intraruminal",
+  "Intraperitonial",
+  "Ocular",
+  "Intradermica"
 ];
 
 export default function MedicamentoFormModal({
@@ -174,10 +183,9 @@ export default function MedicamentoFormModal({
                   onValueChange={(value) =>
                     setFormData((prev) => ({ 
                       ...prev, 
-                      bovino_id: value || undefined // Cambiado de null a undefined para coincidir con el tipo
+                      bovino_id: value || undefined
                     }))
                   }
-                
                 >
                   <SelectTrigger className="h-9 text-sm w-full">
                     <SelectValue placeholder={loadingBovinos ? "Cargando bovinos..." : "Seleccione un animal..."}>
@@ -236,10 +244,9 @@ export default function MedicamentoFormModal({
                   onValueChange={(value) =>
                     setFormData((prev) => ({ 
                       ...prev, 
-                      via: value || undefined // Cambiado de null a undefined para coincidir con el tipo
+                      via: value || undefined
                     }))
                   }
-                
                   >
                     <SelectTrigger className="h-9 text-sm w-full">
                       <SelectValue />
@@ -259,7 +266,7 @@ export default function MedicamentoFormModal({
                     <Calendar className="h-3.5 w-3.5 text-muted-foreground" /> Fecha de Aplicación *
                   </label>
                   <Input
-                    type="date"
+                    type="number"
                     required
                     className="h-9 text-sm"
                     value={formData.fecha_aplicacion || ""}
@@ -277,11 +284,11 @@ export default function MedicamentoFormModal({
                     type="number"
                     min="0"
                     className="h-9 text-sm"
-                    value={formData.retiro_leche ?? 0}
+                    value={formData.retiro_leche === 0 ? "" : formData.retiro_leche}
                     onChange={(e) =>
                       setFormData((prev) => ({
                         ...prev,
-                        retiro_leche: Number(e.target.value),
+                        retiro_leche: e.target.value === "" ? 0 : Number(e.target.value),
                       }))
                     }
                   />
@@ -293,11 +300,11 @@ export default function MedicamentoFormModal({
                     type="number"
                     min="0"
                     className="h-9 text-sm"
-                    value={formData.retiro_carne ?? 0}
+                    value={formData.retiro_carne === 0 ? "" : formData.retiro_carne}
                     onChange={(e) =>
                       setFormData((prev) => ({
                         ...prev,
-                        retiro_carne: Number(e.target.value),
+                        retiro_carne: e.target.value === "" ? 0 : Number(e.target.value),
                       }))
                     }
                   />

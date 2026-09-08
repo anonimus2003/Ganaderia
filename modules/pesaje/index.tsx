@@ -65,6 +65,11 @@ export default function PesajesPage() {
           const registro = allPesajes.find((p) => p.id === id);
           if (registro) setPesajeAEliminar(registro);
         }}
+        onFilters={() => {
+          // 👈 AQUÍ CONECTAS EL BOTÓN DE FILTROS
+          // Puedes abrir un modal de filtros o aplicar una acción de filtrado
+          console.log("Abrir filtros de pesaje");
+        }}
         page={page}
         total={total}
         nextPage={nextPage}
@@ -77,8 +82,7 @@ export default function PesajesPage() {
         onClose={() => setIsModalOpen(false)}
         onSuccess={handleSave}
         pesajeAEditar={selectedPesaje}
-        bovinosList={allBovinos} // <--- Pasamos la lista completa real aquí
-
+        bovinosList={allBovinos}
       />
 
       <ConfirmModal

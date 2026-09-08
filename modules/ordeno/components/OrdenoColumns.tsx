@@ -95,6 +95,18 @@ export const getOrdeñoColumns = ({
   },
 
   {
+    header: "Concentrado (Kg)",
+    accessor: "concentrado_kg",
+    render: (ordeño) => (
+      <span className="text-xs font-semibold text-emerald-700 block">
+        {ordeño.concentrado_kg !== undefined && ordeño.concentrado_kg !== null && Number(ordeño.concentrado_kg) > 0
+          ? `${Number(ordeño.concentrado_kg).toLocaleString()} kg`
+          : "-"}
+      </span>
+    ),
+  },
+
+  {
     header: "Observaciones",
     accessor: "observaciones",
     render: (ordeño) => (

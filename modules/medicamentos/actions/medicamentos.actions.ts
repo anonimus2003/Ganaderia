@@ -5,7 +5,7 @@ const supabase = createClient();
 
 export async function getMedicamentosAction(): Promise<Medicamento[]> {
   const { data, error } = await supabase
-    .from("medicamentos") // Cambia esto por el nombre real de tu tabla en Supabase si es diferente
+    .from("medicamentos") // 👈 Nombre unificado
     .select(`
       *,
       bovinos (
@@ -46,7 +46,7 @@ export async function saveMedicamentoAction(dataToSave: Partial<Medicamento>): P
     delete datosLimpios.created_at;
 
     const { error } = await supabase
-      .from("tratamientos_aplicados")
+      .from("medicamentos") // 👈 Cambiado a "medicamentos"
       .update(datosLimpios)
       .eq("id", registroId);
 
@@ -57,7 +57,7 @@ export async function saveMedicamentoAction(dataToSave: Partial<Medicamento>): P
   } else {
     delete datosLimpios.id;
     const { error } = await supabase
-      .from("tratamientos_aplicados")
+      .from("medicamentos") // 👈 Cambiado a "medicamentos"
       .insert([datosLimpios]);
 
     if (error) {
@@ -73,7 +73,7 @@ export async function deleteMedicamentoAction(id: string | undefined): Promise<v
   }
 
   const { error } = await supabase
-    .from("tratamientos_aplicados")
+    .from("medicamentos") // 👈 Cambiado a "medicamentos"
     .delete()
     .eq("id", id);
 

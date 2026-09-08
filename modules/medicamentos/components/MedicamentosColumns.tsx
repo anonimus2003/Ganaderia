@@ -54,7 +54,7 @@ export const getMedicamentosColumns = ({
     }
   },
   {
-    header: "Medicamento",
+    header: "Medicamento/Dosis",
     accessor: "medicamento",
     render: (item) => (
       <div>
@@ -64,11 +64,11 @@ export const getMedicamentosColumns = ({
     )
   },
   {
-    header: "Fecha Aplicación",
+    header: "Fecha de Aplicación",
     accessor: "fecha_aplicacion",
   },
   {
-    header: "Días de Carencia",
+    header: "Período de Retiro (Días)",
     accessor: "fecha_aplicacion",
     render: (item) => {
       const retiroLeche = calcularEstadoRetiro(item.fecha_aplicacion, item.retiro_leche);
@@ -93,7 +93,7 @@ export const getMedicamentosColumns = ({
     }
   },
   {
-    header: "Estado Retiro",
+    header: "Liberación",
     accessor: "id",
     render: (item) => {
       const retiroLeche = calcularEstadoRetiro(item.fecha_aplicacion, item.retiro_leche);
@@ -102,11 +102,13 @@ export const getMedicamentosColumns = ({
       return (
         <div className="space-y-1 text-xs">
           <div className="flex items-center gap-1">
+            <span className="font-medium text-slate-400 w-11">Leche:</span>
             <span className={`font-semibold ${retiroLeche.esApto ? "text-emerald-600" : "text-rose-600"}`}>
               {retiroLeche.esApto ? "Liberado" : retiroLeche.fechaLibre}
             </span>
           </div>
           <div className="flex items-center gap-1">
+            <span className="font-medium text-slate-400 w-11">Carne:</span>
             <span className={`font-semibold ${retiroCarne.esApto ? "text-emerald-600" : "text-rose-600"}`}>
               {retiroCarne.esApto ? "Liberado" : retiroCarne.fechaLibre}
             </span>
@@ -116,7 +118,7 @@ export const getMedicamentosColumns = ({
     }
   },
   {
-    header: "Veterinario - Motivo",
+    header: "Veterinario y Motivo",
     accessor: "veterinario",
     render: (item) => (
       <div className="text-xs">
@@ -130,7 +132,7 @@ export const getMedicamentosColumns = ({
     )
   },
   {
-    header: "Acciones",
+    header: "",
     accessor: "acciones",
     render: (item) => (
       <ActionDropdown 

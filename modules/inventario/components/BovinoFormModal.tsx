@@ -270,6 +270,11 @@ export default function BovinoFormModal({
                             setFormData((prev) => ({
                               ...prev,
                               condicion: value as "Activo" | "Inactivo",
+                              ...(value === "Activo" && {
+                                motivo_baja: null,
+                                fecha_baja: null,
+                                observacion_baja: null,
+                              }),
                             }))
                           }
                         >
@@ -278,37 +283,74 @@ export default function BovinoFormModal({
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="Activo">Activo</SelectItem>
-                            <SelectItem value="Inactivo">Inactivo (Baja)</SelectItem>
+                            <SelectItem value="Inactivo">Inactivo</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
 
                       {formData.condicion === "Inactivo" && (
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-medium text-destructive">
-                            Motivo *
-                          </label>
-                          <Select
-                            value={formData.motivo_baja || ""}
-                            onValueChange={(value) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                motivo_baja: value as any,
-                              }))
-                            }
-                          >
-                            <SelectTrigger className="h-8 text-xs w-full">
-                              <SelectValue placeholder="Seleccione motivo" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {MOTIVOS_BAJA_DISPONIBLES.map((motivo) => (
-                                <SelectItem key={motivo} value={motivo}>
-                                  {motivo}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
+                        <>
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-medium text-destructive">
+                              Motivo *
+                            </label>
+                            <Select
+                              value={formData.motivo_baja || ""}
+                              onValueChange={(value) =>
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  motivo_baja: value as any,
+                                }))
+                              }
+                            >
+                              <SelectTrigger className="h-8 text-xs w-full">
+                                <SelectValue placeholder="Seleccione motivo" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {MOTIVOS_BAJA_DISPONIBLES.map((motivo) => (
+                                  <SelectItem key={motivo} value={motivo}>
+                                    {motivo}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-medium text-destructive">
+                              Fecha de Baja *
+                            </label>
+                            <Input
+                              type="date"
+                              className="h-8 text-xs"
+                              value={formData.fecha_baja || ""}
+                              onChange={(e) =>
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  fecha_baja: e.target.value,
+                                }))
+                              }
+                            />
+                          </div>
+
+                          <div className="space-y-1 sm:col-span-2">
+                            <label className="text-[11px] font-medium text-destructive">
+                              Observación de Baja
+                            </label>
+                            <Textarea
+                              rows={2}
+                              className="text-xs resize-none"
+                              value={formData.observacion_baja || ""}
+                              onChange={(e) =>
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  observacion_baja: e.target.value,
+                                }))
+                              }
+                              placeholder="Detalles adicionales sobre la baja..."
+                            />
+                          </div>
+                        </>
                       )}
                     </div>
                   </div>
