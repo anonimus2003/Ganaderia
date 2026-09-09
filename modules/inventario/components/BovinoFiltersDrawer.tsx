@@ -118,10 +118,10 @@ export default function BovinoFiltersDrawer({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todas">Todas las categorías</SelectItem>
-                  <SelectItem value="ternero">Ternero</SelectItem>
-                  <SelectItem value="crecimiento">En Crecimiento</SelectItem>
-                  <SelectItem value="levante">Levante</SelectItem>
-                  <SelectItem value="engorde">Engorde</SelectItem>
+                  <SelectItem value="Ternera en lactancia">Ternera en Lactancia</SelectItem>
+                   <SelectItem value="Novilla en desarrollo">Novilla en Desarrollo</SelectItem>
+                  <SelectItem value="Ternera en crecimiento">Ternera en Crecimiento</SelectItem>
+                  <SelectItem value="Novilla de vientre">Novilla de Vientre</SelectItem>
                   <SelectItem value="vaca">Vaca</SelectItem>
                   <SelectItem value="toro">Toro</SelectItem>
                 </SelectContent>

@@ -1,6 +1,10 @@
+// modules/pesajes/hooks/usePesajes.ts
 import { useState, useEffect, useCallback } from "react";
 import { Pesaje } from "../schemas";
+import { Bovino } from "@/modules/inventario/schemas";
+
 import { getPesajesAction, savePesajeAction, deletePesajeAction } from "../actions/pesaje.actions";
+import { getBovinosAction } from "@/modules/inventario/actions/bovino.actions";
 
 export const PAGE_SIZE = 10;
 
@@ -10,51 +14,41 @@ export interface FiltrosPesaje {
   fechaFin: string;
 }
 
+const FILTROS_INICIALES: FiltrosPesaje = {
+  busqueda: "",
+  fechaInicio: "",
+  fechaFin: "",
+};
+
 export function usePesajes() {
-  const [allPesajes, setAllPesajes] = useState<Pesaje[]>([]);
+  const [pesajes, setPesajes] = useState<Pesaje[]>([]);
+  const [allBovinos, setAllBovinos] = useState<Bovino[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   
-  const [filtros, setFiltros] = useState<FiltrosPesaje>({
-    busqueda: "",
-    fechaInicio: "",
-    fechaFin: "",
-  });
+  const [filtros, setFiltros] = useState<FiltrosPesaje>(FILTROS_INICIALES);
 
   const fetchPesajes = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await getPesajesAction();
-      setAllPesajes(data || []);
+      const [pesajesRes, bovinosRes] = await Promise.all([
+        getPesajesAction(page, PAGE_SIZE, filtros),
+        getBovinosAction(1, 100),
+      ]);
+      setPesajes(pesajesRes.data);
+      setTotal(pesajesRes.total);
+      setAllBovinos(bovinosRes.data || []);
     } catch (error) {
       console.error("Error al cargar pesajes:", error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page, filtros]);
 
   useEffect(() => {
     fetchPesajes();
   }, [fetchPesajes]);
-
-  const filteredPesajes = allPesajes.filter(p => {
-    const areteBovino = p.bovinos?.arete || "";
-    const nombreBovino = p.bovinos?.nombre || "";
-    
-    const cumpleBusqueda = !filtros.busqueda || 
-      areteBovino.toLowerCase().includes(filtros.busqueda.toLowerCase()) || 
-      nombreBovino.toLowerCase().includes(filtros.busqueda.toLowerCase());
-
-    const fechaPesajeStr = p.fecha ? p.fecha.split("T")[0] : "";
-
-    const cumpleFechaInicio = !filtros.fechaInicio || fechaPesajeStr >= filtros.fechaInicio;
-    const cumpleFechaFin = !filtros.fechaFin || fechaPesajeStr <= filtros.fechaFin;
-
-    return cumpleBusqueda && cumpleFechaInicio && cumpleFechaFin;
-  });
-
-  const total = filteredPesajes.length;
-  const paginatedPesajes = filteredPesajes.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const nextPage = () => {
     if (page * PAGE_SIZE < total) setPage(p => p + 1);
@@ -80,8 +74,9 @@ export function usePesajes() {
   };
 
   return {
-    pesajes: paginatedPesajes,
-    allPesajes,
+    pesajes,
+    allPesajes: pesajes,
+    allBovinos,
     loading,
     handleSave,
     handleDelete,

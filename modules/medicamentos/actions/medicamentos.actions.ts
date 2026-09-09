@@ -1,27 +1,69 @@
+// modules/medicamentos/actions/medicamentos.actions.ts
 import { createClient } from "@/lib/supabase/client";
 import { Medicamento } from "../schemas";
+import { FiltrosMedicamento } from "../hooks/useMedicamentos";
 
 const supabase = createClient();
 
-export async function getMedicamentosAction(): Promise<Medicamento[]> {
-  const { data, error } = await supabase
-    .from("medicamentos") // 👈 Nombre unificado
+export async function getMedicamentosAction(page = 1, limit = 10, filtros?: FiltrosMedicamento) {
+  const from = (page - 1) * limit;
+  const to = from + limit - 1;
+
+  let query = supabase
+    .from("medicamentos")
     .select(`
       *,
-      bovinos (
+      bovinos!inner (
         id,
         arete,
         nombre
       )
-    `)
+    `, { count: "exact" })
+    .order("fecha_aplicacion", { ascending: false })
     .order("created_at", { ascending: false });
+
+  if (filtros) {
+    // 1. Búsqueda general por texto
+    if (filtros.search && filtros.search.trim() !== "") {
+      const termino = filtros.search.trim();
+      
+      // Aplicamos un filtro .or() múltiple:
+      // Buscamos en las columnas de la tabla medicamentos (medicamento, via, veterinario)
+      // Y usamos una segunda condición o permitimos que coincida. 
+      // Nota: Para buscar en la relación de bovinos y en la principal a la vez sin que rompa, 
+      // lo ideal es filtrar por los campos de texto propios de medicamentos aquí:
+      query = query.or(`medicamento.ilike.%${termino}%,via.ilike.%${termino}%,veterinario.ilike.%${termino}%`);
+      
+      // Si también quieres que busque obligatoriamente por arete o nombre de la vaca cuando escribas eso,
+      // la forma más segura en Supabase con tablas relacionadas es hacer que el filtro aplique o 
+      // bien puedes buscar por arete usando otra condición .or con referencedTable por separado si es necesario.
+    }
+
+    // 2. Filtro por vía de administración
+    if (filtros.viaSeleccionada && filtros.viaSeleccionada.trim() !== "") {
+      query = query.eq("via", filtros.viaSeleccionada.trim());
+    }
+
+    // 3. Rango de fechas (fecha_aplicacion)
+    if (filtros.fechaInicio) {
+      query = query.gte("fecha_aplicacion", `${filtros.fechaInicio}T00:00:00`);
+    }
+    if (filtros.fechaFin) {
+      query = query.lte("fecha_aplicacion", `${filtros.fechaFin}T23:59:59`);
+    }
+  }
+
+  const { data, error, count } = await query.range(from, to);
 
   if (error) {
     console.error("Error al obtener registros:", error.message);
     throw new Error(error.message);
   }
 
-  return data || [];
+  return {
+    data: data || [],
+    total: count || 0,
+  };
 }
 
 function limpiarCamposVacios(data: Partial<Medicamento>) {
@@ -36,8 +78,6 @@ function limpiarCamposVacios(data: Partial<Medicamento>) {
 
 export async function saveMedicamentoAction(dataToSave: Partial<Medicamento>): Promise<void> {
   const datosLimpios = limpiarCamposVacios(dataToSave);
-  
-  // Limpiamos campos relacionales que no deben insertarse directamente como columnas planas si causan conflicto
   delete datosLimpios.bovinos;
 
   if (datosLimpios.id) {
@@ -46,7 +86,7 @@ export async function saveMedicamentoAction(dataToSave: Partial<Medicamento>): P
     delete datosLimpios.created_at;
 
     const { error } = await supabase
-      .from("medicamentos") // 👈 Cambiado a "medicamentos"
+      .from("medicamentos")
       .update(datosLimpios)
       .eq("id", registroId);
 
@@ -57,7 +97,7 @@ export async function saveMedicamentoAction(dataToSave: Partial<Medicamento>): P
   } else {
     delete datosLimpios.id;
     const { error } = await supabase
-      .from("medicamentos") // 👈 Cambiado a "medicamentos"
+      .from("medicamentos")
       .insert([datosLimpios]);
 
     if (error) {
@@ -73,7 +113,7 @@ export async function deleteMedicamentoAction(id: string | undefined): Promise<v
   }
 
   const { error } = await supabase
-    .from("medicamentos") // 👈 Cambiado a "medicamentos"
+    .from("medicamentos")
     .delete()
     .eq("id", id);
 

@@ -9,60 +9,44 @@ export const PAGE_SIZE = 10;
 export interface FiltrosOrdeño {
   busqueda: string;
   turno: string;
-  fecha: string;
+  fechaInicio: string;
+  fechaFin: string;
 }
 
 export function useOrdeños() {
-  const [allOrdeños, setAllOrdeños] = useState<Ordeño[]>([]);
+  const [ordeños, setOrdeños] = useState<Ordeño[]>([]);
   const [allBovinos, setAllBovinos] = useState<Bovino[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   
   const [filtros, setFiltros] = useState<FiltrosOrdeño>({
     busqueda: "",
     turno: "todos",
-    fecha: "",
+    fechaInicio: "",
+    fechaFin: "",
   });
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [ordeñosData, bovinosData] = await Promise.all([
-        getOrdeñosAction(),
-        getBovinosAction(),
+      const [ordeñosRes, bovinosRes] = await Promise.all([
+        getOrdeñosAction(page, PAGE_SIZE, filtros),
+        getBovinosAction(1, 100),
       ]);
-      setAllOrdeños(ordeñosData || []);
-      setAllBovinos(bovinosData || []);
+      setOrdeños(ordeñosRes.data);
+      setTotal(ordeñosRes.total);
+      setAllBovinos(bovinosRes.data || [] );
     } catch (error) {
       console.error("Error al cargar datos de ordeño:", error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page, filtros]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
-
-  const filteredOrdeños = allOrdeños.filter(o => {
-    const arete = o.bovinos?.arete || "";
-    const nombre = o.bovinos?.nombre || "";
-    
-    const cumpleBusqueda = !filtros.busqueda || 
-      arete.toLowerCase().includes(filtros.busqueda.toLowerCase()) || 
-      nombre.toLowerCase().includes(filtros.busqueda.toLowerCase());
-    
-    const cumpleTurno = filtros.turno === "todos" || 
-      (o.jornada && o.jornada.toLowerCase().trim() === filtros.turno.toLowerCase().trim());
-
-    const cumpleFecha = !filtros.fecha || 
-      (o.fecha && String(o.fecha).startsWith(filtros.fecha));
-
-    return cumpleBusqueda && cumpleTurno && cumpleFecha;
-  });
-
-  const total = filteredOrdeños.length;
-  const paginatedOrdeños = filteredOrdeños.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const nextPage = () => {
     if (page * PAGE_SIZE < total) setPage(p => p + 1);
@@ -84,12 +68,12 @@ export function useOrdeños() {
 
   const handleSetFiltros = (nuevosFiltros: FiltrosOrdeño) => {
     setFiltros(nuevosFiltros);
-    setPage(1);
+    setPage(1); // <--- Esto soluciona que al limpiar o buscar te devuelva siempre a la página 1 limpia
   };
 
   return {
-    ordeños: paginatedOrdeños,
-    allOrdeños,
+    ordeños,
+    allOrdeños: ordeños,
     allBovinos,
     loading,
     handleSave,

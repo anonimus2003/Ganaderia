@@ -266,7 +266,7 @@ export default function MedicamentoFormModal({
                     <Calendar className="h-3.5 w-3.5 text-muted-foreground" /> Fecha de Aplicación *
                   </label>
                   <Input
-                    type="number"
+                    type="date"
                     required
                     className="h-9 text-sm"
                     value={formData.fecha_aplicacion || ""}

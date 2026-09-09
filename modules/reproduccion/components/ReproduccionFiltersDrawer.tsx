@@ -118,9 +118,10 @@ export default function ReproduccionFiltersDrawer({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos los tipos</SelectItem>
-                  <SelectItem value="Inseminación">Inseminación Artificial</SelectItem>
-                  <SelectItem value="Monta natural">Monta Natural</SelectItem>
-                  <SelectItem value="Transferecia de embriones">Transferencia de Embriones</SelectItem>
+                  <SelectItem value="I.Artificial">Inseminación Artificial</SelectItem>
+                  <SelectItem value="Monta Natural">Monta Natural</SelectItem>
+                  <SelectItem value="Transf.Embrion">Transferencia de Embriones</SelectItem>
+                   <SelectItem value="Celo no servido">Celo no servido</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -139,10 +140,11 @@ export default function ReproduccionFiltersDrawer({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos los estados</SelectItem>
-                  <SelectItem value="Pendiente de diagnóstico">Pendiente de Diagnóstico</SelectItem>
-                  <SelectItem value="Gestante">Gestante / Preñada</SelectItem>
-                  <SelectItem value="Vacía">Vacía / Fallida</SelectItem>
-                  <SelectItem value="Parida">Parida</SelectItem>
+                  <SelectItem value="Pendiente">Pendiente</SelectItem>
+                  <SelectItem value="Confirmada">Confirmada</SelectItem>
+                  <SelectItem value="Fallida">Fallida</SelectItem>
+                  <SelectItem value="Gestante">Gestante</SelectItem>
+                 
                 </SelectContent>
               </Select>
             </div>

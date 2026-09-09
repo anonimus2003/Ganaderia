@@ -51,7 +51,8 @@ const handleApplyFilters = (nuevosFiltros: {
     setFiltros({
       busqueda: nuevosFiltros.busqueda,
       turno: nuevosFiltros.jornada,
-      fecha: nuevosFiltros.fechaInicio,
+      fechaInicio: nuevosFiltros.fechaInicio,
+      fechaFin: nuevosFiltros.fechaFin,
     });
   };
 

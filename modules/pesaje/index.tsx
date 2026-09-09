@@ -1,17 +1,19 @@
+// modules/pesajes/PesajesPage.tsx (o tu archivo principal de la vista)
 "use client";
 
 import { useState } from "react";
 import { usePesajes } from "./hooks/usePesajes";
 import PesajeTable from "./components/PesajeTable";
 import PesajeFormModal from "./components/PesajeFormModal";
+import PesajeFiltersDrawer from "./components/PesajeFiltersDrawer"; // 👈 Asegúrate de importar tu Drawer de filtros
 import ConfirmModal from "@/components/ui/ConfirmModal";
 import { Pesaje } from "./schemas";
-import { useBovinos } from "@/modules/inventario/hooks/usebovinos";
 
 export default function PesajesPage() {
   const {
     pesajes,
     allPesajes,
+    allBovinos, // 👈 Ya viene optimizado desde el hook de pesajes
     loading,
     handleSave,
     handleDelete,
@@ -23,9 +25,8 @@ export default function PesajesPage() {
     setFiltros,
   } = usePesajes();
 
-  const { allBovinos } = useBovinos();
-
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false); // 👈 Estado para abrir/cerrar el Drawer
   const [selectedPesaje, setSelectedPesaje] = useState<Pesaje | null>(null);
   const [pesajeAEliminar, setPesajeAEliminar] = useState<Pesaje | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -65,11 +66,7 @@ export default function PesajesPage() {
           const registro = allPesajes.find((p) => p.id === id);
           if (registro) setPesajeAEliminar(registro);
         }}
-        onFilters={() => {
-          // 👈 AQUÍ CONECTAS EL BOTÓN DE FILTROS
-          // Puedes abrir un modal de filtros o aplicar una acción de filtrado
-          console.log("Abrir filtros de pesaje");
-        }}
+        onFilters={() => setIsFiltersOpen(true)} // 👈 Conectado para abrir el Drawer de filtros
         page={page}
         total={total}
         nextPage={nextPage}
@@ -82,7 +79,15 @@ export default function PesajesPage() {
         onClose={() => setIsModalOpen(false)}
         onSuccess={handleSave}
         pesajeAEditar={selectedPesaje}
-        bovinosList={allBovinos}
+        bovinosList={allBovinos} // 👈 Usamos la lista eficiente del hook
+      />
+
+      <PesajeFiltersDrawer
+        open={isFiltersOpen}
+        onOpenChange={setIsFiltersOpen}
+        onApplyFilters={(nuevosFiltros) => {
+          setFiltros(nuevosFiltros);
+        }}
       />
 
       <ConfirmModal

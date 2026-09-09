@@ -40,20 +40,18 @@ interface BovinoFormModalProps {
 }
 
 const ETAPAS_HEMBRA: Exclude<Bovino["categoria"], null>[] = [
-  "Ternera en lactancia",
-  "Destete",
-  "Ternera en crecimiento",
-  "Levante",
+ "Ternera en lactancia",
   "Novilla en desarrollo",
+  "Ternera en crecimiento",
   "Novilla de vientre",
   "Vaca",
 ];
 
 const ETAPAS_MACHO: Exclude<Bovino["categoria"], null>[] = [
   "Ternera en lactancia",
-  "Destete",
+  "Novilla en desarrollo",
   "Ternera en crecimiento",
-  "Levante",
+  "Novilla de vientre",
   "Toro",
 ];
 

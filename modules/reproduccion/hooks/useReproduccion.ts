@@ -1,70 +1,62 @@
+// modules/reproduccion/hooks/useReproduccion.ts
 import { useState, useEffect, useCallback } from "react";
 import { Reproduccion } from "../schemas";
+import { Bovino } from "@/modules/inventario/schemas";
+
 import { 
   getReproduccionesAction, 
   saveReproduccionAction, 
   deleteReproduccionAction 
 } from "../actions/reproduccion.actions";
+import { getBovinosAction } from "@/modules/inventario/actions/bovino.actions";
 
 export const PAGE_SIZE = 10;
 
 export interface FiltrosReproduccion {
+  busqueda: string;
   estado: string;
   tipo: string;
   fechaInicio: string;
   fechaFin: string;
 }
 
+const FILTROS_INICIALES: FiltrosReproduccion = {
+  busqueda: "",
+  estado: "todos",
+  tipo: "todos",
+  fechaInicio: "",
+  fechaFin: "",
+};
+
 export function useReproduccion() {
-  const [allReproducciones, setAllReproducciones] = useState<Reproduccion[]>([]);
+  const [reproducciones, setReproducciones] = useState<Reproduccion[]>([]);
+  const [allBovinos, setAllBovinos] = useState<Bovino[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   
-  const [filtros, setFiltros] = useState<FiltrosReproduccion>({
-    estado: "todos",
-    tipo: "todos",
-    fechaInicio: "",
-    fechaFin: "",
-  });
+  const [filtros, setFiltros] = useState<FiltrosReproduccion>(FILTROS_INICIALES);
 
   const fetchReproducciones = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await getReproduccionesAction();
-      setAllReproducciones(data || []);
+      const [reproduccionesRes, bovinosRes] = await Promise.all([
+        getReproduccionesAction(page, PAGE_SIZE, filtros),
+        getBovinosAction(1, 100),
+      ]);
+      setReproducciones(reproduccionesRes.data);
+      setTotal(reproduccionesRes.total);
+      setAllBovinos(bovinosRes.data || []);
     } catch (error) {
       console.error("Error al cargar reproducciones:", error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page, filtros]);
 
   useEffect(() => {
     fetchReproducciones();
   }, [fetchReproducciones]);
-
-  const filteredReproducciones = allReproducciones.filter(item => {
-    const cumpleEstado = filtros.estado === "todos" || !filtros.estado || 
-      (item.estado && item.estado.toLowerCase().trim() === filtros.estado.toLowerCase().trim());
-
-    const cumpleTipo = filtros.tipo === "todos" || !filtros.tipo || 
-      (item.tipo && item.tipo.toLowerCase().trim() === filtros.tipo.toLowerCase().trim());
-
-    let cumpleFechaInicio = true;
-    if (filtros.fechaInicio && item.fecha_inseminacion) {
-      cumpleFechaInicio = item.fecha_inseminacion.split("T")[0] >= filtros.fechaInicio;
-    }
-
-    let cumpleFechaFin = true;
-    if (filtros.fechaFin && item.fecha_inseminacion) {
-      cumpleFechaFin = item.fecha_inseminacion.split("T")[0] <= filtros.fechaFin;
-    }
-
-    return cumpleEstado && cumpleTipo && cumpleFechaInicio && cumpleFechaFin;
-  });
-
-  const total = filteredReproducciones.length;
-  const paginatedReproducciones = filteredReproducciones.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const nextPage = () => {
     if (page * PAGE_SIZE < total) setPage(p => p + 1);
@@ -87,12 +79,13 @@ export function useReproduccion() {
 
   const handleSetFiltros = (nuevosFiltros: FiltrosReproduccion) => {
     setFiltros(nuevosFiltros);
-    setPage(1);
+    setPage(1); // Reinicia a la página 1 al aplicar filtros
   };
 
   return {
-    reproducciones: paginatedReproducciones,
-    allReproducciones,
+    reproducciones,
+    allReproducciones: reproducciones,
+    allBovinos,
     loading,
     handleSave,
     handleDelete,

@@ -1,3 +1,4 @@
+// modules/medicamentos/hooks/useMedicamentos.ts
 import { useState, useEffect, useCallback } from "react";
 import { Medicamento } from "../schemas";
 import { 
@@ -15,64 +16,37 @@ export interface FiltrosMedicamento {
   fechaFin: string;
 }
 
+const FILTROS_INICIALES: FiltrosMedicamento = {
+  search: "",
+  viaSeleccionada: "",
+  fechaInicio: "",
+  fechaFin: "",
+};
+
 export function useMedicamentos() {
-  const [allMedicamentos, setAllMedicamentos] = useState<Medicamento[]>([]);
+  const [medicamentos, setMedicamentos] = useState<Medicamento[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   
-  const [filtros, setFiltros] = useState<FiltrosMedicamento>({
-    search: "",
-    viaSeleccionada: "",
-    fechaInicio: "",
-    fechaFin: "",
-  });
+  const [filtros, setFiltros] = useState<FiltrosMedicamento>(FILTROS_INICIALES);
 
   const fetchMedicamentos = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await getMedicamentosAction();
-      setAllMedicamentos(data || []);
+      const response = await getMedicamentosAction(page, PAGE_SIZE, filtros);
+      setMedicamentos(response.data);
+      setTotal(response.total);
     } catch (error) {
       console.error("Error al cargar medicamentos:", error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page, filtros]);
 
   useEffect(() => {
     fetchMedicamentos();
   }, [fetchMedicamentos]);
-
-  const filteredMedicamentos = allMedicamentos.filter(m => {
-    const s = filtros.search.toLowerCase().trim();
-    
-    // Búsqueda ampliada para incluir arete, nombre del bovino, veterinario y medicamento
-    const cumpleSearch = !s || 
-      (m.medicamento && m.medicamento.toLowerCase().includes(s)) ||
-      (m.via && m.via.toLowerCase().includes(s)) ||
-      (m.veterinario && m.veterinario.toLowerCase().includes(s)) ||
-      (m.bovinos?.arete && m.bovinos.arete.toLowerCase().includes(s)) ||
-      (m.bovinos?.nombre && m.bovinos.nombre.toLowerCase().includes(s));
-
-    const via = filtros.viaSeleccionada.trim();
-    const cumpleVia = !via || 
-      (m.via && m.via.toLowerCase().trim() === via.toLowerCase().trim());
-
-    let cumpleFechaInicio = true;
-    if (filtros.fechaInicio && m.fecha_aplicacion) {
-      cumpleFechaInicio = m.fecha_aplicacion.split("T")[0] >= filtros.fechaInicio;
-    }
-
-    let cumpleFechaFin = true;
-    if (filtros.fechaFin && m.fecha_aplicacion) {
-      cumpleFechaFin = m.fecha_aplicacion.split("T")[0] <= filtros.fechaFin;
-    }
-
-    return cumpleSearch && cumpleVia && cumpleFechaInicio && cumpleFechaFin;
-  });
-
-  const total = filteredMedicamentos.length;
-  const paginatedMedicamentos = filteredMedicamentos.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const nextPage = () => {
     if (page * PAGE_SIZE < total) setPage(p => p + 1);
@@ -99,8 +73,8 @@ export function useMedicamentos() {
   };
 
   return {
-    medicamentos: paginatedMedicamentos, 
-    allMedicamentos,                         
+    medicamentos, // 👈 Ahora devuelve directamente los 10 paginados desde el servidor
+    allMedicamentos: medicamentos, 
     loading,
     handleSave,
     handleDelete,
@@ -109,7 +83,7 @@ export function useMedicamentos() {
     nextPage,
     prevPage,
     PAGE_SIZE,
-    filtros, // <-- Agrega esta línea aquí
+    filtros,
     setFiltros: handleSetFiltros,
   };
 }

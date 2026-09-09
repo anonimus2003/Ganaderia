@@ -42,14 +42,14 @@ const TIPOS_REPRODUCCION = [
   "I.Artificial",
   "Monta Natural",
   "Transferencia de Embriones",
+  "Celo no servido"
 ];
 
 const ESTADOS_INSEMINACION = [
   "Pendiente",
-  "Preñada",
-  "Vacía",
-  "Aborto",
-  "Parto Registrado",
+  "Confirmada",
+  "Fallida",
+  "Gestante",
 ];
 
 // Función auxiliar para sumar días a una fecha base (formato YYYY-MM-DD) sin problemas de zona horaria
@@ -81,6 +81,7 @@ export default function ReproduccionFormModal({
       numero_servicios: 1,
       fecha_inseminacion: hoyStr,
       fecha_chequeo: sumarDiasAFecha(hoyStr, 60),
+      fecha_secado: sumarDiasAFecha(hoyStr, 223), // ~60 días antes del parto (283 - 60)
       fecha_probable_parto: sumarDiasAFecha(hoyStr, 283),
     }
   );
@@ -101,6 +102,7 @@ export default function ReproduccionFormModal({
         numero_servicios: 1,
         fecha_inseminacion: hoyStr,
         fecha_chequeo: sumarDiasAFecha(hoyStr, 60),
+        fecha_secado: sumarDiasAFecha(hoyStr, 223),
         fecha_probable_parto: sumarDiasAFecha(hoyStr, 283),
       });
     }
@@ -111,8 +113,8 @@ export default function ReproduccionFormModal({
     setFormData((prev) => ({
       ...prev,
       fecha_inseminacion: nuevaFecha,
-      // Solo recalculamos automáticamente si el usuario no ha puesto una fecha manual previa (o al crear nuevo)
       fecha_chequeo: sumarDiasAFecha(nuevaFecha, 60),
+      fecha_secado: sumarDiasAFecha(nuevaFecha, 223), // Se calcula automáticamente a los 223 días de gestación
       fecha_probable_parto: sumarDiasAFecha(nuevaFecha, 283),
     }));
   };

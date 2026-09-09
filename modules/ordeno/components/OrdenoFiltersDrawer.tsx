@@ -113,7 +113,6 @@ export default function OrdeñoFiltersDrawer({
                   <SelectItem value="todas">Todos los turnos</SelectItem>
                   <SelectItem value="Mañana">Mañana</SelectItem>
                   <SelectItem value="Tarde">Tarde</SelectItem>
-                  <SelectItem value="Único">Único</SelectItem>
                 </SelectContent>
               </Select>
             </div>

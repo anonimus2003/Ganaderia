@@ -1,3 +1,4 @@
+// modules/inventario/hooks/useBovinos.ts
 import { useState, useEffect, useCallback } from "react";
 import { Bovino } from "../schemas";
 import { getBovinosAction, saveBovinoAction, deleteBovinoAction } from "../actions/bovino.actions";
@@ -13,9 +14,10 @@ export interface FiltrosBovino {
 }
 
 export function useBovinos() {
-  const [allBovinos, setAllBovinos] = useState<Bovino[]>([]);
+  const [bovinos, setBovinos] = useState<Bovino[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   
   const [filtros, setFiltros] = useState<FiltrosBovino>({
     busqueda: "",
@@ -28,45 +30,19 @@ export function useBovinos() {
   const fetchBovinos = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await getBovinosAction();
-      setAllBovinos(data || []);
+      const { data, total: totalRegs } = await getBovinosAction(page, PAGE_SIZE, filtros);
+      setBovinos(data);
+      setTotal(totalRegs);
     } catch (error) {
       console.error("Error al cargar bovinos:", error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page, filtros]);
 
   useEffect(() => {
     fetchBovinos();
   }, [fetchBovinos]);
-
-  const filteredBovinos = allBovinos.filter(b => {
-    const cumpleBusqueda = !filtros.busqueda || 
-      (b.arete && b.arete.toLowerCase().includes(filtros.busqueda.toLowerCase())) || 
-      (b.nombre && b.nombre.toLowerCase().includes(filtros.busqueda.toLowerCase()));
-    
-    const cumpleGenero = filtros.sexo === "todos" || 
-      (b.genero && b.genero.toLowerCase().trim() === filtros.sexo.toLowerCase().trim());
-
-    let cumpleEstado = true;
-    if (filtros.estado !== "todos") {
-      const estadoAnimal = (b.condicion || (b as any).estado || "").toLowerCase().trim();
-      const filtroEst = filtros.estado.toLowerCase().replace(/s$/, "").trim();
-      cumpleEstado = estadoAnimal.includes(filtroEst);
-    }
-
-    const cumpleCategoria = filtros.categoria === "todas" || 
-      (b.categoria && b.categoria.toLowerCase().trim() === filtros.categoria.toLowerCase().trim());
-
-    const cumpleOrigen = filtros.origen === "todos" || 
-      (b.origen && b.origen.toLowerCase().trim() === filtros.origen.toLowerCase().trim());
-
-    return cumpleBusqueda && cumpleGenero && cumpleEstado && cumpleCategoria && cumpleOrigen;
-  });
-
-  const total = filteredBovinos.length;
-  const paginatedBovinos = filteredBovinos.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const nextPage = () => {
     if (page * PAGE_SIZE < total) setPage(p => p + 1);
@@ -88,12 +64,12 @@ export function useBovinos() {
 
   const handleSetFiltros = (nuevosFiltros: FiltrosBovino) => {
     setFiltros(nuevosFiltros);
-    setPage(1);
+    setPage(1); // Regresa a la primera página cada vez que cambias un filtro
   };
 
   return {
-    bovinos: paginatedBovinos, 
-    allBovinos,              
+    bovinos, 
+    allBovinos: bovinos, // Compatible si tu UI lo usaba para referencias rápidas
     loading,
     handleSave,
     handleDelete,
