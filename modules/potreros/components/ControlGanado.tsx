@@ -35,7 +35,7 @@ export default function ControlGanado({ potrero, onIngresarGanado, onSacarGanado
   const estaEnDescanso = estado === 'en descanso';
 
   /* eslint-disable react-hooks/set-state-in-effect -- availability changes reset the local cattle selection. */
-  useEffect(() => {
+ useEffect(() => {
     if (!isDisponible) {
       setBovinosLista([]);
       setBovinosSeleccionados([]);
@@ -48,11 +48,19 @@ export default function ControlGanado({ potrero, onIngresarGanado, onSacarGanado
       try {
         const { data, error } = await supabase
           .from('bovinos')
-          .select('id, arete, nombre, estado')
-          .eq('condicion', 'Activo')
-          .order('arete', { ascending: true });
+          .select('id, arete, nombre, condicion') // Añadimos condicion para traerla
+          .order('arete', { ascending: true }); // Sin filtros de estado: trae todos
 
-        if (!error && !cancelado) setBovinosLista(data ?? []);
+        if (!error && !cancelado) {
+          // Mapeamos 'condicion' a la propiedad 'estado' de tu interfaz Bovino
+          const bovinosMapeados = (data ?? []).map(b => ({
+            id: b.id,
+            arete: b.arete,
+            nombre: b.nombre,
+            estado: b.condicion, 
+          }));
+          setBovinosLista(bovinosMapeados);
+        }
       } finally {
         if (!cancelado) setCargandoBovinos(false);
       }
