@@ -520,7 +520,7 @@ export default function BovinoFormModal({
             </div>
           </Tabs>
 
-          <DialogFooter className="px-6 py-5 min-h-[70px] border-t bg-muted/10 flex flex-row items-center justify-end gap-3 shrink-0">
+          <DialogFooter className="px-6 py-7 min-h-[70px] border-t bg-muted/10 flex flex-row items-center justify-end gap-3 shrink-0">
             <Button
               type="button"
               variant="outline"

@@ -158,7 +158,7 @@ export default function PesajeFormModal({
 
             {/* Selección de Bovino */}
             <div className="space-y-1.5">
-              <label className="text-xs font-medium">Bovino (Arete / Nombre) *</label>
+              <label className="text-xs font-medium">Bovino*</label>
               <Select
                 value={formData.bovino_id || "none"}
                 onValueChange={(value) =>
@@ -326,7 +326,7 @@ export default function PesajeFormModal({
             </div>
           </div>
 
-          <DialogFooter className="px-6 py-4 border-t bg-muted/10 flex flex-row items-center justify-end gap-3 shrink-0">
+          <DialogFooter className="px-6 py-7 border-t bg-muted/10 flex flex-row items-center justify-end gap-3 shrink-0">
             <Button
               type="button"
               variant="outline"

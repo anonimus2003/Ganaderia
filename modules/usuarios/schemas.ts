@@ -1,12 +1,25 @@
 import { z } from "zod";
 
-export const userFormSchema = z.object({
-  nombre: z.string().min(2, "Obligatorio"),
-  apellidos: z.string().min(2, "Obligatorio"),
-  email: z.string().email("Correo inválido"),
-  telefono: z.string().min(7, "Teléfono inválido"),
-  rol: z.enum(['Administrador', 'Veterinario', 'Ordeñador', 'Obrero', 'Potreros', 'Trabajador']),
-  password: z.string().min(6, "Mínimo 6 caracteres").optional().or(z.literal("")),
+export const usuarioSchema = z.object({
+  id: z.string().optional(),
+  nombre: z.string().min(2, "El nombre es obligatorio"),
+  apellidos: z.string().min(2, "El apellido es obligatorio"),
+  email: z.string().email("Correo electrónico inválido").optional().nullable(),
+  telefono: z.string().min(7, "Teléfono inválido").optional().nullable(),
+  rol: z.enum([
+    "Administrador",
+    "Veterinario",
+    "Ordeñador",
+    "Obrero",
+    "Potreros",
+    "Trabajador",
+  ]),
+  permisos: z.object({
+    puede_ver: z.boolean(),
+    puede_crear: z.boolean(),
+    puede_editar: z.boolean(),
+    puede_eliminar: z.boolean(),
+  }).optional(),
 });
 
-export type UserFormValues = z.infer<typeof userFormSchema>;
+export type Usuario = z.infer<typeof usuarioSchema>;

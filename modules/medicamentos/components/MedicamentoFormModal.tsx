@@ -314,7 +314,7 @@ export default function MedicamentoFormModal({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium flex items-center gap-1">
-                    <User className="h-3.5 w-3.5 text-muted-foreground" /> Veterinario / Responsable *
+                    <User className="h-3.5 w-3.5 text-muted-foreground" /> Veterinario*
                   </label>
                   <Input
                     required
@@ -329,7 +329,7 @@ export default function MedicamentoFormModal({
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium flex items-center gap-1">
-                    <FileText className="h-3.5 w-3.5 text-muted-foreground" /> Motivo / Diagnóstico
+                    <FileText className="h-3.5 w-3.5 text-muted-foreground" /> Diagnóstico
                   </label>
                   <Input
                     className="h-9 text-sm"
@@ -344,7 +344,7 @@ export default function MedicamentoFormModal({
             </div>
           </div>
 
-          <DialogFooter className="px-6 py-5 min-h-[70px] border-t bg-muted/10 flex flex-row items-center justify-end gap-3 shrink-0">
+          <DialogFooter className="px-6 py-7 min-h-[70px] border-t bg-muted/10 flex flex-row items-center justify-end gap-3 shrink-0">
             <Button
               type="button"
               variant="outline"

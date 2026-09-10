@@ -130,7 +130,7 @@ export default function OrdeñoFormModal({
       <DialogContent className="max-h-[92vh] max-w-xl overflow-hidden flex flex-col p-0">
         <DialogHeader className="px-6 pt-6 pb-2 border-b">
           <DialogTitle className="text-lg font-semibold flex items-center gap-2">
-            <Milk className="h-5 w-5 text-sky-600" />
+            <Milk className="h-5 w-5 text-black" />
             {isEditing ? "Editar Registro de Ordeño" : "Nuevo Registro de Ordeño"}
           </DialogTitle>
           <DialogDescription className="text-xs">
@@ -279,8 +279,7 @@ export default function OrdeñoFormModal({
               </div>
             </div>
           </div>
-
-          <DialogFooter className="px-6 py-4 border-t bg-muted/10 flex flex-row items-center justify-end gap-3 shrink-0">
+            <DialogFooter className="px-6 py-6 pb-5 sm:py-7 border-t bg-muted/10 flex flex-row items-center justify-end gap-3 shrink-0">
             <Button
               type="button"
               variant="outline"

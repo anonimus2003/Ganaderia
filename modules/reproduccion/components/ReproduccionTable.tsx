@@ -77,7 +77,7 @@ export function ReproduccionTable({
 
       {/* HEADER */}
 
-      <div className="px-6 py-5 border-b flex items-center justify-between">
+      <div className="px-4 sm:px-6 py-4 sm:py-5 border-b flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
 
         <div>
           <h2 className="font-semibold text-slate-900">
@@ -89,9 +89,23 @@ export function ReproduccionTable({
           </p>
         </div>
 
-        <div className="flex gap-2">
+        {/* ACCIONES: En móvil se apilan, en desktop van en fila */}
+        <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full sm:w-auto">
+          
+        {/* Botón Nuevo Bovino: Grande y de ancho completo en móvil (orden 1 arriba) */}
+        
+          <Button
+            onClick={onAddRecord}
+            disabled={!permisos.puede_crear}
+            className="w-full sm:w-auto h-11 sm:h-9 text-sm sm:text-black order-1 sm:order-2 font-medium shadow-xs bg-[#D1F843] hover:bg-[#bedf3b] text-slate-900 rounded-xl"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Nueva inseminación
+          </Button>
 
-          {onFilters && (
+          {/* Grupo de botones secundarios (Filtros, CSV, PDF) distribuidos equitativamente en móvil (orden 2 abajo) */}
+          <div className="grid grid-cols-3 sm:flex items-center gap-2 w-full sm:w-auto order-2 sm:order-1 ">
+            {onFilters && (
             <Button
               variant="outline"
               onClick={onFilters}
@@ -121,16 +135,8 @@ export function ReproduccionTable({
             <FileText className="w-4 h-4 mr-2" />
             PDF
           </Button>
-
-          <Button
-            onClick={onAddRecord}
-            disabled={!permisos.puede_crear}
-            className="text-xs h-9 bg-emerald-600 hover:bg-emerald-700 text-white"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Nueva inseminación
-          </Button>
-
+          
+          </div>
         </div>
       </div>
 

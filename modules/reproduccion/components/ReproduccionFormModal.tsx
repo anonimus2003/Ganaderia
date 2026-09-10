@@ -191,7 +191,7 @@ export default function ReproduccionFormModal({
               <TabsContent value="general" className="mt-0 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5 sm:col-span-2">
-                    <label className="text-xs font-medium">Hembra (Vaca / Novilla) *</label>
+                    <label className="text-xs font-medium">Bovino*</label>
                     <Select
                       value={formData.bovino_id || "none"}
                       onValueChange={(value) =>
@@ -313,7 +313,7 @@ export default function ReproduccionFormModal({
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-medium">Técnico / Responsable *</label>
+                    <label className="text-xs font-medium">Técnico*</label>
                     <Input
                       required
                       className="h-9 text-sm"
@@ -422,7 +422,7 @@ export default function ReproduccionFormModal({
             </div>
           </Tabs>
 
-          <DialogFooter className="px-6 py-5 min-h-[70px] border-t bg-muted/10 flex flex-row items-center justify-end gap-3 shrink-0">
+          <DialogFooter className="px-6 py-7 min-h-[70px] border-t bg-muted/10 flex flex-row items-center justify-end gap-3 shrink-0">
             <Button
               type="button"
               variant="outline"

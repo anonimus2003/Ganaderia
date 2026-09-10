@@ -1,10 +1,9 @@
 "use client";
 
-import { Ordeño } from "../schemas";
-import { getOrdeñoColumns } from "./OrdenoColumns";
+import { Usuario } from "../schemas";
+import { getUsuariosColumns } from "./UsuariosColumns";
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-
 import { Button } from "@/components/ui/button";
 import {
   Plus,
@@ -18,14 +17,14 @@ import {
 import { exportToPDF } from "@/lib/utils/exportUtils";
 import { useExportData } from "@/hooks/useExportData";
 
-interface OrdeñoTableProps {
-  data: Ordeño[];
+interface UsuariosTableProps {
+  data: Usuario[];
   loading?: boolean;
 
   onAddRecord?: () => void;
-  onEdit?: (ordeño: Ordeño) => void;
-  onDelete?: (id: string) => void;
-  onRowClick?: (ordeño: Ordeño) => void;
+  onEdit?: (usuario: Usuario) => void;
+  onDelete?: (usuario: Usuario) => void;
+  onRowClick?: (usuario: Usuario) => void;
   onFilters?: () => void;
 
   page: number;
@@ -42,9 +41,9 @@ interface OrdeñoTableProps {
   };
 }
 
-export default function OrdeñoTable({
-  data,
-  loading,
+export function UsuariosTable({
+  data = [],
+  loading = false,
   onAddRecord,
   onEdit,
   onDelete,
@@ -61,92 +60,82 @@ export default function OrdeñoTable({
     puede_editar: true,
     puede_eliminar: true,
   },
-}: OrdeñoTableProps) {
+}: UsuariosTableProps) {
   const { exportFromTable } = useExportData();
 
-  const columns = getOrdeñoColumns({
+  const columns = getUsuariosColumns({
     onEdit,
     onDelete,
     permisos,
   });
 
-  const totalPages = Math.ceil(total / pageSize);
+  const totalPages = Math.ceil(total / pageSize) || 1;
+
+  // Paginación local sobre la data recibida
+  const paginatedData = data.slice((page - 1) * pageSize, page * pageSize);
 
   return (
     <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-
-      {/* HEADER */}
-
+      {/* HEADER RESPONSIVO */}
       <div className="px-4 sm:px-6 py-4 sm:py-5 border-b flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-    
         <div>
-          <h2 className="font-semibold text-slate-900">
-            REGISTROS DE ORDEÑO
+          <h2 className="font-semibold text-slate-900 text-sm sm:text-base">
+            GESTIÓN DE USUARIOS
           </h2>
-
           <p className="text-xs text-slate-500">
-            Total Ordeños: {total}
+            Total Usuarios: {total}
           </p>
         </div>
 
-        {/* ACCIONES: En móvil se apilan, en desktop van en fila */}
-        <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full sm:w-auto">
-
-         {/* Botón Nuevo Bovino: Grande y de ancho completo en móvil (orden 1 arriba) */}
-          <Button
-            onClick={onAddRecord}
-            disabled={!permisos.puede_crear}
-            className="w-full sm:w-auto h-11 sm:h-9 text-black sm:text-black order-1 sm:order-2 font-medium shadow-xs bg-[#D1F843] hover:bg-[#bedf3b] text-slate-900 rounded-xl"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Nuevo ordeño
-          </Button>
-
-          {/* Grupo de botones secundarios (Filtros, CSV, PDF) distribuidos equitativamente en móvil (orden 2 abajo) */}
-          <div className="grid grid-cols-3 sm:flex items-center gap-2 w-full sm:w-auto order-2 sm:order-1">
-            {onFilters && (
+        {/* CONTENEDOR DE BOTONES ADAPTADO A MÓVILES */}
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
+          {onFilters && (
             <Button
               variant="outline"
               onClick={onFilters}
-              className="text-xs h-9 w-full sm:w-auto justify-center"
+              className="text-xs h-9 flex-1 sm:flex-none"
             >
-              <Filter className="w-3.5 h-3.5 mr-1.5" />
-              Filtros
+              <Filter className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Filtros</span>
             </Button>
           )}
-           <Button
+
+          <Button
             variant="outline"
-            onClick={() =>
-              exportFromTable("ordeño", "*")}
-             className="text-xs h-9 w-full sm:w-auto justify-center"
-            >
-            <Download className="w-3.5 h-3.5 mr-1.5" />
-            CSV
+            onClick={() => exportFromTable("usuarios", "*")}
+            className="text-xs h-9"
+          >
+            <Download className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">CSV</span>
           </Button>
 
           <Button
             variant="outline"
             onClick={() => exportToPDF(data)}
-           className="text-xs h-9 w-full sm:w-auto justify-center"
-            >
-            <FileText className="w-3.5 h-3.5 mr-1.5" />
-            PDF
+            className="text-xs h-9"
+          >
+            <FileText className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">PDF</span>
           </Button>
 
-          </div>
+          <Button
+            onClick={onAddRecord}
+            disabled={!permisos.puede_crear}
+            className="text-xs h-9 flex-1 sm:flex-none"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Nuevo usuario
+          </Button>
         </div>
       </div>
 
       {/* TABLA */}
-
       <div className="overflow-x-auto">
-
         <Table>
-
-          <TableHeader>
+          <TableHeader className="bg-slate-50">
             <TableRow>
               {columns.map((column, index) => (
-                <TableHead key={column.header || index}>
+                <TableHead key={index} className="text-xs font-semibold text-slate-700 whitespace-nowrap">
                   {column.header}
                 </TableHead>
               ))}
@@ -154,78 +143,70 @@ export default function OrdeñoTable({
           </TableHeader>
 
           <TableBody>
-
             {loading ? (
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
-                  className="text-center py-10"
+                  className="text-center py-10 text-xs text-slate-500"
                 >
-                  Cargando ordeños...
+                  Cargando usuarios...
                 </TableCell>
               </TableRow>
-            ) : data.length === 0 ? (
+            ) : paginatedData.length === 0 ? (
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
-                  className="text-center py-10"
+                  className="text-center py-10 text-xs text-slate-500"
                 >
-                  No hay ordeños registrados.
+                  No hay usuarios encontrados.
                 </TableCell>
               </TableRow>
             ) : (
-              data.map((ordeño) => (
+              paginatedData.map((item, rowIndex) => (
                 <TableRow
-                  key={ordeño.id}
+                  key={item.id || rowIndex}
                   className={
                     onRowClick
-                      ? "cursor-pointer hover:bg-slate-50"
-                      : ""
+                      ? "cursor-pointer hover:bg-slate-50/50"
+                      : "hover:bg-slate-50/50"
                   }
-                  onClick={() =>
-                    onRowClick?.(ordeño)
-                  }
+                  onClick={() => onRowClick?.(item)}
                 >
-                  {columns.map((column, index) => (
+                  {columns.map((column, colIndex) => (
                     <TableCell
-                      key={String(column.accessor || index)}
+                      key={colIndex}
+                      className="py-3 text-xs whitespace-nowrap"
                       onClick={(event) => {
-                        if (
-                          column.accessor === "acciones"
-                        ) {
+                        if (colIndex === columns.length - 1) {
                           event.stopPropagation();
                         }
                       }}
                     >
-                      {column.render(ordeño)}
+                      {column.render(item)}
                     </TableCell>
                   ))}
                 </TableRow>
               ))
             )}
-
           </TableBody>
-
         </Table>
       </div>
 
       {/* PAGINACIÓN */}
-
-      <div className="px-6 py-4 border-t flex justify-between items-center">
-
+      <div className="px-4 sm:px-6 py-4 border-t flex justify-between items-center">
         <span className="text-xs text-slate-500">
-          Página {page} de {totalPages || 1}
+          Página {page} de {totalPages}
         </span>
 
         <div className="flex gap-2">
-
           <Button
             variant="outline"
             size="icon"
             onClick={prevPage}
             disabled={page <= 1 || loading}
+            className="h-8 w-8"
           >
-            <ChevronLeft />
+            <ChevronLeft className="h-4 w-4" />
           </Button>
 
           <Button
@@ -233,13 +214,12 @@ export default function OrdeñoTable({
             size="icon"
             onClick={nextPage}
             disabled={page >= totalPages || loading}
+            className="h-8 w-8"
           >
-            <ChevronRight />
+            <ChevronRight className="h-4 w-4" />
           </Button>
-
         </div>
       </div>
-
     </div>
   );
 }
