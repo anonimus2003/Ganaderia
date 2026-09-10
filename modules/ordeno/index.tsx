@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useOrdeños } from "./hooks/useOrdeno";
-import { useBovinos } from "@/modules/inventario/hooks/usebovinos";
 import OrdeñoTable from "./components/OrdenoTable";
 import OrdeñoFormModal from "./components/OrdenoFormModal";
 import OrdeñoFiltersDrawer from "./components/OrdenoFiltersDrawer";
@@ -13,6 +12,7 @@ export default function OrdeñoPage() {
   const {
     ordeños,
     allOrdeños,
+    allBovinos,
     loading,
     handleSave,
     handleDelete,
@@ -24,7 +24,6 @@ export default function OrdeñoPage() {
     setFiltros,
   } = useOrdeños();
 
-  const { allBovinos } = useBovinos();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedOrdeño, setSelectedOrdeño] = useState<Ordeño | null>(null);

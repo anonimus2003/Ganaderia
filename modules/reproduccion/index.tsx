@@ -7,12 +7,12 @@ import ReproduccionFormModal from "./components/ReproduccionFormModal";
 import ReproduccionFiltersDrawer from "./components/ReproduccionFiltersDrawer";
 import ConfirmModal from "@/components/ui/ConfirmModal";
 import { Reproduccion } from "./schemas";
-import { useBovinos } from "@/modules/inventario/hooks/usebovinos";
+
 
 export default function ReproduccionPage() {
   const {
     reproducciones,
-    allReproducciones, // <--- Extraemos la lista completa sin paginar del hook
+    allBovinos,
     loading,
     handleSave,
     handleDelete,
@@ -23,8 +23,6 @@ export default function ReproduccionPage() {
     PAGE_SIZE,
     setFiltros,
   } = useReproduccion();
-
-  const { allBovinos } = useBovinos();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedReproduccion, setSelectedReproduccion] = useState<Reproduccion | null>(null);

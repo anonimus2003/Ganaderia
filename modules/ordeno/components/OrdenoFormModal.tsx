@@ -1,7 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Ordeño, Bovino } from "../schemas";
+import { Ordeño } from "../schemas";
+import { Bovino } from "@/modules/inventario/schemas";
+
+
 import {
   Dialog,
   DialogContent,

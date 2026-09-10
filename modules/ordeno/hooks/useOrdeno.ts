@@ -1,6 +1,7 @@
 // modules/ordeño/hooks/useOrdeños.ts
 import { useState, useEffect, useCallback } from "react";
-import { Ordeño, Bovino } from "../schemas";
+import { Ordeño } from "../schemas";
+import { Bovino } from "@/modules/inventario/schemas";
 import { getOrdeñosAction, saveOrdeñoAction, deleteOrdeñoAction } from "../actions/ordeno.actions";
 import { getBovinosAction } from "@/modules/inventario/actions/bovino.actions";
 
