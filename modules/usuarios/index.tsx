@@ -1,76 +1,46 @@
-"use client";
+import { getMatrizPermisosData, getUsuarios } from '@/modules/usuarios/actions/userActions'
+import UsuariosTable from '@/modules/usuarios/components/UsuariosTable'
+import MatrizPermisos from '@/modules/usuarios/components/MatrizPermisos'
 
-import { useState } from "react";
-import { useUsuarios } from "./hooks/useUsuarios";
-import { UsuariosTable } from "./components/UsuariosTable";
-import { UsuarioModal } from "./components/UsuarioModal";
-import { createUsuario, updateUsuario, deleteUsuario } from "./actions/userActions";
-import { Usuario } from "./schemas";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Users, ShieldCheck } from 'lucide-react'
 
-export default function UsuariosModule() {
-  const { data, loading, page, total, nextPage, prevPage, pageSize, refresh } = useUsuarios();
-  
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<Usuario | null>(null);
-  const [actionLoading, setActionLoading] = useState(false);
-
-  const handleOpenCreate = () => {
-    setSelectedUser(null);
-    setIsModalOpen(true);
-  };
-
-  const handleOpenEdit = (usuario: Usuario) => {
-    setSelectedUser(usuario);
-    setIsModalOpen(true);
-  };
-
-  const handleSubmitForm = async (formData: any) => {
-    setActionLoading(true);
-    try {
-      if (selectedUser?.id) {
-        await updateUsuario(selectedUser.id, formData);
-      } else {
-        await createUsuario(formData);
-      }
-      setIsModalOpen(false);
-      refresh();
-    } catch (error) {
-      console.error("Error al guardar:", error);
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleDelete = async (usuario: Usuario) => {
-    if (!usuario.id) return;
-    if (confirm(`¿Estás seguro de eliminar a ${usuario.nombre}?`)) {
-      await deleteUsuario(usuario.id);
-      refresh();
-    }
-  };
+export default async function UsuariosPage() {
+  const [matrizRes, usuariosRes] = await Promise.all([
+    getMatrizPermisosData(),
+    getUsuarios(),
+  ])
 
   return (
-    <div className="p-6">
-      <UsuariosTable
-        data={data}
-        loading={loading}
-        page={page}
-        total={total}
-        pageSize={pageSize}
-        nextPage={nextPage}
-        prevPage={prevPage}
-        onAddRecord={handleOpenCreate}
-        onEdit={handleOpenEdit}
-        onDelete={handleDelete}
-      />
+    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Gestión de Usuarios y Permisos</h1>
+        <p className="text-sm text-muted-foreground">
+          Administra los accesos del personal y define sus permisos sobre los módulos de la hacienda.
+        </p>
+      </div>
 
-      <UsuarioModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSubmit={handleSubmitForm}
-        initialData={selectedUser}
-        loading={actionLoading}
-      />
+      <Tabs defaultValue="usuarios" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="usuarios" className="gap-2 text-xs">
+            <Users className="h-4 w-4" /> Directorio de Usuarios
+          </TabsTrigger>
+          <TabsTrigger value="permisos" className="gap-2 text-xs">
+            <ShieldCheck className="h-4 w-4" /> Matriz de Permisos
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="usuarios">
+          <UsuariosTable usuarios={usuariosRes.data || []} />
+        </TabsContent>
+
+        <TabsContent value="permisos">
+          <MatrizPermisos
+            modulos={matrizRes.modulos || []}
+            permisosIniciales={matrizRes.permisos || []}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
-  );
+  )
 }

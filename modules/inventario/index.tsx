@@ -81,6 +81,7 @@ export default function InventarioPage() {
         prevPage={prevPage}
         pageSize={PAGE_SIZE}
         onFilters={() => setIsFilterOpen(true)}
+
       />
 
       <BovinoFormModal

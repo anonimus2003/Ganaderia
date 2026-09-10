@@ -144,8 +144,6 @@ export default function MantenimientoPage() {
 
       </div>
 
-     
-
     </div>
   );
 }

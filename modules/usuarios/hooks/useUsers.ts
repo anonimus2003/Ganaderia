@@ -12,7 +12,9 @@ export function useUsuarios() {
     setLoading(true);
     try {
       const res = await getUsuarios();
-      setData(res);
+      if (res.success && res.data) {
+        setData(res.data); // <-- Extraer el arreglo .data
+      }
     } catch (error) {
       console.error(error);
     } finally {

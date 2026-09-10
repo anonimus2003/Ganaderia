@@ -1,233 +1,217 @@
-"use client";
+'use client'
 
-import { useEffect } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { usuarioSchema, Usuario } from "../schemas";
-import { Button } from "@/components/ui/button";
+import { useEffect, useState, useTransition } from 'react'
+import { RolValido } from '../actions/userActions'
+import { Usuario } from '../schemas'
+
+// Componentes UI de shadcn
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Button } from '@/components/ui/button'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Shield } from "lucide-react";
+} from '@/components/ui/select'
+import { toast } from 'sonner'
+import { Loader2, User, Phone, Mail, ShieldCheck, Save } from 'lucide-react'
+
+const ROLES_LISTA: RolValido[] = [
+  'Administrador',
+  'Veterinario',
+  'Ordeñador',
+  'Obrero',
+  'Potreros',
+  'Trabajador',
+]
 
 interface UsuarioModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSubmit: (data: any) => Promise<void>;
-  initialData?: Usuario | null;
-  loading?: boolean;
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  usuario?: Usuario | null
 }
 
-export function UsuarioModal({
-  isOpen,
-  onClose,
-  onSubmit,
-  initialData,
-  loading,
-}: UsuarioModalProps) {
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    reset,
-    formState: { errors },
-  } = useForm({
-    resolver: zodResolver(usuarioSchema),
-    defaultValues: {
-      nombre: "",
-      apellidos: "",
-      email: "",
-      telefono: "",
-      rol: "Trabajador",
-      permisos: {
-        puede_ver: true,
-        puede_crear: false,
-        puede_editar: false,
-        puede_eliminar: false,
-      },
-    },
-  });
+export default function UsuarioModal({ open, onOpenChange, usuario }: UsuarioModalProps) {
+  const [isPending, startTransition] = useTransition()
 
-  const rolActual = watch("rol");
+  // Estados del formulario
+  const [nombre, setNombre] = useState('')
+  const [apellidos, setApellidos] = useState('')
+  const [telefono, setTelefono] = useState('')
+  const [email, setEmail] = useState('')
+  const [rol, setRol] = useState<RolValido>('Trabajador')
 
+  // Cargar datos si estamos en modo edición
   useEffect(() => {
-    if (initialData) {
-      reset({
-        nombre: initialData.nombre,
-        apellidos: initialData.apellidos,
-        email: initialData.email || "",
-        telefono: initialData.telefono || "",
-        rol: initialData.rol as any,
-        permisos: initialData.permisos || {
-          puede_ver: true,
-          puede_crear: false,
-          puede_editar: false,
-          puede_eliminar: false,
-        },
-      });
+    if (usuario) {
+      setNombre(usuario.nombre || '')
+      setApellidos(usuario.apellidos || '')
+      setTelefono(usuario.telefono || '')
+      setEmail(usuario.email || '')
+      setRol(usuario.rol || 'Trabajador')
     } else {
-      reset({
-        nombre: "",
-        apellidos: "",
-        email: "",
-        telefono: "",
-        rol: "Trabajador",
-        permisos: {
-          puede_ver: true,
-          puede_crear: false,
-          puede_editar: false,
-          puede_eliminar: false,
-        },
-      });
+      setNombre('')
+      setApellidos('')
+      setTelefono('')
+      setEmail('')
+      setRol('Trabajador')
     }
-  }, [initialData, reset, isOpen]);
+  }, [usuario, open])
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!nombre.trim()) {
+      toast.error('El nombre del usuario es obligatorio')
+      return
+    }
+
+    startTransition(async () => {
+      const payload = {
+        id: usuario?.id,
+        nombre: nombre.trim(),
+        apellidos: apellidos.trim() || null,
+        telefono: telefono.trim() || null,
+        email: email.trim() || null,
+        rol,
+      }
+
+    })
+  }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle>
-            {initialData ? "Editar Usuario" : "Nuevo Usuario"}
-          </DialogTitle>
-        </DialogHeader>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[480px]">
+        <form onSubmit={handleSubmit}>
+          <DialogHeader className="pb-4 border-b">
+            <DialogTitle className="text-lg font-bold flex items-center gap-2">
+              <User className="h-5 w-5 text-primary" />
+              {usuario ? 'Editar Usuario' : 'Registrar Nuevo Usuario'}
+            </DialogTitle>
+            <DialogDescription>
+              {usuario
+                ? 'Modifica la información general y el rol asignado a este trabajador.'
+                : 'Diligencia los datos para dar de alta a un nuevo miembro del personal.'}
+            </DialogDescription>
+          </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-2">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="text-xs">Nombre</Label>
-              <Input placeholder="Ej. Juan" {...register("nombre")} />
-              {errors.nombre && (
-                <span className="text-xs text-red-500">
-                  {errors.nombre.message as string}
-                </span>
-              )}
+          <div className="grid gap-4 py-4">
+            {/* Nombre y Apellidos */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="nombre" className="text-xs font-semibold">
+                  Nombre *
+                </Label>
+                <Input
+                  id="nombre"
+                  placeholder="Ej. Juan"
+                  value={nombre}
+                  onChange={(e) => setNombre(e.target.value)}
+                  className="h-9 text-xs"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="apellidos" className="text-xs font-semibold">
+                  Apellidos
+                </Label>
+                <Input
+                  id="apellidos"
+                  placeholder="Ej. Pérez"
+                  value={apellidos}
+                  onChange={(e) => setApellidos(e.target.value)}
+                  className="h-9 text-xs"
+                />
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label className="text-xs">Apellidos</Label>
-              <Input placeholder="Ej. Pérez" {...register("apellidos")} />
-              {errors.apellidos && (
-                <span className="text-xs text-red-500">
-                  {errors.apellidos.message as string}
-                </span>
-              )}
-            </div>
-          </div>
+            {/* Teléfono y Email */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="telefono" className="text-xs font-semibold flex items-center gap-1">
+                  <Phone className="h-3 w-3 text-muted-foreground" /> Teléfono
+                </Label>
+                <Input
+                  id="telefono"
+                  placeholder="Ej. 3101234567"
+                  value={telefono}
+                  onChange={(e) => setTelefono(e.target.value)}
+                  className="h-9 text-xs"
+                />
+              </div>
 
-          <div className="space-y-2">
-            <Label className="text-xs">Correo Electrónico</Label>
-            <Input type="email" placeholder="correo@ejemplo.com" {...register("email")} />
-            {errors.email && (
-              <span className="text-xs text-red-500">
-                {errors.email.message as string}
-              </span>
-            )}
-          </div>
-
-          {!initialData && (
-            <div className="space-y-2">
-              <Label className="text-xs">Contraseña temporal</Label>
-              <Input type="password" placeholder="******" {...register("password" as any)} />
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="text-xs">Teléfono</Label>
-              <Input placeholder="3001234567" {...register("telefono")} />
+              <div className="space-y-1.5">
+                <Label htmlFor="email" className="text-xs font-semibold flex items-center gap-1">
+                  <Mail className="h-3 w-3 text-muted-foreground" /> Email
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="ejemplo@correo.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="h-9 text-xs"
+                />
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label className="text-xs">Rol</Label>
-              <Select
-                value={rolActual}
-                onValueChange={(val) => setValue("rol", val as any)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccione rol" />
+            {/* Rol Asignado */}
+            <div className="space-y-1.5">
+              <Label htmlFor="rol" className="text-xs font-semibold flex items-center gap-1">
+                <ShieldCheck className="h-3 w-3 text-muted-foreground" /> Rol Asignado *
+              </Label>
+              <Select value={rol} onValueChange={(val) => setRol(val as RolValido)}>
+                <SelectTrigger className="h-9 text-xs font-medium">
+                  <SelectValue placeholder="Selecciona un rol" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Administrador">Administrador</SelectItem>
-                  <SelectItem value="Veterinario">Veterinario</SelectItem>
-                  <SelectItem value="Ordeñador">Ordeñador</SelectItem>
-                  <SelectItem value="Obrero">Obrero</SelectItem>
-                  <SelectItem value="Potreros">Potreros</SelectItem>
-                  <SelectItem value="Trabajador">Trabajador</SelectItem>
+                  {ROLES_LISTA.map((r) => (
+                    <SelectItem key={r} value={r} className="text-xs">
+                      {r}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
 
-          {/* SECCIÓN DE PERMISOS INTEGRADA */}
-          <div className="bg-slate-50/70 border border-slate-100 rounded-xl p-4 space-y-3">
-            <div className="flex items-center gap-2 text-slate-800">
-              <Shield className="w-4 h-4 text-primary" />
-              <Label className="text-xs font-semibold">Permisos del Módulo</Label>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 pt-1">
-              <label className="flex items-center space-x-2 text-xs text-slate-600 cursor-pointer bg-white p-2.5 rounded-lg border border-slate-200/60 shadow-xs hover:border-slate-300 transition-all">
-                <input
-                  type="checkbox"
-                  className="rounded border-slate-300 text-primary focus:ring-primary h-4 w-4"
-                  {...register("permisos.puede_ver")}
-                />
-                <span className="font-medium">Ver registros</span>
-              </label>
-
-              <label className="flex items-center space-x-2 text-xs text-slate-600 cursor-pointer bg-white p-2.5 rounded-lg border border-slate-200/60 shadow-xs hover:border-slate-300 transition-all">
-                <input
-                  type="checkbox"
-                  className="rounded border-slate-300 text-primary focus:ring-primary h-4 w-4"
-                  {...register("permisos.puede_crear")}
-                />
-                <span className="font-medium">Crear registros</span>
-              </label>
-
-              <label className="flex items-center space-x-2 text-xs text-slate-600 cursor-pointer bg-white p-2.5 rounded-lg border border-slate-200/60 shadow-xs hover:border-slate-300 transition-all">
-                <input
-                  type="checkbox"
-                  className="rounded border-slate-300 text-primary focus:ring-primary h-4 w-4"
-                  {...register("permisos.puede_editar")}
-                />
-                <span className="font-medium">Editar registros</span>
-              </label>
-
-              <label className="flex items-center space-x-2 text-xs text-slate-600 cursor-pointer bg-white p-2.5 rounded-lg border border-slate-200/60 shadow-xs hover:border-slate-300 transition-all">
-                <input
-                  type="checkbox"
-                  className="rounded border-slate-300 text-primary focus:ring-primary h-4 w-4"
-                  {...register("permisos.puede_eliminar")}
-                />
-                <span className="font-medium">Eliminar registros</span>
-              </label>
-            </div>
-          </div>
-
-          <DialogFooter className="pt-4">
-            <Button type="button" variant="outline" onClick={onClose}>
+          <DialogFooter className="pt-3 border-t">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isPending}
+              className="h-9 text-xs"
+            >
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? "Guardando..." : "Guardar Usuario"}
+            <Button type="submit" disabled={isPending} className="h-9 text-xs gap-1.5">
+              {isPending ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Guardando...
+                </>
+              ) : (
+                <>
+                  <Save className="h-3.5 w-3.5" />
+                  {usuario ? 'Guardar Cambios' : 'Crear Usuario'}
+                </>
+              )}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
-  );
+  )
 }
