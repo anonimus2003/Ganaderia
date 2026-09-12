@@ -1,90 +1,242 @@
-'use client'
+// modules/dashboard/hooks/useDashboard.ts
+"use client"
 
-import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { Bovino, RegistroOrdeno, RegistroPeso, AlertaAnimal } from '../types/dashboard'
+import { useState, useEffect } from "react"
+import { 
+  obtenerTotalAnimalesActivos, 
+  obtenerVacasEnOrdenoHoy, 
+  obtenerDiasLactancia, 
+  obtenerProduccionTotalHoy, 
+  obtenerListaBovinos,
+  BovinoOption, 
+  obtenerDatosGraficaLeche, 
+  PuntoProduccion,
+  obtenerDatosGraficaPesaje,
+  PuntoPesaje,
+  obtenerAlertasRetiros,
+  RetiroAnimal,
+  obtenerDistribucionHato
+} from "../actions/actions.dashboard"
 
-export function useDashboardData() {
-  const supabase = createClient()
+export function useTotalAnimales() {
+  const [total, setTotal] = useState<number>(0)
+  const [loading, setLoading] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const [totalAnimales, setTotalAnimales] = useState(0)
-  const [totalPotreros, setTotalPotreros] = useState(0)
-  const [listaBovinos, setListaBovinos] = useState<Bovino[]>([])
-  const [vacaSeleccionada, setVacaSeleccionada] = useState<string>('')
-  
-  const [registrosOrdeno, setRegistrosOrdeno] = useState<RegistroOrdeno[]>([])
-  const [registrosPeso, setRegistrosPeso] = useState<RegistroPeso[]>([])
-  const [alertasAnimal, setAlertasAnimal] = useState<AlertaAnimal[]>([])
-  const [errorSupabase, setErrorSupabase] = useState<string | null>(null)
-
-  // Cargar datos generales y lista de bovinos
   useEffect(() => {
-    async function init() {
+    async function cargarTotal() {
       try {
-        const [{ count: countAnim }, { count: countPot }] = await Promise.all([
-          supabase.from('bovinos').select('*', { count: 'exact', head: true }),
-          supabase.from('potreros').select('*', { count: 'exact', head: true })
-        ])
-
-        setTotalAnimales(countAnim || 0)
-        setTotalPotreros(countPot || 0)
-
-        const { data: bovinos, error } = await supabase
-          .from('bovinos')
-          .select('id, nombre, arete')
-
-        if (error) throw error
-
-        if (bovinos && bovinos.length > 0) {
-          setListaBovinos(bovinos)
-          setVacaSeleccionada(String(bovinos[0].id))
-        } else {
-          setErrorSupabase("No hay bovinos registrados en la base de datos.")
-        }
-      } catch (err: any) {
-        setErrorSupabase(err.message)
+        setLoading(true)
+        const resultado = await obtenerTotalAnimalesActivos()
+        setTotal(resultado)
+      } catch (err) {
+        console.error("Error al obtener total de animales:", err)
+        setError("No se pudo cargar el total")
+      } finally {
+        setLoading(false)
       }
     }
-    init()
+
+    cargarTotal()
   }, [])
 
-  // Cargar historial del bovino seleccionado
+  return { total, loading, error }
+}
+
+export function useVacasEnOrdeno() {
+  const [vacasOrdeno, setVacasOrdeno] = useState<number>(0)
+  const [loading, setLoading] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
+
   useEffect(() => {
-    if (!vacaSeleccionada) return
-
-    async function cargarHistorial() {
-      const [{ data: ordeno }, { data: pesajes }] = await Promise.all([
-        supabase.from('ordeño').select('fecha, litros, jornada').eq('bovino_id', vacaSeleccionada).order('fecha', { ascending: true }),
-        supabase.from('pesajes').select('fecha, peso_kgs').eq('bovino_id', vacaSeleccionada).order('fecha', { ascending: true })
-      ])
-
-      setRegistrosOrdeno(ordeno || [])
-      setRegistrosPeso(pesajes || [])
-
-      // Análisis de alertas de rendimiento
-      const alertas: AlertaAnimal[] = []
-      if (ordeno && ordeno.length >= 2) {
-        const ultimo = Number(ordeno[ordeno.length - 1].litros)
-        const anterior = Number(ordeno[ordeno.length - 2].litros)
-        if (ultimo < anterior * 0.7) {
-          alertas.push({ tipo: 'produccion', mensaje: 'Alerta de rendimiento: Caída abrupta mayor al 30% en el último ordeño.' })
-        }
+    async function cargarVacasOrdeno() {
+      try {
+        setLoading(true)
+        const resultado = await obtenerVacasEnOrdenoHoy()
+        setVacasOrdeno(resultado)
+      } catch (err) {
+        console.error("Error al cargar vacas en ordeño:", err)
+        setError("No se pudo cargar el dato")
+      } finally {
+        setLoading(false)
       }
-      setAlertasAnimal(alertas)
     }
 
-    cargarHistorial()
+    cargarVacasOrdeno()
+  }, [])
+
+  return { vacasOrdeno, loading, error }
+}
+
+export function useDiasLactancia(vacaSeleccionada: string) {
+  const [dias, setDias] = useState<number>(0)
+  const [loading, setLoading] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function cargarDiasLactancia() {
+      try {
+        setLoading(true)
+        const resultado = await obtenerDiasLactancia(vacaSeleccionada)
+        setDias(resultado)
+      } catch (err) {
+        console.error("Error al cargar días de lactancia:", err)
+        setError("No se pudo calcular")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    cargarDiasLactancia()
   }, [vacaSeleccionada])
 
-  return {
-    totalAnimales,
-    totalPotreros,
-    listaBovinos,
-    vacaSeleccionada,
-    setVacaSeleccionada,
-    registrosOrdeno,
-    registrosPeso,
-    alertasAnimal,
-    errorSupabase
-  }
+  return { dias, loading, error }
+}
+
+export function useProduccionTotalHoy(vacaSeleccionada: string) {
+  const [produccion, setProduccion] = useState<number>(0)
+  const [loading, setLoading] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function cargarProduccion() {
+      try {
+        setLoading(true)
+        const resultado = await obtenerProduccionTotalHoy(vacaSeleccionada)
+        setProduccion(resultado)
+      } catch (err) {
+        console.error("Error al cargar producción de leche:", err)
+        setError("No se pudo calcular")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    cargarProduccion()
+  }, [vacaSeleccionada])
+
+  return { produccion, loading, error }
+}
+
+export function useListaBovinos() {
+  const [bovinos, setBovinos] = useState<BovinoOption[]>([])
+  const [loading, setLoading] = useState<boolean>(true)
+
+  useEffect(() => {
+    async function cargarBovinos() {
+      try {
+        setLoading(true)
+        const resultado = await obtenerListaBovinos()
+        setBovinos(resultado)
+      } catch (err) {
+        console.error("Error al cargar lista de bovinos:", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    cargarBovinos()
+  }, [])
+
+  return { bovinos, loading }
+}
+
+export function useGraficaLeche(vacaSeleccionada: string, escalaTiempo: "dia" | "mes" | "anio" = "dia") {
+  const [datos, setDatos] = useState<PuntoProduccion[]>([])
+  const [loading, setLoading] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function cargarGrafica() {
+      try {
+        setLoading(true)
+        const resultado = await obtenerDatosGraficaLeche(vacaSeleccionada, escalaTiempo)
+        setDatos(resultado)
+      } catch (err) {
+        console.error("Error al cargar la gráfica de leche:", err)
+        setError("No se pudo cargar la gráfica")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    cargarGrafica()
+  }, [vacaSeleccionada, escalaTiempo])
+
+  return { datos, loading, error }
+}
+
+export function useGraficaPesaje(vacaSeleccionada: string, escalaTiempo: "dias" | "meses" | "anios" = "meses") {
+  const [datos, setDatos] = useState<PuntoPesaje[]>([])
+  const [loading, setLoading] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function cargarGraficaPesaje() {
+      try {
+        setLoading(true)
+        const resultado = await obtenerDatosGraficaPesaje(vacaSeleccionada, escalaTiempo)
+        setDatos(resultado)
+      } catch (err) {
+        console.error("Error al cargar la gráfica de pesaje:", err)
+        setError("No se pudo cargar la gráfica de pesaje")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    cargarGraficaPesaje()
+  }, [vacaSeleccionada, escalaTiempo])
+
+  return { datos, loading, error }
+}
+
+
+export function useAlertasRetiros() {
+  const [retiros, setRetiros] = useState<RetiroAnimal[]>([])
+  const [loading, setLoading] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function cargarRetiros() {
+      try {
+        setLoading(true)
+        const resultado = await obtenerAlertasRetiros()
+        setRetiros(resultado)
+      } catch (err) {
+        console.error("Error al cargar alertas de retiros:", err)
+        setError("No se pudieron cargar las alertas")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    cargarRetiros()
+  }, [])
+
+  return { retiros, loading, error }
+}
+
+export function useGraficaEstadoHato() {
+  const [datos, setDatos] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function cargarDatos() {
+      try {
+        setLoading(true)
+        const resultado = await obtenerDistribucionHato()
+        setDatos(resultado)
+      } catch (error) {
+        console.error("Error al cargar la distribución del hato:", error)
+        setDatos([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    cargarDatos()
+  }, [])
+
+  return { datos, loading }
 }
