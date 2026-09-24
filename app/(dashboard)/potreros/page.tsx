@@ -1,6 +1,6 @@
 // app/dashboard/medicamentos/page.tsx
-import  MantenimientoPage from '@/modules/mantenimiento'; // Ajusta la ruta exacta según dónde tengas guardada tu carpeta
+import  PotrerosModule  from '@/modules/potreros'; // Asegúrate de que la ruta sea correcta
 
 export default function Page() {
-  return < MantenimientoPage />;
+  return <PotrerosModule />;
 }

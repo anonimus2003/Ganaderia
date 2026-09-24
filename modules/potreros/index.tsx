@@ -1,329 +1,413 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { createClient } from '@/lib/supabase/client';
-import { PlusCircle, ArrowRightLeft, Sprout, X, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { usePotreros } from './hooks/usePotreros';
 import MapaPotreros from './components/MapaPotreros';
-import VistaPotreros from './components/vistaPotreros';
-import EditarPotreroModal from './components/EditarPotreroModal';
-import HistorialList from './components/HistorialList';
-import ControlGanado from './components/ControlGanado';
-import ControlAbono from './components/ControlAbono';
-import RecuperacionPotrero from './components/RecuperarcionPotrero';
+import HeaderPotreros from './components/HeaderPotreros';
+import { PotreroDrawer } from './components/PotreroDrawer';
+import { BitacoraPotrero, EventoBitacora } from './components/BitacoraPotrero';
+import { createClient } from '@/lib/supabase/client';
 
-export default function PotrerosPage() {
+const supabase = createClient();
+
+export default function PotrerosModule() {
   const {
     potreros,
-    loading,
-    selectedId,
-    setSelectedId,
-    ingresarGanado,
-    sacarGanado,
-    registrarAbono,
-    guardarPotrero,
-    eliminarPotrero,
+    potreroActivo,
+    seleccionarPotrero,
+    actualizarGanadoLocal
   } = usePotreros();
 
-  const supabase = createClient();
+  const [bitacoraEventos, setBitacoraEventos] = useState<EventoBitacora[]>([]);
+  const [eventoEnEdicion, setEventoEnEdicion] = useState<EventoBitacora | null>(null);
+  const [cargandoBitacora, setCargandoBitacora] = useState<boolean>(true);
 
-  const [historialRotacion, setHistorialRotacion] = useState<any[]>([]);
-  const [historialAbonos, setHistorialAbonos] = useState<any[]>([]);
-  const [progresoCrecimiento, setProgresoCrecimiento] = useState<number>(0);
+  const [potreroFiltradoBitacoraId, setPotreroFiltradoBitacoraId] = useState<string | number | null>(null);
+  const [isPlanificadorOpen, setIsPlanificadorOpen] = useState<boolean>(false);
 
-  const [mostrarModalEdicion, setMostrarModalEdicion] = useState<boolean>(false);
-  const [mostrarModalCreacion, setMostrarModalCreacion] = useState<boolean>(false);
-  const [mostrarMenuFlotante, setMostrarMenuFlotante] = useState<boolean>(false);
-  const [accionActiva, setAccionActiva] = useState<'ganado' | 'abono' | 'recuperacion' | null>(null);
-  const [creandoDesdeMapa, setCreandoDesdeMapa] = useState<boolean>(false);
-
-  const potreroSeleccionado = potreros.find((p) => p.id === selectedId) || null;
-  const estadoPotrero = potreroSeleccionado?.estado?.toLowerCase().trim() || '';
-  const estaOcupado = estadoPotrero === 'ocupado';
-  const estaEnDescanso = estadoPotrero === 'en descanso';
-
-  const abrirAccion = (accion: 'ganado' | 'abono' | 'recuperacion') => {
-    if (!potreroSeleccionado) return;
-    setMostrarMenuFlotante(true);
-    setAccionActiva(accionActiva === accion ? null : accion);
-  };
-
-  const fetchHistoriales = useCallback(async () => {
+  // Carga unificada de historial generando eventos tanto de Ingreso como de Salida
+  const cargarDatosBitacora = useCallback(async () => {
     try {
-      let qR = supabase.from('historial_potreros').select('*').order('id', { ascending: false });
-      let qA = supabase.from('historial_abonos').select('*').order('fecha_aplicacion', { ascending: false });
+      setCargandoBitacora(true);
 
-      if (selectedId !== null) {
-        qR = qR.eq('potrero_id', selectedId);
-        qA = qA.eq('potrero_id', selectedId);
+      const [resGanado, resAbonos] = await Promise.all([
+        supabase
+          .from('historial_ocupacion_potreros')
+          .select('id, potrero_id, bovino_id, fecha_entrada, fecha_salida, notas, bovinos(id, arete, nombre), potreros(nombre)')
+          .order('fecha_entrada', { ascending: false }),
+        supabase
+          .from('historial_abonos')
+          .select('*, potreros(nombre)')
+          .order('creado_at', { ascending: false })
+      ]);
+
+      if (resGanado.error) console.error('Error en historial ganado:', resGanado.error.message || resGanado.error);
+      if (resAbonos.error) console.error('Error en historial abonos:', resAbonos.error.message || resAbonos.error);
+
+      let eventosUnificados: EventoBitacora[] = [];
+
+      if (resGanado.data) {
+        const eventosGanado: EventoBitacora[] = [];
+
+        resGanado.data.forEach((item: any) => {
+          const infoBovino = Array.isArray(item.bovinos) ? item.bovinos[0] : item.bovinos;
+          const infoPotrero = Array.isArray(item.potreros) ? item.potreros[0] : item.potreros;
+
+          const identificacionBovino = infoBovino 
+            ? `${infoBovino.arete || 'Sin arete'} - ${infoBovino.nombre || 'Sin nombre'}` 
+            : item.bovino_id ? `Bovino ID: ${item.bovino_id}` : 'Bovino registrado';
+
+          const nombrePotrero = infoPotrero?.nombre || `Potrero #${item.potrero_id}`;
+
+          // 1. Evento de INGRESO
+          if (item.fecha_entrada) {
+            eventosGanado.push({
+              id: `p_ingreso_${item.id}`,
+              potrero_id: item.potrero_id,
+              potrero_nombre: nombrePotrero,
+              tipo: 'ingreso',
+              titulo: 'Ingreso de Bovino',
+              detalle: item.notas ? `${identificacionBovino} (${item.notas})` : identificacionBovino,
+              fecha: new Date(item.fecha_entrada).toISOString().split('T')[0],
+              animales: [identificacionBovino]
+            });
+          }
+
+          // 2. Evento de SALIDA
+          if (item.fecha_salida) {
+            eventosGanado.push({
+              id: `p_salida_${item.id}`,
+              potrero_id: item.potrero_id,
+              potrero_nombre: nombrePotrero,
+              tipo: 'salida',
+              titulo: 'Salida / Retiro de Bovino',
+              detalle: `Retiro de ${identificacionBovino}`,
+              fecha: new Date(item.fecha_salida).toISOString().split('T')[0],
+              animales: [identificacionBovino]
+            });
+          }
+        });
+
+        eventosUnificados = [...eventosUnificados, ...eventosGanado];
       }
 
-      const [{ data: rotaciones }, { data: abonos }] = await Promise.all([qR, qA]);
-      setHistorialRotacion(rotaciones || []);
-      setHistorialAbonos(abonos || []);
-    } catch (error) {
-      console.error('Error cargando historiales:', error);
+      if (resAbonos.data) {
+        const eventosAbonos: EventoBitacora[] = resAbonos.data.map((item: any) => {
+          const infoPotrero = Array.isArray(item.potreros) ? item.potreros[0] : item.potreros;
+          return {
+            id: `a_${item.id}`,
+            potrero_id: item.potrero_id,
+            potrero_nombre: infoPotrero?.nombre || `Potrero #${item.potrero_id}`,
+            tipo: 'abono',
+            titulo: `Aplicación de Abono: ${item.insumo || item.tipo_abono || 'Abono'}`,
+            detalle: `Cantidad: ${item.cantidad || item.unidades || ''} ${item.responsable ? `- ${item.responsable}` : ''}`,
+            fecha: item.fecha_aplicacion ? new Date(item.fecha_aplicacion).toISOString().split('T')[0] : 'Fecha no registrada',
+          };
+        });
+        eventosUnificados = [...eventosUnificados, ...eventosAbonos];
+      }
+
+      setBitacoraEventos(eventosUnificados);
+    } catch (err: any) {
+      console.error('Error cargando la bitácora:', err?.message || err);
+    } finally {
+      setCargandoBitacora(false);
     }
-  }, [selectedId, supabase]);
-
-  /* eslint-disable react-hooks/set-state-in-effect -- selection changes reset the local pasture controls. */
-  useEffect(() => {
-    queueMicrotask(() => { void fetchHistoriales(); });
-  }, [fetchHistoriales]);
+  }, []);
 
   useEffect(() => {
-    if (potreroSeleccionado) {
-      setProgresoCrecimiento(potreroSeleccionado.progreso_pasto || 0);
+    cargarDatosBitacora();
+  }, [cargarDatosBitacora]);
+
+  const handleOperarGanado = async (
+    accion: 'ingreso' | 'salida', 
+    cantidad: number, 
+    tipo: string, 
+    fecha: string, 
+    animalesSeleccionados: any[],
+    potreroIdDestino?: string | number
+  ) => {
+    const potreroIdFinal = potreroIdDestino || potreroActivo?.id;
+    if (!potreroIdFinal) return;
+
+    const potreroIdNum = Number(potreroIdFinal);
+
+    if (eventoEnEdicion && eventoEnEdicion.id.includes('_')) {
+      const parts = eventoEnEdicion.id.split('_');
+      const rawId = parts[parts.length - 1];
+      const realId = isNaN(Number(rawId)) ? rawId : Number(rawId);
+      
+      const updateData = accion === 'ingreso' 
+        ? { fecha_entrada: new Date(fecha).toISOString() }
+        : { fecha_salida: new Date(fecha).toISOString() };
+
+      const { error } = await supabase
+        .from('historial_ocupacion_potreros')
+        .update(updateData)
+        .eq('id', realId);
+
+      if (error) {
+        alert('Error al actualizar en Supabase: ' + error.message);
+        return;
+      }
     } else {
-      setProgresoCrecimiento(0);
-      setMostrarMenuFlotante(false);
-      setAccionActiva(null);
-    }
-  }, [potreroSeleccionado]);
-  /* eslint-enable react-hooks/set-state-in-effect */
+      if (accion === 'ingreso') {
+        if (!animalesSeleccionados || animalesSeleccionados.length === 0) {
+          alert('Debes seleccionar al menos un bovino');
+          return;
+        }
 
-  const handleGuardarPotrero = async (datos: any) => {
-    if (!potreroSeleccionado) return;
-    await guardarPotrero(datos, potreroSeleccionado.id);
-    await fetchHistoriales();
-  };
+        const registrosAInsertar = animalesSeleccionados.map(anim => {
+          const bovinoId = typeof anim === 'object' ? anim.id : anim;
+          return {
+            potrero_id: potreroIdNum,
+            bovino_id: bovinoId,
+            fecha_entrada: new Date(fecha).toISOString(),
+            fecha_salida: null
+          };
+        });
 
-  const handleEliminarPotrero = async () => {
-    if (!potreroSeleccionado || !eliminarPotrero) return;
-    await eliminarPotrero(potreroSeleccionado.id);
-    setSelectedId(null);
-    setMostrarMenuFlotante(false);
-    setAccionActiva(null);
-    await fetchHistoriales();
-  };
+        const { error } = await supabase
+          .from('historial_ocupacion_potreros')
+          .insert(registrosAInsertar);
 
-  // RECUPERACIÓN: Disponible solo si el progreso es exactamente 100%
-  const handleRecuperacion = async (potreroId: number, progreso: number, fecha: string, observacion?: string) => {
-    try {
-      const progresoNormalizado = Math.min(100, Math.max(0, Number(progreso) || 0));
-      const potreroActual = potreros.find((p) => p.id === potreroId);
+        if (error) {
+          alert('Error al guardar el movimiento: ' + error.message);
+          return;
+        }
 
-      if (!potreroActual) throw new Error('No se encontró el potrero.');
-
-      const estadoActual = potreroActual.estado?.toLowerCase().trim();
-      let nuevoEstado = potreroActual.estado;
-
-      if (estadoActual === 'en descanso') {
-        nuevoEstado = progresoNormalizado === 100 ? 'Disponible' : 'En Descanso';
+        await supabase
+          .from('potreros')
+          .update({ estado: 'Ocupado' })
+          .eq('id', potreroIdNum);
       }
 
-      await guardarPotrero({ progreso_pasto: progresoNormalizado, estado: nuevoEstado } as any, potreroId);
-      setProgresoCrecimiento(progresoNormalizado);
-      await fetchHistoriales();
-      setAccionActiva(null);
-      setMostrarMenuFlotante(false);
-
-      if (estadoActual === 'en descanso' && progresoNormalizado === 100) {
-        alert('Recuperación registrada correctamente. El potrero ya está disponible.');
-      } else {
-        alert('Recuperación registrada correctamente.');
+      if (actualizarGanadoLocal) {
+        actualizarGanadoLocal(potreroIdNum, accion === 'ingreso' ? 'ingreso' : 'salida', animalesSeleccionados);
       }
-    } catch (error) {
-      console.error('Error registrando recuperación:', error);
-      alert('No se pudo registrar la recuperación del potrero.');
+    }
+
+    // Resetear estados y cerrar drawer tras operar exitosamente
+    await cargarDatosBitacora();
+    setEventoEnEdicion(null);
+    seleccionarPotrero(null);
+    setIsPlanificadorOpen(false);
+  };
+
+  const handleOperarAbono = async (
+    unidades: number, 
+    tipoAbono: string, 
+    fecha: string, 
+    detalleExtra: string, 
+    potreroIdDestino?: string | number
+  ) => {
+    const potreroIdFinal = potreroIdDestino || potreroActivo?.id;
+    if (!potreroIdFinal) return;
+
+    const potreroIdNum = Number(potreroIdFinal);
+
+    if (eventoEnEdicion && eventoEnEdicion.id.startsWith('a_')) {
+      // ✅ Se mantiene realId como string (UUID) sin forzar Number()
+      const realId = eventoEnEdicion.id.replace('a_', '');
+      const { error } = await supabase
+        .from('historial_abonos')
+        .update({
+          insumo: tipoAbono,
+          cantidad: `${unidades} Unidades`,
+          fecha_aplicacion: fecha,
+          responsable: detalleExtra || 'Administrador'
+        })
+        .eq('id', realId);
+
+      if (error) {
+        alert('Error al actualizar el abono: ' + error.message);
+        return;
+      }
+    } else {
+      const { error } = await supabase
+        .from('historial_abonos')
+        .insert({
+          potrero_id: potreroIdNum,
+          insumo: tipoAbono,
+          cantidad: `${unidades} Unidades`,
+          fecha_aplicacion: fecha,
+          responsable: detalleExtra || 'Administrador'
+        });
+
+      if (error) {
+        alert('Error al guardar el abono: ' + error.message);
+        return;
+      }
+    }
+
+    // Resetear estados y cerrar drawer tras operar exitosamente
+    await cargarDatosBitacora();
+    setEventoEnEdicion(null);
+    seleccionarPotrero(null);
+    setIsPlanificadorOpen(false);
+  };
+
+  const handleEliminarEventoBitacora = async (eventoId: string) => {
+    if (confirm('¿Estás seguro de eliminar este registro del historial?')) {
+      if (eventoId.startsWith('p_salida_')) {
+        const rawId = eventoId.replace('p_salida_', '');
+        const realId = isNaN(Number(rawId)) ? rawId : Number(rawId);
+        const { error } = await supabase
+          .from('historial_ocupacion_potreros')
+          .update({ fecha_salida: null })
+          .eq('id', realId);
+
+        if (error) {
+          alert('Error al revertir la salida: ' + error.message);
+          return;
+        }
+      } else if (eventoId.startsWith('p_ingreso_') || eventoId.startsWith('p_')) {
+        const rawId = eventoId.replace('p_ingreso_', '').replace('p_', '');
+        const realId = isNaN(Number(rawId)) ? rawId : Number(rawId);
+        const { error } = await supabase
+          .from('historial_ocupacion_potreros')
+          .delete()
+          .eq('id', realId);
+
+        if (error) {
+          alert('Error al eliminar ingreso: ' + error.message);
+          return;
+        }
+      } else if (eventoId.startsWith('a_')) {
+        // ✅ Se mantiene realId como string (UUID) sin forzar Number()
+        const realId = eventoId.replace('a_', '');
+        const { error } = await supabase
+          .from('historial_abonos')
+          .delete()
+          .eq('id', realId);
+
+        if (error) {
+          alert('Error al eliminar abono: ' + error.message);
+          return;
+        }
+      }
+
+      await cargarDatosBitacora();
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex h-[80vh] items-center justify-center">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-600" />
-      </div>
-    );
-  }
+  const handleIniciarEdicionEvento = (evento: EventoBitacora) => {
+    const potreroAsociado = potreros.find(p => String(p.id) === String(evento.potrero_id));
+    seleccionarPotrero(potreroAsociado || null);
+    setEventoEnEdicion(evento);
+    setIsPlanificadorOpen(true);
+  };
+
+  const handleEliminarPotrero = () => {
+    if (!potreroActivo) return;
+    if (confirm(`¿Estás seguro de eliminar el potrero #${potreroActivo.nombre}?`)) {
+      seleccionarPotrero(null);
+    }
+  };
+
+  const handleGuardarPuntosPotrero = async (potreroId: string | number, nuevosPuntos: Array<{ x: number; y: number }>) => {
+    const { error } = await supabase
+      .from('potreros')
+      .update({ puntos: nuevosPuntos })
+      .eq('id', Number(potreroId));
+
+    if (error) {
+      alert('Error al guardar la posición: ' + error.message);
+    }
+  };
+
+  const handleAbrirPlanificador = () => {
+    seleccionarPotrero(null);
+    setEventoEnEdicion(null);
+    setIsPlanificadorOpen(true);
+  };
+
+  const idFiltroActivo = potreroFiltradoBitacoraId || potreroActivo?.id;
+  
+  const potreroSeleccionadoInfo = useMemo(() => {
+    if (!idFiltroActivo) return null;
+    return potreros.find(p => String(p.id) === String(idFiltroActivo));
+  }, [potreros, idFiltroActivo]);
+
+  const eventosFiltrados = useMemo(() => {
+    return idFiltroActivo 
+      ? bitacoraEventos.filter(e => String(e.potrero_id) === String(idFiltroActivo))
+      : bitacoraEventos;
+  }, [bitacoraEventos, idFiltroActivo]);
+
+  // Key única para forzar el re-render y desmontaje del Drawer cuando cambia la selección
+  const drawerKey = eventoEnEdicion 
+    ? `edit-${eventoEnEdicion.id}` 
+    : potreroActivo 
+    ? `potrero-${potreroActivo.id}` 
+    : 'planificador-nuevo';
 
   return (
-    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 relative pb-24">
-      {/* CABECERA */}
-      <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-sm">
-        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-5">
-          <div>
-            <span className="inline-flex text-xs font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
-              Módulo Ganadero
-            </span>
-            <h1 className="text-2xl sm:text-3xl font-black text-slate-800 mt-2">Gestión de Potreros</h1>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1">Controla animales, fertilización y recuperación del terreno.</p>
+    <div className="min-h-screen bg-slate-50/50 p-6 space-y-6 relative overflow-x-hidden">
+      <HeaderPotreros 
+        onAbrirPlanificador={handleAbrirPlanificador}
+        totalPotreros={potreros.length}
+        totalLibres={potreros.filter(p => p.estado?.toLowerCase() === 'libre' || p.estado?.toLowerCase() === 'disponible').length}
+        totalOcupados={potreros.filter(p => p.estado?.toLowerCase() === 'ocupado').length}
+      />
 
-            {potreroSeleccionado && (
-              <div className="flex items-center gap-2 mt-3">
-                <span className="text-[11px] font-bold text-slate-400 uppercase">Potrero:</span>
-                <span className="text-xs font-black text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg">
-                  {potreroSeleccionado.nombre}
-                </span>
-                <span
-                  className={`text-[10px] font-bold px-2 py-1 rounded-lg ${
-                    estaOcupado
-                      ? 'bg-amber-50 text-amber-700'
-                      : estaEnDescanso
-                      ? 'bg-blue-50 text-blue-700'
-                      : 'bg-emerald-50 text-emerald-700'
-                  }`}
-                >
-                  {potreroSeleccionado.estado}
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* ACCIONES PRINCIPALES */}
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              disabled={!potreroSeleccionado}
-              onClick={() => abrirAccion('ganado')}
-              className={`group flex items-center gap-2 px-4 py-3 rounded-xl text-xs font-bold border transition-all ${
-                accionActiva === 'ganado'
-                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg shadow-emerald-600/20'
-                  : 'bg-white text-slate-700 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50'
-              } ${!potreroSeleccionado ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              <ArrowRightLeft size={17} className={accionActiva === 'ganado' ? 'text-white' : 'text-emerald-600'} />
-              <span>{estaOcupado ? 'Sacar Animales' : 'Control Bovinos'}</span>
-            </button>
-
-            <button
-              type="button"
-              disabled={!potreroSeleccionado}
-              onClick={() => abrirAccion('abono')}
-              className={`group flex items-center gap-2 px-4 py-3 rounded-xl text-xs font-bold border transition-all ${
-                accionActiva === 'abono'
-                  ? 'bg-amber-600 text-white border-amber-600 shadow-lg shadow-amber-600/20'
-                  : 'bg-white text-slate-700 border-slate-200 hover:border-amber-300 hover:bg-amber-50'
-              } ${!potreroSeleccionado ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              <Sprout size={17} className={accionActiva === 'abono' ? 'text-white' : 'text-amber-600'} />
-              <span>Abonos</span>
-            </button>
-
-            <button
-              type="button"
-              disabled={!potreroSeleccionado || !estaEnDescanso}
-              onClick={() => abrirAccion('recuperacion')}
-              className={`group flex items-center gap-2 px-4 py-3 rounded-xl text-xs font-bold border transition-all ${
-                accionActiva === 'recuperacion'
-                  ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-600/20'
-                  : 'bg-white text-slate-700 border-slate-200 hover:border-blue-300 hover:bg-blue-50'
-              } ${!potreroSeleccionado || !estaEnDescanso ? 'opacity-40 cursor-not-allowed' : ''}`}
-            >
-              <RefreshCw size={17} className={accionActiva === 'recuperacion' ? 'text-white' : 'text-blue-600'} />
-              <span>Recuperación</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setMostrarModalCreacion(true)}
-              className="flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-3 rounded-xl text-xs font-bold shadow-lg transition-all"
-            >
-              <PlusCircle size={16} />
-              <span>Crear Potrero</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* GRID PRINCIPAL */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div className="lg:col-span-8 flex flex-col gap-6">
           <MapaPotreros
             potreros={potreros}
-            selectedId={selectedId}
-            onSelectPotrero={setSelectedId}
-            creandoDesdeMapa={creandoDesdeMapa}
-            onCrearDesdeMapa={(_coords) => {
-              setCreandoDesdeMapa(true);
-              setMostrarModalCreacion(true);
+            potreroSeleccionadoId={idFiltroActivo}
+            onSelectPotrero={(potrero) => {
+              setPotreroFiltradoBitacoraId(potrero.id);
             }}
+            onDoubleClickPotrero={(potrero) => {
+              setIsPlanificadorOpen(false);
+              seleccionarPotrero(potrero);
+              setPotreroFiltradoBitacoraId(potrero.id);
+              setEventoEnEdicion(null);
+            }}
+            onGuardarPuntos={handleGuardarPuntosPotrero}
           />
         </div>
 
-        <VistaPotreros
-          potreroSeleccionado={potreroSeleccionado}
-          selectedId={selectedId}
-          setSelectedId={setSelectedId}
-          setMostrarModalEdicion={setMostrarModalEdicion}
-          setMostrarModalControl={() => {
-            if (potreroSeleccionado) setMostrarMenuFlotante(true);
-          }}
-          progresoCrecimiento={progresoCrecimiento}
-        />
+        <div className="lg:col-span-4 space-y-4">
+          {cargandoBitacora ? (
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 text-center text-xs text-slate-400 py-6">
+              Cargando historial de potreros...
+            </div>
+          ) : (
+            <BitacoraPotrero 
+              eventos={eventosFiltrados}
+              potreroActivoNombre={
+                potreroSeleccionadoInfo 
+                  ? String(potreroSeleccionadoInfo.nombre || idFiltroActivo)
+                  : undefined
+              }
+              areaPotrero={potreroSeleccionadoInfo?.area_m2}
+              pastoPotrero={potreroSeleccionadoInfo?.tipo_pasto}
+              aforoEst={potreroSeleccionadoInfo?.aforo}
+              progresoPasto={potreroSeleccionadoInfo?.progreso_pasto}
+              onEditarSeleccionado={handleIniciarEdicionEvento}
+              onEliminarEvento={handleEliminarEventoBitacora}
+            />
+          )}
+        </div>
       </div>
 
-      {/* MODAL EDICIÓN */}
-      <EditarPotreroModal
-        potrero={potreroSeleccionado}
-        isOpen={mostrarModalEdicion}
-        onClose={() => setMostrarModalEdicion(false)}
-        onSave={handleGuardarPotrero}
-        onDelete={handleEliminarPotrero}
-      />
-
-      {/* FORMULARIO DE ACCIÓN */}
-      {potreroSeleccionado && mostrarMenuFlotante && accionActiva && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-slate-900/20 backdrop-blur-[2px]">
-          <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-2xl w-full max-w-md relative max-h-[90vh] overflow-y-auto">
-            <button
-              type="button"
-              onClick={() => {
-                setAccionActiva(null);
-                setMostrarMenuFlotante(false);
-              }}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 p-2 rounded-full hover:bg-slate-100 transition-colors"
-            >
-              <X size={18} />
-            </button>
-
-            <div className="mb-5 pr-10">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Gestión de Potrero</span>
-              <h2 className="text-xl font-black text-slate-800 mt-1">{potreroSeleccionado.nombre}</h2>
-              <p className="text-xs text-slate-500 mt-1">
-                Estado actual: <span className="font-bold text-slate-700">{potreroSeleccionado.estado}</span>
-              </p>
-            </div>
-
-            {accionActiva === 'ganado' && (
-              <ControlGanado
-                potrero={potreroSeleccionado}
-                onIngresarGanado={async (id, bovinos, fecha) => {
-                  await ingresarGanado(id, bovinos, fecha);
-                  await fetchHistoriales();
-                  setAccionActiva(null);
-                  setMostrarMenuFlotante(false);
-                }}
-                onSacarGanado={async (id, fecha) => {
-                  await sacarGanado(id, fecha);
-                  await fetchHistoriales();
-                  setAccionActiva(null);
-                  setMostrarMenuFlotante(false);
-                }}
-              />
-            )}
-
-            {accionActiva === 'abono' && (
-              <ControlAbono
-                potreroId={potreroSeleccionado.id}
-                onRegistrarAbono={async (id, insumo, cantidad, fecha) => {
-                  await registrarAbono(id, insumo, cantidad, fecha);
-                  await fetchHistoriales();
-                  setAccionActiva(null);
-                  setMostrarMenuFlotante(false);
-                }}
-              />
-            )}
-
-            {accionActiva === 'recuperacion' && (
-              <RecuperacionPotrero potrero={potreroSeleccionado} onActualizar={handleRecuperacion} />
-            )}
-          </div>
-        </div>
+      {(potreroActivo || isPlanificadorOpen) && (
+        <PotreroDrawer
+          key={drawerKey}
+          potrero={potreroActivo}
+          eventoEnEdicion={eventoEnEdicion}
+          onClose={() => {
+            seleccionarPotrero(null);
+            setEventoEnEdicion(null);
+            setIsPlanificadorOpen(false);
+          }}
+          onOperarGanado={handleOperarGanado}
+          onOperarAbono={handleOperarAbono}
+          onEliminar={handleEliminarPotrero}
+        />
       )}
-
-      {/* HISTORIALES */}
-      <HistorialList rotaciones={historialRotacion} abonos={historialAbonos} />
     </div>
   );
 }

@@ -121,7 +121,7 @@ export default function ReproduccionFiltersDrawer({
                   <SelectItem value="I.Artificial">Inseminación Artificial</SelectItem>
                   <SelectItem value="Monta Natural">Monta Natural</SelectItem>
                   <SelectItem value="Transf.Embrion">Transferencia de Embriones</SelectItem>
-                   <SelectItem value="Celo no servido">Celo no servido</SelectItem>
+                  <SelectItem value="Celo no servido">Celo no servido</SelectItem>
                 </SelectContent>
               </Select>
             </div>
