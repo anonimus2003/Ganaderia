@@ -14,20 +14,29 @@ export async function getBovinosAction(page = 1, limit = 10, filtros?: FiltrosBo
     .select("*", { count: "exact" })
     .order("created_at", { ascending: false });
 
-  // Aplicar filtros directamente en Supabase para no saturar la memoria
+  // Aplicar filtros a las columnas reales de la BD
   if (filtros) {
-    if (filtros.busqueda) {
-      query = query.or(`arete.ilike.%${filtros.busqueda}%,nombre.ilike.%${filtros.busqueda}%`);
+    if (filtros.busqueda && filtros.busqueda.trim() !== "") {
+      const term = `%${filtros.busqueda.trim()}%`;
+      query = query.or(`arete.ilike.${term},nombre.ilike.${term}`);
     }
-    if (filtros.sexo && filtros.sexo !== "todos") {
-      query = query.eq("genero", filtros.sexo);
+
+    // Filtro por Género
+    if (filtros.genero && filtros.genero !== "todos") {
+      query = query.eq("genero", filtros.genero);
     }
-    if (filtros.estado && filtros.estado !== "todos") {
-      query = query.ilike("condicion", `%${filtros.estado}%`);
+
+    // Filtro por Condición Operativa (Activo/Inactivo)
+    if (filtros.condicion && filtros.condicion !== "todos") {
+      query = query.eq("condicion", filtros.condicion);
     }
+
+    // ✅ Filtro por Categoría
     if (filtros.categoria && filtros.categoria !== "todas") {
       query = query.eq("categoria", filtros.categoria);
     }
+
+    // Filtro por Origen
     if (filtros.origen && filtros.origen !== "todos") {
       query = query.eq("origen", filtros.origen);
     }
@@ -41,15 +50,15 @@ export async function getBovinosAction(page = 1, limit = 10, filtros?: FiltrosBo
   }
 
   return {
-    data: data || [],
+    data: (data as Bovino[]) || [],
     total: count || 0,
   };
 }
 
 // Función auxiliar para limpiar cadenas vacías y convertirlas en null
 function limpiarCamposVacios(data: Partial<Bovino>) {
-  const limpio: any = { ...data };
-  Object.keys(limpio).forEach(key => {
+  const limpio: Record<string, any> = { ...data };
+  Object.keys(limpio).forEach((key) => {
     if (limpio[key] === "" || limpio[key] === undefined) {
       limpio[key] = null;
     }

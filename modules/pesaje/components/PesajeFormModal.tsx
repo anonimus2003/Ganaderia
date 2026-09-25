@@ -93,8 +93,17 @@ export default function PesajeFormModal({
     }
   }, [pesajeAEditar, isOpen]);
 
-  const listaBovinos = Array.isArray(bovinosList) ? bovinosList : [];
-  const bovinoActual = listaBovinos.find((b) => b.id === formData.bovino_id);
+  const listaBovinos = (Array.isArray(bovinosList) ? bovinosList : []).filter(
+    (b) =>
+      b.condicion?.toLowerCase() === "activo" ||
+      (isEditing && b.id === formData.bovino_id)
+  );
+
+  const bovinoActual = (Array.isArray(bovinosList) ? bovinosList : []).find(
+    (b) => b.id === formData.bovino_id
+  );
+
+ 
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

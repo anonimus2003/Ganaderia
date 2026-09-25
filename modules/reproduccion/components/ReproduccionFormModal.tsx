@@ -120,7 +120,12 @@ export default function ReproduccionFormModal({
   };
 
   const listaBovinos = Array.isArray(allBovinos) ? allBovinos : [];
-  const posiblesHembras = listaBovinos.filter((b) => b.genero === "Hembra");
+
+  const posiblesHembras = listaBovinos.filter(
+  (b) =>
+    b.genero === "Hembra" &&
+    (b.condicion === "Activo" || !b.condicion || b.id === formData.bovino_id)
+  );
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -216,7 +221,7 @@ export default function ReproduccionFormModal({
                         </SelectItem>
                         {posiblesHembras.map((hembra) => (
                           <SelectItem key={hembra.id} value={hembra.id}>
-                            {hembra.arete} {hembra.nombre ? `- ${hembra.nombre}` : ""} ({hembra.raza})
+                            {hembra.arete} {hembra.nombre ? `- ${hembra.nombre}` : ""}
                           </SelectItem>
                         ))}
                       </SelectContent>

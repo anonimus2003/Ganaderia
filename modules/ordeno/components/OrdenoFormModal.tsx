@@ -81,9 +81,13 @@ export default function OrdeñoFormModal({
   }, [initialData, isOpen]);
 
   const listaBovinos = Array.isArray(bovinos) ? bovinos : [];
-  const vacasDisponibles = listaBovinos.filter(
-    (b) => b.genero === "Hembra" 
-  );
+  const vacasDisponibles = listaBovinos.filter((b) => {
+  const esHembra = b.genero === "Hembra";
+  const estaActiva = b.condicion === "Activo";
+  const esLaSeleccionada = b.id === formData.bovino_id;
+
+  return esHembra && (estaActiva || esLaSeleccionada);
+  });
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

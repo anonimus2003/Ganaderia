@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useBovinos } from "./hooks/usebovinos";
+import { useBovinos, FiltrosBovino } from "./hooks/usebovinos";
 import BovinoTable from "./components/BovinoTable";
 import BovinoFormModal from "./components/BovinoFormModal";
 import BovinoFiltersDrawer from "./components/BovinoFiltersDrawer";
@@ -11,7 +11,7 @@ import { Bovino } from "./schemas";
 export default function InventarioPage() {
   const {
     bovinos,
-    allBovinos, // <--- Extraemos la lista completa sin paginar del hook
+    allBovinos, // Lista completa sin paginar
     loading,
     handleSave,
     handleDelete,
@@ -19,7 +19,6 @@ export default function InventarioPage() {
     total,
     nextPage,
     prevPage,
-    
     PAGE_SIZE,
     setFiltros,
   } = useBovinos();
@@ -40,13 +39,8 @@ export default function InventarioPage() {
     setIsModalOpen(true);
   };
 
-  const handleApplyFilters = (nuevosFiltros: {
-    busqueda: string;
-    sexo: string;
-    estado: string;
-    categoria: string;
-    origen: string;
-  }) => {
+  // ✅ Ahora usa FiltrosBovino (con la propiedad 'categoria')
+  const handleApplyFilters = (nuevosFiltros: FiltrosBovino) => {
     setFiltros(nuevosFiltros);
   };
 
@@ -81,7 +75,6 @@ export default function InventarioPage() {
         prevPage={prevPage}
         pageSize={PAGE_SIZE}
         onFilters={() => setIsFilterOpen(true)}
-
       />
 
       <BovinoFormModal
@@ -89,7 +82,7 @@ export default function InventarioPage() {
         onClose={() => setIsModalOpen(false)}
         onSave={handleSave}
         initialData={selectedBovino}
-        allBovinos={allBovinos} // <--- Pasamos la lista completa real aquí
+        allBovinos={allBovinos}
       />
 
       <BovinoFiltersDrawer

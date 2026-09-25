@@ -4,7 +4,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
-// Lista de respaldo por si la tabla 'modulos' en Supabase está vacía o no existe
+// Lista de respaldo en caso de que la tabla 'modulos' esté vacía
+// NOTA: Para producción es ideal que la tabla 'modulos' en Supabase tenga estos registros creados con sus UUIDs
 const MODULOS_SISTEMA_BASE = [
   { id: 'inventario', nombre: 'inventario', etiqueta: 'Ganado e Inventario', categoria: 'General' },
   { id: 'ordeno', nombre: 'ordeno', etiqueta: 'Control de Ordeño', categoria: 'Producción' },
@@ -33,11 +34,13 @@ export async function getMatrizPermisosData() {
   try {
     const supabase = await createClient()
 
-    // Consulta a Supabase / DB
+    // 1. Consultar módulos y permisos a la tabla 'permisos_roles' (plural)
     const { data: modulos, error: errModulos } = await supabase.from('modulos').select('*')
-    const { data: permisos, error: errPermisos } = await supabase.from('permisos_rol').select('*')
+    const { data: permisos, error: errPermisos } = await supabase.from('permisos_roles').select('*')
 
-    // Si hay error o la tabla de módulos viene vacía, usamos el respaldo base
+    if (errModulos) console.error('Error al consultar módulos:', errModulos.message)
+    if (errPermisos) console.error('Error al consultar permisos:', errPermisos.message)
+
     const modulosFinales = (modulos && modulos.length > 0) ? modulos : MODULOS_SISTEMA_BASE
 
     return {
@@ -46,8 +49,7 @@ export async function getMatrizPermisosData() {
       permisos: permisos || []
     }
   } catch (error) {
-    console.error('Error al obtener matriz de permisos:', error)
-    // En caso de catch crítico, retornamos al menos los módulos base para que pinte la tabla
+    console.error('Error crítico al obtener matriz de permisos:', error)
     return { 
       success: false, 
       modulos: MODULOS_SISTEMA_BASE, 
@@ -77,17 +79,34 @@ export async function guardarMatrizPermisos(nuevosPermisos: PermisoRolPayload[])
   try {
     const supabase = await createClient()
 
-    // Usamos upsert para actualizar o insertar dependiendo de si ya existe la llave (rol + modulo_id)
-    // Asegúrate de tener un UNIQUE constraint en tu tabla de Supabase para (rol, modulo_id)
+    // Limpiamos los IDs antes de hacer upsert si son ficticios o vacíos
+    const payloadLimpio = nuevosPermisos.map(p => {
+      const objeto: any = {
+        rol: p.rol,
+        modulo_id: p.modulo_id,
+        puede_ver: p.puede_ver,
+        puede_crear: p.puede_crear,
+        puede_editar: p.puede_editar,
+        puede_eliminar: p.puede_eliminar,
+      }
+      // Solo incluimos el id si existe y es un UUID válido
+      if (p.id && p.id.length > 20) {
+        objeto.id = p.id
+      }
+      return objeto
+    })
+
+    // Upsert aprovechando la restricción UNIQUE 'rol_modulo_unique' (rol, modulo_id)
     const { error } = await supabase
       .from('permisos_roles')
-      .upsert(nuevosPermisos, { onConflict: 'rol,modulo_id' })
+      .upsert(payloadLimpio, { onConflict: 'rol,modulo_id' })
 
     if (error) {
+      console.error('Error al guardar matriz de permisos:', error)
       return { success: false, error: error.message }
     }
 
-    revalidatePath('/dashboard/usuarios') // Ajusta la ruta de tu página si es diferente
+    revalidatePath('/dashboard/usuarios')
     return { success: true }
   } catch (error: any) {
     return { success: false, error: error.message }

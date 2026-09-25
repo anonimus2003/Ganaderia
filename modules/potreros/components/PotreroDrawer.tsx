@@ -95,7 +95,7 @@ export const PotreroDrawer: React.FC<PotreroDrawerProps> = ({
   const estadoNormalizado = potreroActual?.estado?.toLowerCase() || '';
   const estaOcupado = estadoNormalizado === 'ocupado';
 
-  // 2. Cargar bovinos según el estado del potrero
+  // 2. Cargar bovinos según el estado del potrero (Solo Activos)
   useEffect(() => {
     const fetchBovinosYEstado = async () => {
       if (!potreroActual) {
@@ -123,7 +123,8 @@ export const PotreroDrawer: React.FC<PotreroDrawerProps> = ({
               const { data: bovinosEnPotrero, error: bovError } = await supabase
                 .from('bovinos')
                 .select('id, nombre, arete')
-                .in('id', idsBovinos);
+                .in('id', idsBovinos)
+                .eq('condicion', 'Activo'); // 👈 Filtra solo bovinos activos en este potrero
 
               if (!bovError && bovinosEnPotrero) {
                 const lista = bovinosEnPotrero.map((b: any) => ({
@@ -142,6 +143,7 @@ export const PotreroDrawer: React.FC<PotreroDrawerProps> = ({
           const { data, error } = await supabase
             .from('bovinos')
             .select('id, nombre, arete')
+            .eq('condicion', 'Activo') // 👈 Filtra todos los bovinos activos disponibles
             .order('nombre', { ascending: true });
 
           if (error) throw error;

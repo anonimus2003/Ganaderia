@@ -8,19 +8,28 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-import { Drawer, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+import { FiltrosBovino } from "../hooks/usebovinos";
 
 interface BovinoFiltersDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onApplyFilters?: (filters: {
-    busqueda: string;
-    sexo: string;
-    estado: string;
-    categoria: string;
-    origen: string;
-  }) => void;
+  onApplyFilters?: (filters: FiltrosBovino) => void;
 }
 
 export default function BovinoFiltersDrawer({
@@ -29,8 +38,8 @@ export default function BovinoFiltersDrawer({
   onApplyFilters,
 }: BovinoFiltersDrawerProps) {
   const [busqueda, setBusqueda] = React.useState("");
-  const [sexo, setSexo] = React.useState("todos");
-  const [estado, setEstado] = React.useState("Activo"); // Cambiado a "Activo" para hacer match con Supabase
+  const [genero, setGenero] = React.useState("todos");
+  const [condicion, setCondicion] = React.useState("Activo");
   const [categoria, setCategoria] = React.useState("todas");
   const [origen, setOrigen] = React.useState("todos");
 
@@ -40,26 +49,32 @@ export default function BovinoFiltersDrawer({
     onOpenChange(false);
 
     if (onApplyFilters) {
-      onApplyFilters({ busqueda, sexo, estado, categoria, origen });
+      onApplyFilters({
+        busqueda,
+        genero,
+        condicion,
+        categoria,
+        origen,
+      });
     }
 
     toast("Filtros de inventario aplicados", {
-      description: `Búsqueda: "${busqueda || "General"}" | Categoría: ${categoria} | Sexo: ${sexo}`,
+      description: `Búsqueda: "${busqueda || "General"}" | Condición: ${condicion} | Género: ${genero}`,
     });
   }
 
   function handleReset() {
     setBusqueda("");
-    setSexo("todos");
-    setEstado("Activo"); // Restablece al valor exacto de la base de datos
+    setGenero("todos");
+    setCondicion("Activo");
     setCategoria("todas");
     setOrigen("todos");
 
     if (onApplyFilters) {
       onApplyFilters({
         busqueda: "",
-        sexo: "todos",
-        estado: "Activo",
+        genero: "todos",
+        condicion: "Activo",
         categoria: "todas",
         origen: "todos",
       });
@@ -83,12 +98,12 @@ export default function BovinoFiltersDrawer({
             Filtrar Inventario Bovino
           </DrawerTitle>
           <DrawerDescription className="text-sm text-muted-foreground mt-1">
-            Refina la búsqueda por identificación, categoría zootécnica, origen y estado operativo.
+            Refina la búsqueda por arete/nombre, categoría, género y condición.
           </DrawerDescription>
         </DrawerHeader>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Bloque 1: Identificación principal */}
+          {/* Búsqueda por Arete o Nombre */}
           <div className="space-y-2">
             <Label htmlFor="busqueda-arete" className="text-sm font-medium text-foreground">
               Número de Arete o Nombre
@@ -102,15 +117,14 @@ export default function BovinoFiltersDrawer({
             />
           </div>
 
-          {/* Bloque 2: Contenedor en 2 columnas pulido y simétrico */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Categoría */}
             <div className="space-y-2">
               <Label htmlFor="select-categoria" className="text-sm font-medium text-foreground">
-                Categoría Zootécnica
+                Categoría
               </Label>
-              <Select 
-                value={categoria} 
+              <Select
+                value={categoria}
                 onValueChange={(v) => setCategoria(v ?? "todas")}
               >
                 <SelectTrigger id="select-categoria" className="h-10 w-full">
@@ -118,60 +132,60 @@ export default function BovinoFiltersDrawer({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todas">Todas las categorías</SelectItem>
-                  <SelectItem value="Ternera en lactancia">Ternera en Lactancia</SelectItem>
-                   <SelectItem value="Novilla en desarrollo">Novilla en Desarrollo</SelectItem>
-                  <SelectItem value="Ternera en crecimiento">Ternera en Crecimiento</SelectItem>
-                  <SelectItem value="Novilla de vientre">Novilla de Vientre</SelectItem>
-                  <SelectItem value="vaca">Vaca</SelectItem>
-                  <SelectItem value="toro">Toro</SelectItem>
+                  <SelectItem value="Ternera en lactancia">Ternera en lactancia</SelectItem>
+                  <SelectItem value="Destete">Destete</SelectItem>
+                  <SelectItem value="Ternera en crecimiento">Ternera en crecimiento</SelectItem>
+                  <SelectItem value="Levante">Levante</SelectItem>
+                  <SelectItem value="Novilla en desarrollo">Novilla en desarrollo</SelectItem>
+                  <SelectItem value="Novilla de vientre">Novilla de vientre</SelectItem>
+                  <SelectItem value="Vaca">Vaca</SelectItem>
+                   <SelectItem value="Toro">Toro</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Sexo */}
+            {/* Género */}
             <div className="space-y-2">
-              <Label htmlFor="select-sexo" className="text-sm font-medium text-foreground">
-                Sexo
+              <Label htmlFor="select-genero" className="text-sm font-medium text-foreground">
+                Género
               </Label>
-              <Select 
-                value={sexo} 
-                onValueChange={(v) => setSexo(v ?? "todos")}
+              <Select
+                value={genero}
+                onValueChange={(v) => setGenero(v ?? "todos")}
               >
-                <SelectTrigger id="select-sexo" className="h-10 w-full">
-                  <SelectValue placeholder="Seleccionar sexo" />
+                <SelectTrigger id="select-genero" className="h-10 w-full">
+                  <SelectValue placeholder="Seleccionar género" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="todos">Ambos sexos</SelectItem>
+                  <SelectItem value="todos">Todos los géneros</SelectItem>
                   <SelectItem value="Macho">Macho</SelectItem>
                   <SelectItem value="Hembra">Hembra</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Estado */}
+            {/* Condición */}
             <div className="space-y-2">
-              <Label htmlFor="select-estado" className="text-sm font-medium text-foreground">
-                Estado Operativo
+              <Label htmlFor="select-condicion" className="text-sm font-medium text-foreground">
+                Condición Operativa
               </Label>
-              <Select 
-                value={estado} 
-                onValueChange={(v) => setEstado(v ?? "Activo")}
+              <Select
+                value={condicion}
+                onValueChange={(v) => setCondicion(v ?? "Activo")}
               >
-                <SelectTrigger id="select-estado" className="h-10 w-full">
-                  <SelectValue placeholder="Seleccionar estado" />
+                <SelectTrigger id="select-condicion" className="h-10 w-full">
+                  <SelectValue placeholder="Seleccionar condición" />
                 </SelectTrigger>
                 <SelectContent>
-                  {/* Los values deben coincidir con lo que acepta el check constraint de Supabase ('Activo' / 'Inactivo') */}
-                  <SelectItem value="Activo">Activos</SelectItem>
-                  <SelectItem value="Inactivo">Inactivos</SelectItem>
-                  <SelectItem value="todos">Todos los estados</SelectItem>
+                  <SelectItem value="Activo">Activo</SelectItem>
+                  <SelectItem value="Inactivo">Inactivo</SelectItem>
+                  <SelectItem value="todos">Todas las condiciones</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
         </div>
 
-        {/* Footer optimizado para garantizar visibilidad total de los botones */}
         <DrawerFooter className="border-t border-border/50 pt-4 pb-6 px-6 flex flex-col gap-2.5">
           <div className="grid grid-cols-1 gap-2 w-full">
             <Button

@@ -5,10 +5,11 @@ import { getBovinosAction, saveBovinoAction, deleteBovinoAction } from "../actio
 
 export const PAGE_SIZE = 10;
 
+// ✅ Usamos 'categoria' en lugar de 'estados_productivos'
 export interface FiltrosBovino {
   busqueda: string;
-  sexo: string;
-  estado: string;
+  genero: string;
+  condicion: string;
   categoria: string;
   origen: string;
 }
@@ -18,11 +19,12 @@ export function useBovinos() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
-  
+
+  // ✅ Estado inicial ajustado con 'categoria'
   const [filtros, setFiltros] = useState<FiltrosBovino>({
     busqueda: "",
-    sexo: "todos",
-    estado: "todos", 
+    genero: "todos",
+    condicion: "Activo",
     categoria: "todas",
     origen: "todos",
   });
@@ -45,11 +47,11 @@ export function useBovinos() {
   }, [fetchBovinos]);
 
   const nextPage = () => {
-    if (page * PAGE_SIZE < total) setPage(p => p + 1);
+    if (page * PAGE_SIZE < total) setPage((p) => p + 1);
   };
 
   const prevPage = () => {
-    if (page > 1) setPage(p => p - 1);
+    if (page > 1) setPage((p) => p - 1);
   };
 
   const handleSave = async (dataToSave: Partial<Bovino>) => {
@@ -68,8 +70,8 @@ export function useBovinos() {
   };
 
   return {
-    bovinos, 
-    allBovinos: bovinos, // Compatible si tu UI lo usaba para referencias rápidas
+    bovinos,
+    allBovinos: bovinos,
     loading,
     handleSave,
     handleDelete,

@@ -17,6 +17,7 @@ export interface Medicamento {
   retiro_carne: number;
   bovinos?: {
     id: string;
+    condicion: string
     arete: string; // <-- Cambiado de arete?: string a arete: string (obligatorio)
     nombre?: string | null;
   } | null;
