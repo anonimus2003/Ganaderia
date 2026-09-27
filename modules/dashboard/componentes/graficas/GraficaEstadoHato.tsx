@@ -14,21 +14,38 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart"
-import { useGraficaEstadoHato } from "@/modules/dashboard/hooks/useDashboard"
+import { useDashboardContext } from "@/modules/dashboard/context/DashboardContext"
 
 const chartConfig = {
   cantidad: {},
 } satisfies ChartConfig
 
+// Paleta de colores para las categorías del hato
+const COLORES_ESTADO = [
+  "#2563eb", // Azul
+  "#16a34a", // Verde
+  "#d97706", // Ámbar
+  "#9333ea", // Morado
+  "#dc2626", // Rojo
+  "#0891b2", // Cían
+]
+
 export function GraficaEstadoHato() {
-  const { datos, loading } = useGraficaEstadoHato()
+  const { data, loading } = useDashboardContext()
+
+  // Mapeamos los datos asignando cada categoría a su color respetando el esquema
+  const datos = (data?.graficaEstado ?? []).map((item, index) => ({
+    categoria: item.estado,
+    cantidad: item.cantidad,
+    fill: COLORES_ESTADO[index % COLORES_ESTADO.length],
+  }))
 
   const totalAnimales = datos.reduce((acc, curr) => acc + curr.cantidad, 0)
 
   return (
     <Card className="w-full flex flex-col shadow-sm hover:shadow-md transition-shadow">
       <CardHeader className="items-center pb-2">
-        <CardTitle className="text-base font-semibold text-center">Estado y Categorías del Hato</CardTitle>
+        <CardTitle className="text-base font-semibold text-center">Categorías del Hato</CardTitle>
         <CardDescription className="text-xs text-center">
           Distribución poblacional actual en tiempo real ({totalAnimales} animales activos)
         </CardDescription>
@@ -45,6 +62,7 @@ export function GraficaEstadoHato() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-12 items-center gap-4">
             
+            {/* Gráfica de Dona */}
             <div className="md:col-span-6 flex justify-center">
               <ChartContainer
                 config={chartConfig}
@@ -60,7 +78,7 @@ export function GraficaEstadoHato() {
                           const porcentaje = totalAnimales > 0 
                             ? ((cantidadNum / totalAnimales) * 100).toFixed(1) 
                             : "0"
-                          return `${porcentaje}%`
+                          return `${cantidadNum} (${porcentaje}%)`
                         }}
                         hideLabel={false}
                       />
@@ -83,28 +101,20 @@ export function GraficaEstadoHato() {
               </ChartContainer>
             </div>
 
+            {/* Leyenda: Solo Nombre de Categoría con Color */}
             <div className="md:col-span-6 flex flex-col justify-center space-y-2 px-2">
               <div className="text-xs font-semibold text-muted-foreground mb-1">Categorías:</div>
-              {datos.map((item, index) => {
-                return (
-                  <div key={index} className="flex items-center justify-between text-xs">
-                    <div className="flex items-center space-x-2 truncate">
-                      <span 
-                        className="w-3 h-3 rounded-full shrink-0 shadow-sm" 
-                        style={{ backgroundColor: item.fill }} 
-                      />
-                      <span className="font-medium text-foreground truncate" title={item.categoria}>
-                        {item.categoria}
-                      </span>
-                    </div>
-                    <div className="flex items-center space-x-2 shrink-0">
-                      <span className="font-bold text-foreground bg-muted px-2 py-0.5 rounded-md">
-                        {item.cantidad}
-                      </span>
-                    </div>
-                  </div>
-                )
-              })}
+              {datos.map((item, index) => (
+                <div key={index} className="flex items-center space-x-2 text-xs">
+                  <span 
+                    className="w-3 h-3 rounded-full shrink-0 shadow-sm" 
+                    style={{ backgroundColor: item.fill }} 
+                  />
+                  <span className="font-medium text-foreground truncate" title={item.categoria}>
+                    {item.categoria}
+                  </span>
+                </div>
+              ))}
             </div>
 
           </div>

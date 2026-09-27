@@ -1,150 +1,146 @@
-// modules/dashboard/componentes/GraficaLeche.tsx
 "use client"
 
-import { useState } from "react"
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import {
-  ChartConfig,
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart"
-import { useGraficaLeche } from "@/modules/dashboard/hooks/useDashboard"
+import { useState, useMemo } from "react"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid } from "recharts"
+import { useDashboardContext } from "@/modules/dashboard/context/DashboardContext"
 
 const chartConfig = {
-  leche: {
+  litros: {
     label: "Litros de Leche",
-    color: "hsl(var(--primary))",
+    color: "hsl(var(--chart-1))",
   },
-} satisfies ChartConfig
-
-interface GraficaLecheProps {
-  vacaSeleccionada: string
 }
 
-export function GraficaLeche({ vacaSeleccionada }: GraficaLecheProps) {
-  // Estado local para alternar entre día, mes o año
-  const [escalaTiempo, setEscalaTiempo] = useState<"dia" | "mes" | "anio">("dia")
+type Periodo = "dias" | "meses" | "anios"
 
-  // Pasamos tanto la vaca como la escala de tiempo al hook
-  const { datos, loading } = useGraficaLeche(vacaSeleccionada, escalaTiempo)
+export function GraficaLeche() {
+  const { data, loading, vacaSeleccionada } = useDashboardContext()
+  const [periodo, setPeriodo] = useState<Periodo>("dias")
+
+  const datosProcesados = useMemo(() => {
+    if (!data?.graficaLeche) return []
+
+    // 1. MODO DÍAS: Procesamiento fila por fila exactamente como lo tenías antes
+    if (periodo === "dias") {
+      const ordenados = [...(data.graficaLeche.dias || [])].sort(
+        (a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime()
+      )
+
+      return ordenados.map((item) => {
+        const partes = item.fecha.split("-")
+        const fechaCorta = partes.length === 3 ? `${partes[2]}/${partes[1]}` : item.fecha
+        return {
+          etiqueta: fechaCorta,
+          litros: Number(item.litros || 0),
+        }
+      })
+    }
+
+    // 2. MODO MESES: Utiliza el consolidado precalculado de la Vista
+    if (periodo === "meses") {
+      return (data.graficaLeche.meses || []).map((item: any) => ({
+        etiqueta: item.fecha, // Ej: "Ene 2026"
+        litros: Number(item.litros || 0),
+      }))
+    }
+
+    // 3. MODO AÑOS: Agrupa las sumas de los meses por Año (YYYY)
+    if (periodo === "anios") {
+      const mapaAnios: Record<string, number> = {}
+
+      ;(data.graficaLeche.meses || []).forEach((item: any) => {
+        const anioKey = item.mesKey.substring(0, 4) // Obtiene "YYYY" de "YYYY-MM"
+        mapaAnios[anioKey] = (mapaAnios[anioKey] || 0) + Number(item.litros || 0)
+      })
+
+      return Object.keys(mapaAnios)
+        .sort()
+        .map((anioKey) => ({
+          etiqueta: anioKey,
+          litros: Number(mapaAnios[anioKey].toFixed(1)),
+        }))
+    }
+
+    return []
+  }, [data, periodo])
 
   return (
-    <Card className="w-full">
-      <CardHeader className="flex flex-col items-stretch space-y-4 border-b p-6 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-col justify-center gap-1">
-          <CardTitle>Registro de Producción de Leche</CardTitle>
-          <CardDescription>
+    <Card className="w-full shadow-sm hover:shadow-md transition-shadow">
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <div className="space-y-1">
+          <CardTitle className="text-base font-semibold">Producción de Leche</CardTitle>
+          <CardDescription className="text-xs">
             {vacaSeleccionada === "general"
-              ? "Producción total acumulada del hato"
-              : "Comportamiento de producción del animal seleccionado"}
+              ? "Histórico general de producción del hato"
+              : "Histórico de producción del animal seleccionado"}
           </CardDescription>
         </div>
 
-        {/* Botones de control para alternar Día, Mes o Año */}
-        <div className="flex items-center bg-muted p-1 rounded-lg border self-start sm:self-auto">
+        {/* Filtro de período */}
+        <div className="flex items-center gap-1 bg-muted p-1 rounded-lg text-xs font-medium">
           <button
-            onClick={() => setEscalaTiempo("dia")}
-            className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
-              escalaTiempo === "dia"
-                ? "bg-background text-foreground shadow-sm"
+            onClick={() => setPeriodo("dias")}
+            className={`px-2.5 py-1 rounded-md transition-all ${
+              periodo === "dias"
+                ? "bg-background text-foreground shadow-sm font-semibold"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            Día
+            Últimos 7 Días
           </button>
           <button
-            onClick={() => setEscalaTiempo("mes")}
-            className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
-              escalaTiempo === "mes"
-                ? "bg-background text-foreground shadow-sm"
+            onClick={() => setPeriodo("meses")}
+            className={`px-2.5 py-1 rounded-md transition-all ${
+              periodo === "meses"
+                ? "bg-background text-foreground shadow-sm font-semibold"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            Mes
+            Meses
           </button>
           <button
-            onClick={() => setEscalaTiempo("anio")}
-            className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
-              escalaTiempo === "anio"
-                ? "bg-background text-foreground shadow-sm"
+            onClick={() => setPeriodo("anios")}
+            className={`px-2.5 py-1 rounded-md transition-all ${
+              periodo === "anios"
+                ? "bg-background text-foreground shadow-sm font-semibold"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            Año
+            Años
           </button>
         </div>
       </CardHeader>
-      <CardContent className="px-2 pt-4 sm:p-6">
+
+      <CardContent>
         {loading ? (
-          <div className="h-[300px] w-full flex items-center justify-center text-muted-foreground">
-            Cargando registros de producción...
+          <div className="h-[250px] w-full flex items-center justify-center text-muted-foreground text-sm">
+            Cargando historial de producción...
           </div>
-        ) : datos.length === 0 ? (
-          <div className="h-[300px] w-full flex items-center justify-center text-muted-foreground">
-            No hay registros de ordeño disponibles para mostrar.
+        ) : datosProcesados.length === 0 ? (
+          <div className="h-[250px] w-full flex items-center justify-center text-muted-foreground text-sm">
+            No hay registros de producción en este periodo.
           </div>
         ) : (
-          <ChartContainer config={chartConfig} className="aspect-auto h-[300px] w-full">
-            <AreaChart
-              accessibilityLayer
-              data={datos}
-              margin={{
-                top: 20,
-                left: 12,
-                right: 12,
-                bottom: 12,
-              }}
-            >
-              <CartesianGrid vertical={false} />
-              <XAxis
-                dataKey="fecha"
-                tickLine={false}
-                axisLine={false}
-                tickMargin={8}
-              />
-              <YAxis
-                tickLine={false}
-                axisLine={false}
-                tickMargin={8}
-              />
-              <ChartTooltip
-                cursor={false}
-                content={
-                  <ChartTooltipContent
-                    formatter={(value) => `${value} Litros`}
-                    labelKey="fecha"
-                  />
-                }
-              />
+          <ChartContainer config={chartConfig} className="h-[250px] w-full">
+            <AreaChart data={datosProcesados} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <defs>
-                <linearGradient id="fillLeche" x1="0" y1="0" x2="0" y2="1">
-                  <stop
-                    offset="5%"
-                    stopColor="var(--color-leche)"
-                    stopOpacity={0.8}
-                  />
-                  <stop
-                    offset="95%"
-                    stopColor="var(--color-leche)"
-                    stopOpacity={0.1}
-                  />
+                <linearGradient id="fillLitros" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.4} />
+                  <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0.05} />
                 </linearGradient>
               </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="etiqueta" tickLine={false} axisLine={false} className="text-xs" />
+              <YAxis tickLine={false} axisLine={false} className="text-xs" />
+              <ChartTooltip content={<ChartTooltipContent />} />
               <Area
+                type="monotone"
                 dataKey="litros"
-                type="natural"
-                fill="url(#fillLeche)"
-                fillOpacity={0.4}
-                stroke="var(--color-leche)"
+                stroke="hsl(var(--chart-1))"
                 strokeWidth={2}
+                fill="url(#fillLitros)"
               />
             </AreaChart>
           </ChartContainer>

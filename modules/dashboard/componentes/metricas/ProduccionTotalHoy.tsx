@@ -2,15 +2,11 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { useProduccionTotalHoy } from "@/modules/dashboard/hooks/useDashboard"
+import { useDashboardContext } from "@/modules/dashboard/context/DashboardContext"
 import { Droplet } from "lucide-react"
 
-interface KpiProduccionLecheProps {
-  vacaSeleccionada: string
-}
-
-export function KpiProduccionLeche({ vacaSeleccionada }: KpiProduccionLecheProps) {
-  const { produccion, loading } = useProduccionTotalHoy(vacaSeleccionada)
+export function KpiProduccionLeche() {
+  const { data, loading, vacaSeleccionada } = useDashboardContext()
 
   return (
     <Card>
@@ -20,7 +16,7 @@ export function KpiProduccionLeche({ vacaSeleccionada }: KpiProduccionLecheProps
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold">
-          {loading ? "..." : `${produccion} L`}
+          {loading ? "..." : `${data?.metricas.produccionHoy ?? 0} L`}
         </div>
         <p className="text-xs text-muted-foreground">
           {vacaSeleccionada === "general" ? "Suma de todas las jornadas" : "Producción de la vaca"}

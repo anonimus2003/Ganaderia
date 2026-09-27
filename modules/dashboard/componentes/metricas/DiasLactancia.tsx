@@ -1,16 +1,11 @@
-// modules/dashboard/componentes/metricas/DiasLactancia.tsx
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { useDiasLactancia } from "@/modules/dashboard/hooks/useDashboard"
+import { useDashboardContext } from "@/modules/dashboard/context/DashboardContext"
 import { Calendar } from "lucide-react"
 
-interface KpiDiasLactanciaProps {
-  vacaSeleccionada: string
-}
-
-export function KpiDiasLactancia({ vacaSeleccionada }: KpiDiasLactanciaProps) {
-  const { dias, loading } = useDiasLactancia(vacaSeleccionada)
+export function KpiDiasLactancia() {
+  const { data, loading, vacaSeleccionada } = useDashboardContext()
 
   return (
     <Card>
@@ -20,7 +15,7 @@ export function KpiDiasLactancia({ vacaSeleccionada }: KpiDiasLactanciaProps) {
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold">
-          {loading ? "..." : `${dias} días`}
+          {loading ? "..." : `${data?.metricas.diasLactancia ?? 0} días`}
         </div>
         <p className="text-xs text-muted-foreground">
           {vacaSeleccionada === "general" ? "Promedio del hato" : "Actual de la vaca"}

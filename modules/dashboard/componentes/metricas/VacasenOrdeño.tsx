@@ -1,11 +1,11 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { useVacasEnOrdeno } from "@/modules/dashboard/hooks/useDashboard"
+import { useDashboardContext } from "@/modules/dashboard/context/DashboardContext"
 import { Activity } from "lucide-react"
 
 export function KpiVacasEnOrdeno() {
-  const { vacasOrdeno, loading } = useVacasEnOrdeno()
+  const { data, loading } = useDashboardContext()
 
   return (
     <Card>
@@ -15,7 +15,7 @@ export function KpiVacasEnOrdeno() {
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold">
-          {loading ? "..." : vacasOrdeno}
+          {loading ? "..." : (data?.metricas.vacasOrdeno ?? 0)}
         </div>
         <p className="text-xs text-muted-foreground">Únicas hoy en ordeño</p>
       </CardContent>

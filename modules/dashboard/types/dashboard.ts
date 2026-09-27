@@ -1,21 +1,64 @@
-export interface Bovino {
+export interface AlertaRetiro {
   id: string
-  nombre: string | null
-  arete: string | null
+  codigoAnimal: string
+  nombreAnimal?: string // Nombre opcional de la vaca
+  medicamento: string
+  tipo: "Leche" | "Carne" | "Mixto"
+  diasRestantes: number
 }
 
-export interface RegistroOrdeno {
+export interface MetricasDashboard {
+  produccionHoy: number
+  diasLactancia: number
+  totalAnimales: number
+  vacasOrdeno: number
+}
+
+// Para la vista diaria de los últimos 7 días
+export interface ItemGraficaLeche {
   fecha: string
   litros: number
-  jornada: string
 }
 
-export interface RegistroPeso {
+// Para la vista consolidada de meses
+export interface ItemGraficaLecheMes {
+  mesKey: string
   fecha: string
-  peso_kgs: number
+  litros: number
 }
 
-export interface AlertaAnimal {
-  tipo: 'produccion' | 'salud' | 'retiro'
-  mensaje: string
+export interface ItemGraficaPesaje {
+  fecha: string
+  peso: number
+}
+
+export interface ItemGraficaEstado {
+  estado: string
+  cantidad: number
+}
+
+export interface BovinoOption {
+  id: string
+  nombre: string
+  arete: string
+}
+
+export interface PotreroRendimiento {
+  potrero: string
+  litros: number
+}
+
+// Interfaz principal consumida por el Contexto
+export interface DashboardData {
+  metricas: MetricasDashboard
+  // 🟢 Estructura actualizada para soportar filtrado por días y meses
+  graficaLeche: {
+    dias: ItemGraficaLeche[]
+    meses: ItemGraficaLecheMes[]
+  }
+  graficaPesaje: ItemGraficaPesaje[]
+  graficaEstado: ItemGraficaEstado[]
+  alertasRetiro: AlertaRetiro[]
+  graficaPotreros?: PotreroRendimiento[]
+  bovinos: BovinoOption[]
 }

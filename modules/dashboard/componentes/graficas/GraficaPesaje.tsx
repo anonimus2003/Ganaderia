@@ -1,129 +1,78 @@
 "use client"
 
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import {
-  ChartConfig,
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart"
-import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs"
-import { useState } from "react"
-import { useGraficaPesaje } from "@/modules/dashboard/hooks/useDashboard"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid } from "recharts"
+import { useDashboardContext } from "@/modules/dashboard/context/DashboardContext"
+
+// Paleta de colores detallada con tonos base, superior (claro) e inferior (oscuro) para degradados
+const PALETA_COLORES = [
+  { id: "emerald", base: "hsl(158, 64%, 42%)", top: "hsl(158, 64%, 52%)", bottom: "hsl(158, 64%, 30%)" },
+  { id: "sky",     base: "hsl(199, 89%, 48%)", top: "hsl(199, 89%, 58%)", bottom: "hsl(199, 89%, 35%)" },
+  { id: "rose",    base: "hsl(346, 84%, 61%)", top: "hsl(346, 84%, 71%)", bottom: "hsl(346, 84%, 40%)" },
+  { id: "violet",  base: "hsl(262, 83%, 58%)", top: "hsl(262, 83%, 68%)", bottom: "hsl(262, 83%, 38%)" },
+  { id: "amber",   base: "hsl(38, 92%, 50%)",  top: "hsl(38, 92%, 60%)",  bottom: "hsl(38, 92%, 35%)" },
+]
 
 const chartConfig = {
   peso: {
-    label: "Peso Promedio (kg)",
-    color: "#16a34a", // Verde esmeralda vivo y profesional
+    label: "Peso (Kg)",
+    color: "hsl(var(--chart-1))",
   },
-} satisfies ChartConfig
-
-interface GraficaPesajeProps {
-  vacaSeleccionada: string
 }
 
-export function GraficaPesaje({ vacaSeleccionada }: GraficaPesajeProps) {
-  const [escalaTiempo, setEscalaTiempo] = useState<"dias" | "meses" | "anios">("meses")
-
-  const { datos, loading } = useGraficaPesaje(vacaSeleccionada, escalaTiempo)
-
-  const obtenerDescripcion = () => {
-    switch (escalaTiempo) {
-      case "dias":
-        return "Control de peso diario registrado recientemente"
-      case "meses":
-        return "Evolución del peso promedio mensual"
-      case "anios":
-        return "Histórico de ganancia de peso anual"
-    }
-  }
+export function GraficaPesaje() {
+  const { data, loading, vacaSeleccionada } = useDashboardContext()
+  const datos = data?.graficaPesaje ?? []
 
   return (
     <Card className="w-full shadow-sm hover:shadow-md transition-shadow">
-      <CardHeader className="flex flex-col items-stretch space-y-0 border-b p-0 sm:flex-row">
-        <div className="flex flex-1 flex-col justify-center gap-1 px-6 py-5 sm:py-6">
-          <CardTitle className="text-base font-semibold">Control y Registro de Pesaje</CardTitle>
-          <CardDescription className="text-xs">{obtenerDescripcion()}</CardDescription>
-        </div>
-        <div className="flex items-center px-6 py-4 sm:py-0">
-          <Tabs
-            defaultValue="meses"
-            value={escalaTiempo}
-            onValueChange={(v) => setEscalaTiempo(v as "dias" | "meses" | "anios")}
-            className="w-full sm:w-auto"
-          >
-            <TabsList className="grid w-full grid-cols-3 h-8 text-xs">
-              <TabsTrigger value="dias">Días</TabsTrigger>
-              <TabsTrigger value="meses">Meses</TabsTrigger>
-              <TabsTrigger value="anios">Años</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
+      <CardHeader>
+        <CardTitle className="text-base font-semibold">Evolución de Peso (Kg)</CardTitle>
+        <CardDescription className="text-xs">
+          {vacaSeleccionada === "general"
+            ? "Promedio de pesaje general del hato"
+            : "Histórico de pesajes del animal seleccionado"}
+        </CardDescription>
       </CardHeader>
-      <CardContent className="px-2 pt-4 sm:p-6">
+      <CardContent>
         {loading ? (
-          <div className="h-[300px] w-full flex items-center justify-center text-muted-foreground text-sm">
-            Cargando registros de pesaje...
+          <div className="h-[250px] w-full flex items-center justify-center text-muted-foreground text-sm">
+            Cargando historial de pesaje...
           </div>
         ) : datos.length === 0 ? (
-          <div className="h-[300px] w-full flex items-center justify-center text-muted-foreground text-sm">
-            No hay registros de pesaje disponibles para mostrar.
+          <div className="h-[250px] w-full flex items-center justify-center text-muted-foreground text-sm">
+            No hay registros de pesaje disponibles.
           </div>
         ) : (
-          <ChartContainer config={chartConfig} className="aspect-auto h-[300px] w-full">
-            <BarChart
-              accessibilityLayer
-              data={datos}
-              margin={{
-                top: 20,
-                left: 12,
-                right: 12,
-                bottom: 12,
-              }}
-            >
-              {/* Cuadrícula de fondo más sutil y punteada */}
-              <CartesianGrid vertical={false} strokeDasharray="3 3" strokeOpacity={0.4} />
-              <XAxis
-                dataKey="periodo"
-                tickLine={false}
-                axisLine={false}
-                tickMargin={8}
-                className="text-xs text-muted-foreground"
-              />
-              <YAxis
-                tickLine={false}
-                axisLine={false}
-                tickMargin={8}
-                domain={['dataMin - 10', 'dataMax + 10']}
-                className="text-xs text-muted-foreground"
-              />
-              <ChartTooltip
-                cursor={{ fill: "rgba(0, 0, 0, 0.04)" }}
-                content={
-                  <ChartTooltipContent
-                    formatter={(value) => `${value} kg`}
-                    hideLabel
-                  />
-                }
-              />
-              {/* Barras con bordes redondeados arriba y color vibrante */}
-              <Bar 
-                dataKey="peso" 
-                fill="var(--color-peso)" 
-                radius={[6, 6, 0, 0]} 
-                maxBarSize={50}
-              />
+          <ChartContainer config={chartConfig} className="h-[250px] w-full">
+            <BarChart data={datos} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <defs>
+                {/* Definición de degradados SVG individuales para cada color */}
+                {PALETA_COLORES.map((c) => (
+                  <linearGradient key={c.id} id={`grad-${c.id}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={c.top} stopOpacity={1} />
+                    <stop offset="100%" stopColor={c.bottom} stopOpacity={0.6} />
+                  </linearGradient>
+                ))}
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border/40" />
+              <XAxis dataKey="fecha" tickLine={false} axisLine={false} className="text-xs text-muted-foreground" />
+              <YAxis tickLine={false} axisLine={false} className="text-xs text-muted-foreground" domain={['auto', 'auto']} />
+              <ChartTooltip content={<ChartTooltipContent />} />
+              <Bar dataKey="peso" radius={[4, 4, 0, 0]} maxBarSize={40}>
+                {datos.map((_, index) => {
+                  const colorScheme = PALETA_COLORES[index % PALETA_COLORES.length]
+                  return (
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={`url(#grad-${colorScheme.id})`}
+                      stroke={colorScheme.base}
+                      strokeWidth={1}
+                    />
+                  )
+                })}
+              </Bar>
             </BarChart>
           </ChartContainer>
         )}

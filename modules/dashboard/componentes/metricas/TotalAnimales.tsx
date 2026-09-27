@@ -1,12 +1,11 @@
-// modules/dashboard/componentes/metricas/TotalAnimales.tsx
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useDashboardContext } from "@/modules/dashboard/context/DashboardContext"
 import { Database } from "lucide-react"
-import { useTotalAnimales } from "@/modules/dashboard/hooks/useDashboard" // Ajusta la ruta si es necesario
 
 export function KpiTotalAnimales() {
-  const { total, loading } = useTotalAnimales()
+  const { data, loading } = useDashboardContext()
 
   return (
     <Card>
@@ -16,7 +15,7 @@ export function KpiTotalAnimales() {
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold">
-          {loading ? "..." : total}
+          {loading ? "..." : (data?.metricas.totalAnimales ?? 0)}
         </div>
         <p className="text-xs text-muted-foreground">Hato activo general</p>
       </CardContent>
