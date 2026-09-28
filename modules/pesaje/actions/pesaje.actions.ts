@@ -18,7 +18,8 @@ export async function getPesajesAction(page = 1, limit = 10, filtros?: FiltrosPe
         nombre
       )
     `, { count: "exact" })
-    .order("fecha", { ascending: false });
+    .order("fecha", { ascending: false })
+    .order("created_at", { ascending: false }); // <-- Agrega este orden secundario
 
   if (filtros) {
     if (filtros.busqueda) {

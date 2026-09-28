@@ -19,7 +19,8 @@ export async function getReproduccionesAction(page = 1, limit = 10, filtros?: Fi
         nombre
       )
     `, { count: "exact" })
-    .order("fecha_inseminacion", { ascending: false });
+    .order("fecha_inseminacion", { ascending: false })
+    .order("created_at", { ascending: false }); // <-- Agrega este orden secundario
 
   if (filtros) {
     // 1. Filtro de búsqueda por texto (Arete o Nombre de la vaca)
