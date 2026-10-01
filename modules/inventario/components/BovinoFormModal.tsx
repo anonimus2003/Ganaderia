@@ -44,7 +44,10 @@ const ETAPAS_HEMBRA: Exclude<Bovino["categoria"], null>[] = [
   "Novilla en desarrollo",
   "Ternera en crecimiento",
   "Novilla de vientre",
-  "Vaca",
+  "Vaca en producción gestando",
+  "Vaca seca",
+  "Vaca horra",
+  "Vaca en produccion vacia"
 ];
 
 const ETAPAS_MACHO: Exclude<Bovino["categoria"], null>[] = [
@@ -52,7 +55,7 @@ const ETAPAS_MACHO: Exclude<Bovino["categoria"], null>[] = [
   "Novilla en desarrollo",
   "Ternera en crecimiento",
   "Novilla de vientre",
-  "Toro",
+  "Toro"
 ];
 
 const PROPOSITOS_DISPONIBLES = [

@@ -110,11 +110,15 @@ export const getOrdeñoColumns = ({
     header: "Observaciones",
     accessor: "observaciones",
     render: (ordeño) => (
-      <span className="text-xs text-slate-600">
+       <span 
+          className="block max-w-[200px] truncate text-xs text-slate-600" 
+          title={ordeño.observaciones ?? undefined}
+        >
         {ordeño.observaciones || "-"}
-      </span>
-    ),
-  },
+       </span>
+     ),
+      
+ },
 
   {
     header: "",

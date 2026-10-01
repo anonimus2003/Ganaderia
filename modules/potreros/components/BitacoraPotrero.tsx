@@ -282,24 +282,7 @@ export function BitacoraPotrero({
             <span className="text-sm font-extrabold text-slate-900">{totalCabezas} {totalCabezas === 1 ? 'Cabeza' : 'Cabezas'}</span>
           </div>
 
-          {tipoContadorActual === 'ocupado' && animalesActuales.length > 0 && (
-            <div className="pt-2 border-t border-slate-200/60">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
-                Animales Presentes:
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                {animalesActuales.map((animal, idx) => (
-                  <span 
-                    key={idx} 
-                    className="bg-white border border-slate-200 text-slate-700 font-medium text-[11px] px-2 py-0.5 rounded-md shadow-2xs"
-                  >
-                    🐮 {animal}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
+       
           <div className="flex items-center justify-between text-[11px] pt-2 border-t border-slate-200/60 text-slate-500">
             <span>Aforo Estimado: <strong className="text-slate-800">{aforoEst !== undefined ? `${aforoEst} kg/m²` : '0 kg/m²'}</strong></span>
             <span>Recuperación Pasto: <strong className="text-slate-800">{progresoPasto !== undefined ? `${progresoPasto}%` : '0%'}</strong></span>

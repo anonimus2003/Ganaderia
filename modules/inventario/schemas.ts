@@ -17,7 +17,10 @@ export interface Bovino {
     | "Novilla en desarrollo"
     | "Novilla de vientre"
     | "Toro"
-    | "Vaca"
+    | "Vaca en producción gestando"
+    | "Vaca seca"
+    | "Vaca horra"
+    | "Vaca en produccion vacia"
     | null;
   condicion: "Activo" | "Inactivo";
   motivo_baja?: "Muerte" | "Venta" | "Otros" | null;

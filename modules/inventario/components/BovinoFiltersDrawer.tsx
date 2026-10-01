@@ -138,8 +138,11 @@ export default function BovinoFiltersDrawer({
                   <SelectItem value="Levante">Levante</SelectItem>
                   <SelectItem value="Novilla en desarrollo">Novilla en desarrollo</SelectItem>
                   <SelectItem value="Novilla de vientre">Novilla de vientre</SelectItem>
-                  <SelectItem value="Vaca">Vaca</SelectItem>
-                   <SelectItem value="Toro">Toro</SelectItem>
+                  <SelectItem value="Vaca en producción gestando">Vaca en producción gestando</SelectItem>
+                  <SelectItem value="Vaca seca">Vaca seca</SelectItem>
+                  <SelectItem value="Vaca horra">Vaca horra</SelectItem>
+                  <SelectItem value="Vaca en producción vacía">Vaca en producción vacía</SelectItem>
+                  <SelectItem value="Toro">Toro</SelectItem>
                 </SelectContent>
               </Select>
             </div>
