@@ -1,100 +1,300 @@
-'use server';
+import { createClient } from "@/lib/supabase/client";
 
-import { createClient } from "@/lib/supabase/server";
+const supabase = createClient();
 
-export async function registrarSalidaPotrero(potreroId: string | number, fechaSalida: string) {
-  const supabase = await createClient();
+// ==========================================
+// 1. HISTORIAL DE OCUPACIÓN
+// ==========================================
+export async function getHistorialOcupacionAction(page = 1, limit = 10, potreroId?: string | number) {
+  const from = (page - 1) * limit;
+  const to = from + limit - 1;
 
-  const potreroIdLimpio = parseInt(String(potreroId).split('_')[0], 10);
+  let query = supabase
+    .from("historial_ocupacion_potreros")
+    .select(`
+      id,
+      potrero_id,
+      bovino_id,
+      fecha_entrada,
+      fecha_salida,
+      aforo,
+      registrado_por,
+      potreros ( id, nombre ),
+      bovinos ( id, arete, nombre, raza ),
+      usuarios ( id, nombre, apellidos, rol )
+    `, { count: "exact" })
+    .order("fecha_entrada", { ascending: false });
 
-  if (isNaN(potreroIdLimpio)) {
-    throw new Error(`ID de potrero inválido: ${potreroId}`);
+
+  if (potreroId && potreroId !== "todos") {
+    query = query.eq("potrero_id", potreroId);
   }
+  
 
-  // 1. Contamos cuántos animales quedan actualmente en el potrero
-  const { count: animalesRestantes, error: errContar } = await supabase
-    .from('bovinos')
-    .select('id', { count: 'exact', head: true })
-    .eq('potrero_id', potreroIdLimpio);
-
-  if (errContar) {
-    console.error("Error al contar bovinos en el potrero:", errContar.message);
-    throw errContar;
-  }
-
-  const cantidadQuedan = animalesRestantes ?? 0;
-
-  // 2. Si ya NO quedan animales, cerramos el ciclo en el historial
-  if (cantidadQuedan === 0) {
-    const { data: ultimoIngreso, error: errBusqueda } = await supabase
-      .from('historial_ocupacion_potreros')
-      .select('id')
-      .eq('potrero_id', potreroIdLimpio)
-      .is('fecha_salida', null)
-      .order('fecha_entrada', { ascending: false })
-      .limit(1);
-
-    if (errBusqueda) {
-      console.error("Error al buscar el historial activo:", errBusqueda.message);
-      throw errBusqueda;
-    }
-
-    if (ultimoIngreso && ultimoIngreso.length > 0) {
-      const idHistorialAbierto = ultimoIngreso[0].id;
-
-      const { error: errHistorial } = await supabase
-        .from('historial_ocupacion_potreros')
-        .update({ fecha_salida: fechaSalida })
-        .eq('id', idHistorialAbierto);
-
-      if (errHistorial) {
-        console.error("Error al actualizar la salida en el historial:", errHistorial.message);
-        throw errHistorial;
-      }
-    }
-  }
-
-  // 3. Estado estricto: 'Ocupado' o 'Disponible'
-  const nuevoEstado = cantidadQuedan > 0 ? 'Ocupado' : 'Disponible';
-
-  const { data, error } = await supabase
-    .from('potreros')
-    .update({
-      estado: nuevoEstado,
-      bovinos_actuales: cantidadQuedan,
-      ...(cantidadQuedan === 0 && { fecha_salida_ganado: fechaSalida })
-    })
-    .eq('id', potreroIdLimpio)
-    .select();
+  const { data, error, count } = await query.range(from, to);
 
   if (error) {
-    console.error("Error al actualizar el estado del potrero:", error.message);
-    throw error;
+    console.error("Error al obtener historial de ocupación:", error.message);
+    throw new Error(error.message);
   }
 
-  return { success: true, data, bovinosRestantes: cantidadQuedan };
+  const eventosMapeados = (data || []).map((item: any) => {
+    const usuarioObj = item.usuarios;
+    const bovinoObj = item.bovinos;
+    const potreroObj = item.potreros;
+
+    const nombreCreador = usuarioObj && (usuarioObj.nombre || usuarioObj.apellidos)
+      ? `${usuarioObj.nombre || ''} ${usuarioObj.apellidos || ''}`.trim()
+      : 'Sistema';
+
+    return {
+      ...item,
+      potrero_nombre: potreroObj?.nombre || `Potrero #${item.potrero_id}`,
+      bovino_arete: bovinoObj?.arete || 'S/A',
+      bovino_nombre: bovinoObj?.nombre || '',
+      registrado_por_nombre: nombreCreador,
+      aforo_formateado: item.aforo !== null && item.aforo !== undefined ? `${item.aforo}` : '-',
+    };
+  });
+
+  return {
+    data: eventosMapeados,
+    total: count || 0,
+  };
 }
 
-export async function eliminarEventoBitacora(eventoId: string | number) {
-  const supabase = await createClient();
+// ==========================================
+// 2. HISTORIAL DE ABONOS (Añade esta función que faltaba)
+// ==========================================
+// ==========================================
+// 2. HISTORIAL DE ABONOS (Corregido para tu esquema de BD)
+// ==========================================
+export async function getHistorialAbonosAction(page = 1, limit = 10, potreroId?: string | number) {
+  const from = (page - 1) * limit;
+  const to = from + limit - 1;
 
-  // Limpiamos el ID eliminando sufijos si los hay, pero manteniéndolo como String/UUID
-  const idLimpio = String(eventoId).split('_')[0].trim();
+  let query = supabase
+    .from("historial_abonos")
+    .select(`
+      id,
+      potrero_id,
+      tipo_abono,
+      fecha_aplicacion,
+      cantidad,
+      unidad_medida,
+      responsable,
+      observaciones,
+      registrado_por,
+      potreros ( id, nombre )
+    `, { count: "exact" })
+    .order("fecha_aplicacion", { ascending: false });
 
-  if (!idLimpio || idLimpio === 'NaN' || idLimpio === 'undefined') {
-    console.error('El ID proporcionado no es un UUID válido:', eventoId);
-    return { success: false, error: 'ID inválido' };
+  if (potreroId && potreroId !== "todos") {
+    query = query.eq("potrero_id", potreroId);
   }
 
-  const { error } = await supabase
-    .from('historial_ocupacion_potreros')
-    .delete()
-    .eq('id', idLimpio); // <-- Se pasa el string (UUID) directamente
+  const { data, error, count } = await query.range(from, to);
 
   if (error) {
-    console.error('Error al eliminar en Supabase:', error.message);
-    throw error;
+    console.error("Error al obtener historial de abonos:", error.message);
+    throw new Error(error.message);
   }
 
-  return { success: true };
+  const abonosMapeados = (data || []).map((item: any) => {
+    const potreroObj = item.potreros;
+
+    return {
+      ...item,
+      potrero_nombre: potreroObj?.nombre || `Potrero #${item.potrero_id}`,
+      registrado_por_nombre: item.responsable || 'Sistema',
+    };
+  });
+
+  return {
+    data: abonosMapeados,
+    total: count || 0,
+  };
+}
+// ==========================================
+// 3. REGISTRAR INGRESO DE GANADO
+// ==========================================
+export async function registrarIngresoGanado(data: {
+  potreroId: string | number;
+  animalesIds: string[];
+  fecha: string;
+  aforo?: number;
+  cantidad: number;
+  tipoAnimal?: string;
+}) {
+  const fechaIso = data.fecha ? new Date(data.fecha).toISOString() : new Date().toISOString();
+  let descripcionAnimales = `${data.cantidad} animales (${data.tipoAnimal || 'Vaca'})`;
+
+  if (data.animalesIds && data.animalesIds.length > 0) {
+    const { data: bovinos, error: errBovinos } = await supabase
+      .from('bovinos')
+      .select('id, arete, nombre')
+      .in('id', data.animalesIds);
+
+    if (errBovinos) throw errBovinos;
+
+    if (bovinos && bovinos.length > 0) {
+      const detalleAnimales = bovinos
+        .map((b) => `${b.arete}${b.nombre ? ` (${b.nombre})` : ''}`)
+        .join(', ');
+
+      descripcionAnimales = `los animales: ${detalleAnimales}`;
+    }
+
+    const nuevosRegistros = data.animalesIds.map((bovinoId) => ({
+      potrero_id: data.potreroId,
+      bovino_id: bovinoId,
+      fecha_entrada: fechaIso,
+      aforo: data.aforo || null,
+    }));
+
+    const { error: errHistorial } = await supabase
+      .from('historial_ocupacion_potreros')
+      .insert(nuevosRegistros);
+
+    if (errHistorial) throw errHistorial;
+  }
+
+  const { error: errPotrero } = await supabase
+    .from('potreros')
+    .update({ estado: 'Ocupado' })
+    .eq('id', data.potreroId);
+
+  if (errPotrero) throw errPotrero;
+
+  return await supabase.from('bitacora_potreros').insert({
+    potrero_id: data.potreroId,
+    tipo_evento: 'Ingreso Ganado',
+    descripcion: `Ingreso de ${descripcionAnimales}. Aforo: ${data.aforo || 'N/A'} kg/m²`,
+    fecha: fechaIso,
+    cantidad_animales: data.cantidad,
+  });
+}
+
+// ==========================================
+// 4. REGISTRAR SALIDA DE GANADO
+// ==========================================
+export async function registrarSalidaGanado(data: {
+  potreroId: string | number;
+  animalesIds?: string[];
+  fecha: string;
+  cantidad: number;
+  tipoAnimal?: string; // 👈 Agrégalo aquí para que TypeScript lo acepte
+}) {
+  const fechaIso = data.fecha ? new Date(data.fecha).toISOString() : new Date().toISOString();
+  let descripcionAnimales = `${data.cantidad} animales`;
+
+  if (data.animalesIds && data.animalesIds.length > 0) {
+    const { data: bovinos, error: errBovinos } = await supabase
+      .from('bovinos')
+      .select('id, arete, nombre')
+      .in('id', data.animalesIds);
+
+    if (!errBovinos && bovinos && bovinos.length > 0) {
+      const detalleAnimales = bovinos
+        .map((b) => `${b.arete}${b.nombre ? ` (${b.nombre})` : ''}`)
+        .join(', ');
+
+      descripcionAnimales = `los animales: ${detalleAnimales}`;
+    }
+  }
+
+  let queryHistorial = supabase
+    .from('historial_ocupacion_potreros')
+    .update({ fecha_salida: fechaIso })
+    .eq('potrero_id', data.potreroId)
+    .is('fecha_salida', null);
+
+  if (data.animalesIds && data.animalesIds.length > 0) {
+    queryHistorial = queryHistorial.in('bovino_id', data.animalesIds);
+  }
+
+  const { error: errHistorial } = await queryHistorial;
+  if (errHistorial) throw errHistorial;
+
+  const { error: errPotrero } = await supabase
+    .from('potreros')
+    .update({ estado: 'Disponible' })
+    .eq('id', data.potreroId);
+
+  if (errPotrero) throw errPotrero;
+
+  return await supabase.from('bitacora_potreros').insert({
+    potrero_id: data.potreroId,
+    tipo_evento: 'Salida Ganado',
+    descripcion: `Salida de ${descripcionAnimales}.`,
+    fecha: fechaIso,
+    cantidad_animales: data.cantidad,
+  });
+}
+
+// ==========================================
+// 5. REGISTRAR ABONO
+// ==========================================
+export async function registrarAbono(data: {
+  potreroId: string | number;
+  unidades: number;
+  unidadMedida: string;
+  tipoAbono: string;
+  fecha: string;
+  responsable?: string;
+  detalleExtra?: string;
+}) {
+  const fechaIso = data.fecha ? new Date(data.fecha).toISOString() : new Date().toISOString();
+
+  const { error: errAbono } = await supabase.from('historial_abonos').insert({
+    potrero_id: data.potreroId,
+    cantidad: data.unidades,
+    unidad_medida: data.unidadMedida,
+    tipo_abono: data.tipoAbono,
+    fecha_aplicacion: fechaIso,
+    responsable: data.responsable || null,
+    observaciones: data.detalleExtra || null,
+  });
+
+  if (errAbono) throw errAbono;
+
+  return await supabase.from('bitacora_potreros').insert({
+    potrero_id: data.potreroId,
+    tipo_evento: 'Abonado',
+    descripcion: `Aplicación de ${data.unidades} ${data.unidadMedida} de ${data.tipoAbono}. ${
+      data.detalleExtra ? `Nota: ${data.detalleExtra}` : ''
+    }`,
+    fecha: fechaIso,
+    responsable: data.responsable || null,
+  });
+}
+
+// ==========================================
+// 6. ELIMINAR REGISTRO DE OCUPACIÓN
+// ==========================================
+export async function deleteHistorialOcupacionAction(id: number | string): Promise<void> {
+  const { error } = await supabase
+    .from("historial_ocupacion_potreros")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    console.error("Error al eliminar registro de ocupación:", error.message);
+    throw new Error(error.message);
+  }
+}
+
+// ==========================================
+// 7. ELIMINAR REGISTRO DE ABONO
+// ==========================================
+export async function deleteHistorialAbonoAction(id: string | number): Promise<void> {
+  const { error } = await supabase
+    .from("historial_abonos")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    console.error("Error al eliminar registro de abono:", error.message);
+    throw new Error(error.message);
+  }
 }

@@ -13,6 +13,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { any } from "zod";
 
 export interface BovinoColumn {
   header: string;
@@ -146,6 +147,16 @@ export const getBovinoColumns = ({
     render: (bovino) => (
       <span className="text-xs text-slate-600">
         {bovino.origen || "-"}
+      </span>
+    ),
+  },
+
+ {
+    header: "Registrado Por" ,
+    accessor: "registrado_por_nombre"as any, // Debe apuntar a esta propiedad mapeada
+    render: (bovino: any) => (
+      <span className="text-xs text-slate-700 font-medium">
+        {bovino.registrado_por_nombre || "Desconocido"}
       </span>
     ),
   },

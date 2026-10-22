@@ -17,7 +17,8 @@ export async function getMedicamentosAction(page = 1, limit = 10, filtros?: Filt
         id,
         arete,
         nombre
-      )
+      ),
+      usuarios!fk_medicamentos_registrado_por_usuarios ( nombre, apellidos, rol )
     `, { count: "exact" })
     .order("fecha_aplicacion", { ascending: false })
     .order("created_at", { ascending: false });
@@ -26,17 +27,7 @@ export async function getMedicamentosAction(page = 1, limit = 10, filtros?: Filt
     // 1. Búsqueda general por texto
     if (filtros.search && filtros.search.trim() !== "") {
       const termino = filtros.search.trim();
-      
-      // Aplicamos un filtro .or() múltiple:
-      // Buscamos en las columnas de la tabla medicamentos (medicamento, via, veterinario)
-      // Y usamos una segunda condición o permitimos que coincida. 
-      // Nota: Para buscar en la relación de bovinos y en la principal a la vez sin que rompa, 
-      // lo ideal es filtrar por los campos de texto propios de medicamentos aquí:
       query = query.or(`medicamento.ilike.%${termino}%,via.ilike.%${termino}%,veterinario.ilike.%${termino}%`);
-      
-      // Si también quieres que busque obligatoriamente por arete o nombre de la vaca cuando escribas eso,
-      // la forma más segura en Supabase con tablas relacionadas es hacer que el filtro aplique o 
-      // bien puedes buscar por arete usando otra condición .or con referencedTable por separado si es necesario.
     }
 
     // 2. Filtro por vía de administración
@@ -60,8 +51,22 @@ export async function getMedicamentosAction(page = 1, limit = 10, filtros?: Filt
     throw new Error(error.message);
   }
 
+  // Mapear los datos para unificar el nombre y apellido del creador
+  const medicamentosConRegistrador = (data || []).map((item: any) => {
+    const usuarioObj = item.usuarios;
+    
+    const nombreCreador = usuarioObj && (usuarioObj.nombre || usuarioObj.apellidos)
+      ? `${usuarioObj.nombre || ''} ${usuarioObj.apellidos || ''}`.trim()
+      : (item.registrado_por ? 'Usuario Registrado' : 'Sistema');
+
+    return {
+      ...item,
+      registrado_por_nombre: nombreCreador,
+    };
+  });
+
   return {
-    data: data || [],
+    data: medicamentosConRegistrador as Medicamento[],
     total: count || 0,
   };
 }
@@ -79,11 +84,13 @@ function limpiarCamposVacios(data: Partial<Medicamento>) {
 export async function saveMedicamentoAction(dataToSave: Partial<Medicamento>): Promise<void> {
   const datosLimpios = limpiarCamposVacios(dataToSave);
   delete datosLimpios.bovinos;
+  delete datosLimpios.usuarios;
 
   if (datosLimpios.id) {
     const registroId = datosLimpios.id;
     delete datosLimpios.id;
     delete datosLimpios.created_at;
+    delete datosLimpios.registrado_por; // Mantenemos el creador original al actualizar
 
     const { error } = await supabase
       .from("medicamentos")
@@ -96,6 +103,13 @@ export async function saveMedicamentoAction(dataToSave: Partial<Medicamento>): P
     }
   } else {
     delete datosLimpios.id;
+
+    // Asignar automáticamente el usuario actual si no viene definido
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user && !datosLimpios.registrado_por) {
+      datosLimpios.registrado_por = user.id;
+    }
+
     const { error } = await supabase
       .from("medicamentos")
       .insert([datosLimpios]);

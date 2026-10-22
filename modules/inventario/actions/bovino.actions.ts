@@ -9,9 +9,13 @@ export async function getBovinosAction(page = 1, limit = 10, filtros?: FiltrosBo
   const from = (page - 1) * limit;
   const to = from + limit - 1;
 
+  // Usamos el alias directo apuntando a la columna sin restricciones con nombres complejos
   let query = supabase
     .from("bovinos")
-    .select("*", { count: "exact" })
+    .select(`
+      *,
+      usuarios!fk_bovinos_registrado_por_unico ( nombre, apellidos, rol )
+    `, { count: "exact" })
     .order("created_at", { ascending: false });
 
   // Aplicar filtros a las columnas reales de la BD
@@ -21,22 +25,18 @@ export async function getBovinosAction(page = 1, limit = 10, filtros?: FiltrosBo
       query = query.or(`arete.ilike.${term},nombre.ilike.${term}`);
     }
 
-    // Filtro por Género
     if (filtros.genero && filtros.genero !== "todos") {
       query = query.eq("genero", filtros.genero);
     }
 
-    // Filtro por Condición Operativa (Activo/Inactivo)
     if (filtros.condicion && filtros.condicion !== "todos") {
       query = query.eq("condicion", filtros.condicion);
     }
 
-    // ✅ Filtro por Categoría
     if (filtros.categoria && filtros.categoria !== "todas") {
       query = query.eq("categoria", filtros.categoria);
     }
 
-    // Filtro por Origen
     if (filtros.origen && filtros.origen !== "todos") {
       query = query.eq("origen", filtros.origen);
     }
@@ -49,8 +49,24 @@ export async function getBovinosAction(page = 1, limit = 10, filtros?: FiltrosBo
     throw new Error(error.message);
   }
 
+  console.log("DATOS CRUDOS DESDE SUPABASE:", data);
+
+  // Mapear los datos para unificar el nombre y apellido del creador
+  const bovinosConRegistrador = (data || []).map((item: any) => {
+    const usuarioObj = item.usuarios;
+    
+    const nombreCreador = usuarioObj && (usuarioObj.nombre || usuarioObj.apellidos)
+      ? `${usuarioObj.nombre || ''} ${usuarioObj.apellidos || ''}`.trim()
+      : (item.registrado_por ? 'Usuario Registrado' : 'Sistema');
+
+    return {
+      ...item,
+      registrado_por_nombre: nombreCreador,
+    };
+  });
+
   return {
-    data: (data as Bovino[]) || [],
+    data: bovinosConRegistrador as Bovino[],
     total: count || 0,
   };
 }
@@ -70,7 +86,6 @@ export async function saveBovinoAction(dataToSave: Partial<Bovino>): Promise<voi
   const datosLimpios = limpiarCamposVacios(dataToSave);
 
   if (datosLimpios.id) {
-    // Actualizar registro existente
     const bovinoId = datosLimpios.id;
     delete datosLimpios.id;
     delete datosLimpios.created_at;
@@ -86,8 +101,13 @@ export async function saveBovinoAction(dataToSave: Partial<Bovino>): Promise<voi
       throw new Error(error.message);
     }
   } else {
-    // Crear nuevo registro
     delete datosLimpios.id;
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user && !datosLimpios.registrado_por) {
+      datosLimpios.registrado_por = user.id;
+    }
+
     const { error } = await supabase
       .from("bovinos")
       .insert([datosLimpios]);

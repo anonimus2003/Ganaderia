@@ -1,112 +1,100 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { useState, useEffect, useCallback } from 'react';
+import { Potrero } from '../types/potrero.types';
+import { EventoBitacora } from '@/modules/potreros/types/potrero.types';
+import { getPotrerosData } from '@/modules/potreros/api/get-potreros-data';
 
-export interface Potrero {
-  id: string | number;
-  nombre?: string;
-  numero?: number;
-  area_m2?: number;
-  tipo_pasto?: string;
-  aforo?: number;
-  progreso_pasto?: number;
-  estado: string;
-  bovinos_actuales?: number;
-  puntos?: any;
-}
+export type ModoDrawer = 
+  | 'CREAR_POTRERO' 
+  | 'EDITAR_POTRERO' 
+  | 'REGISTRAR_OCUPACION' 
+  | 'REGISTRAR_ABONO' 
+  | null;
 
-export function usePotreros() {
-  // Instanciación memorizada para evitar re-creación en cada render
-  const supabase = useMemo(() => createClient(), []);
-  
+export const usePotreros = () => {
+  // Estados de datos
   const [potreros, setPotreros] = useState<Potrero[]>([]);
-  const [potreroActivo, setPotreroActivo] = useState<Potrero | null>(null);
-  const [cargando, setCargando] = useState<boolean>(true);
+  const [eventos, setEventos] = useState<EventoBitacora[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const cargarPotreros = useCallback(async () => {
-    setCargando(true);
+  // Estados de UI y selección
+  const [potreroSeleccionado, setPotreroSeleccionado] = useState<Potrero | null>(null);
+  const [modoDrawer, setModoDrawer] = useState<ModoDrawer>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
+
+  // Carga inicial y refetch de datos desde Supabase / API
+  const fetchData = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('potreros')
-        .select('*')
-        .order('id', { ascending: true });
+      setLoading(true);
+      setError(null);
 
-      if (error) {
-        console.error('Error al cargar potreros:', error.message);
-      } else if (data) {
-        setPotreros(data);
+      const { potrerosData, eventosData } = await getPotrerosData();
+
+      setPotreros(potrerosData || []);
+      setEventos(eventosData || []);
+
+      // Si había un potrero seleccionado, actualizamos sus datos con la nueva información
+      if (potreroSeleccionado) {
+        const actualizado = potrerosData?.find(
+          (p) => String(p.id) === String(potreroSeleccionado.id)
+        );
+        setPotreroSeleccionado(actualizado || null);
       }
-    } catch (err) {
-      console.error('Error inesperado al cargar potreros:', err);
+    } catch (err: any) {
+      console.error('Error al cargar información de potreros:', err);
+      setError(err?.message || 'Error al cargar los potreros.');
     } finally {
-      setCargando(false);
+      setLoading(false);
     }
-  }, [supabase]);
+  }, [potreroSeleccionado]);
 
   useEffect(() => {
-    cargarPotreros();
-  }, [cargarPotreros]);
+    fetchData();
+  }, []);
 
-  const seleccionarPotrero = (potrero: Potrero | null) => {
-    setPotreroActivo(potrero);
+  // Handler para seleccionar potrero desde el mapa o la lista
+  const seleccionarPotrero = (potrero: Potrero) => {
+    if (potreroSeleccionado?.id === potrero.id) {
+      // Toggle: Si se vuelve a tocar el mismo, se deselecciona
+      setPotreroSeleccionado(null);
+    } else {
+      setPotreroSeleccionado(potrero);
+    }
   };
 
-  const actualizarGanadoLocal = (
-    potreroId: number | string, 
-    accion: 'ingreso' | 'salida', 
-    animales: string[],
-    bovinosRestantes?: number
-  ) => {
-    const determinarEstado = (): string => {
-      if (accion === 'ingreso') return 'Ocupado';
-      if (bovinosRestantes !== undefined) {
-        return bovinosRestantes > 0 ? 'Ocupado' : 'Disponible';
-      }
-      return 'Disponible';
-    };
+  // Control de apertura del Drawer
+  const abrirDrawer = (modo: ModoDrawer) => {
+    setModoDrawer(modo);
+    setIsDrawerOpen(true);
+  };
 
-    setPotreros((prev) =>
-      prev.map((p) => {
-        if (String(p.id) === String(potreroId)) {
-          const nuevoEstado = determinarEstado();
-          const nuevaCantidad = bovinosRestantes !== undefined 
-            ? bovinosRestantes 
-            : (accion === 'ingreso' ? (p.bovinos_actuales || 0) + animales.length : 0);
-
-          return {
-            ...p,
-            estado: nuevoEstado,
-            bovinos_actuales: nuevaCantidad,
-          };
-        }
-        return p;
-      })
-    );
-
-    setPotreroActivo((prev) => {
-      if (prev && String(prev.id) === String(potreroId)) {
-        const nuevoEstado = determinarEstado();
-        const nuevaCantidad = bovinosRestantes !== undefined 
-          ? bovinosRestantes 
-          : (accion === 'ingreso' ? (prev.bovinos_actuales || 0) + animales.length : 0);
-
-        return {
-          ...prev,
-          estado: nuevoEstado,
-          bovinos_actuales: nuevaCantidad,
-        };
-      }
-      return prev;
-    });
+  // Control de cierre del Drawer
+  const cerrarDrawer = () => {
+    setIsDrawerOpen(false);
+    setModoDrawer(null);
   };
 
   return {
+    // Datos
     potreros,
-    potreroActivo,
-    cargando,
+    eventos,
+    loading,
+    error,
+
+    // Selección
+    potreroSeleccionado,
+    potreroSeleccionadoId: potreroSeleccionado?.id ?? null,
     seleccionarPotrero,
-    actualizarGanadoLocal,
-    recargarPotreros: cargarPotreros,
+
+    // Modal / Drawer
+    isDrawerOpen,
+    modoDrawer,
+    abrirDrawer,
+    cerrarDrawer,
+
+    // Acciones de recarga
+    refetchData: fetchData,
   };
-}
+};

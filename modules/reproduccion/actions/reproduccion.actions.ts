@@ -17,10 +17,11 @@ export async function getReproduccionesAction(page = 1, limit = 10, filtros?: Fi
         id,
         arete,
         nombre
-      )
+      ),
+      usuarios!fk_reproducciones_registrado_por_usuarios ( nombre, apellidos, rol )
     `, { count: "exact" })
     .order("fecha_inseminacion", { ascending: false })
-    .order("created_at", { ascending: false }); // <-- Agrega este orden secundario
+    .order("created_at", { ascending: false });
 
   if (filtros) {
     // 1. Filtro de búsqueda por texto (Arete o Nombre de la vaca)
@@ -29,12 +30,12 @@ export async function getReproduccionesAction(page = 1, limit = 10, filtros?: Fi
       query = query.or(`arete.ilike.%${termino}%,nombre.ilike.%${termino}%`, { referencedTable: 'bovinos' });
     }
 
-    // 2. Filtro por estado del proceso (Usamos .eq si es un valor exacto del select)
+    // 2. Filtro por estado del proceso
     if (filtros.estado && filtros.estado !== "todos") {
       query = query.eq("estado", filtros.estado);
     }
 
-    // 3. Filtro por tipo de servicio (Usamos .eq para asegurar coincidencia exacta con el select)
+    // 3. Filtro por tipo de servicio
     if (filtros.tipo && filtros.tipo !== "todos") {
       query = query.eq("tipo", filtros.tipo);
     }
@@ -55,8 +56,22 @@ export async function getReproduccionesAction(page = 1, limit = 10, filtros?: Fi
     throw new Error(error.message);
   }
 
+  // Mapear los datos para unificar el nombre y apellido del creador
+  const reproduccionesConRegistrador = (data || []).map((item: any) => {
+    const usuarioObj = item.usuarios;
+    
+    const nombreCreador = usuarioObj && (usuarioObj.nombre || usuarioObj.apellidos)
+      ? `${usuarioObj.nombre || ''} ${usuarioObj.apellidos || ''}`.trim()
+      : (item.registrado_por ? 'Usuario Registrado' : 'Sistema');
+
+    return {
+      ...item,
+      registrado_por_nombre: nombreCreador,
+    };
+  });
+
   return {
-    data: data || [],
+    data: reproduccionesConRegistrador as Reproduccion[],
     total: count || 0,
   };
 }
@@ -74,11 +89,13 @@ function limpiarCamposVacios(data: Partial<Reproduccion>) {
 export async function saveReproduccionAction(dataToSave: Partial<Reproduccion>): Promise<void> {
   const datosLimpios = limpiarCamposVacios(dataToSave);
   delete datosLimpios.bovinos;
+  delete datosLimpios.usuarios;
 
   if (datosLimpios.id) {
     const reproduccionId = datosLimpios.id;
     delete datosLimpios.id;
     delete datosLimpios.created_at;
+    delete datosLimpios.registrado_por; // Mantenemos el creador original al actualizar
 
     const { error } = await supabase
       .from("reproducciones")
@@ -91,6 +108,13 @@ export async function saveReproduccionAction(dataToSave: Partial<Reproduccion>):
     }
   } else {
     delete datosLimpios.id;
+
+    // Asignar automáticamente el usuario actual si no viene definido
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user && !datosLimpios.registrado_por) {
+      datosLimpios.registrado_por = user.id;
+    }
+
     const { error } = await supabase
       .from("reproducciones")
       .insert([datosLimpios]);

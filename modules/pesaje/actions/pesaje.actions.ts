@@ -1,3 +1,4 @@
+// modules/inventario/actions/pesaje.actions.ts
 import { createClient } from "@/lib/supabase/client";
 import { Pesaje } from "../schemas";
 import { FiltrosPesaje } from "../hooks/usePesajes";
@@ -16,10 +17,11 @@ export async function getPesajesAction(page = 1, limit = 10, filtros?: FiltrosPe
         id,
         arete,
         nombre
-      )
+      ),
+      usuarios!fk_pesajes_registrado_por_usuarios ( nombre, apellidos, rol )
     `, { count: "exact" })
     .order("fecha", { ascending: false })
-    .order("created_at", { ascending: false }); // <-- Agrega este orden secundario
+    .order("created_at", { ascending: false });
 
   if (filtros) {
     if (filtros.busqueda) {
@@ -40,8 +42,22 @@ export async function getPesajesAction(page = 1, limit = 10, filtros?: FiltrosPe
     throw new Error(error.message);
   }
 
+  // Mapear los datos para unificar el nombre y apellido del creador
+  const pesajesConRegistrador = (data || []).map((item: any) => {
+    const usuarioObj = item.usuarios;
+    
+    const nombreCreador = usuarioObj && (usuarioObj.nombre || usuarioObj.apellidos)
+      ? `${usuarioObj.nombre || ''} ${usuarioObj.apellidos || ''}`.trim()
+      : (item.registrado_por ? 'Usuario Registrado' : 'Sistema');
+
+    return {
+      ...item,
+      registrado_por_nombre: nombreCreador,
+    };
+  });
+
   return {
-    data: data || [],
+    data: pesajesConRegistrador as Pesaje[],
     total: count || 0,
   };
 }
@@ -64,6 +80,7 @@ export async function savePesajeAction(dataToSave: Partial<Pesaje>): Promise<voi
     delete datosLimpios.id;
     delete datosLimpios.created_at;
     delete datosLimpios.bovinos;
+    delete datosLimpios.registrado_por; // Mantenemos el creador original al editar
 
     const { error } = await supabase
       .from("pesajes")
@@ -77,6 +94,12 @@ export async function savePesajeAction(dataToSave: Partial<Pesaje>): Promise<voi
   } else {
     delete datosLimpios.id;
     delete datosLimpios.bovinos;
+
+    // Asignar automáticamente el usuario actual si no viene definido
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user && !datosLimpios.registrado_por) {
+      datosLimpios.registrado_por = user.id;
+    }
 
     const { error } = await supabase
       .from("pesajes")

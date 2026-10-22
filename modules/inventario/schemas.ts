@@ -17,7 +17,7 @@ export interface Bovino {
     | "Novilla en desarrollo"
     | "Novilla de vientre"
     | "Toro"
-    | "Vaca en producción gestando"
+    | "Vaca en produccion gestando"
     | "Vaca seca"
     | "Vaca horra"
     | "Vaca en produccion vacia"

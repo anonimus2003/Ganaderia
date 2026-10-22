@@ -119,6 +119,17 @@ export const getReproduccionColumns = ({
     ),
   },
 
+
+  {
+    header: "Registrado Por",
+    accessor: "registrado_por_nombre" as any,
+    render: (bovino: any) => (
+      <span className="text-xs text-slate-700 font-medium">
+        {bovino.registrado_por_nombre || "Desconocido"}
+      </span>
+    ),
+  },
+
   {
     header: "Lactancia y Notas",
     accessor: "fecha_secado",

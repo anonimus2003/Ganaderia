@@ -107,6 +107,16 @@ export const getOrdeñoColumns = ({
   },
 
   {
+    header: "Registrado Por",
+    accessor: "registrado_por_nombre" as any,
+    render: (bovino: any) => (
+      <span className="text-xs text-slate-700 font-medium">
+        {bovino.registrado_por_nombre || "Desconocido"}
+      </span>
+    ),
+  },
+
+  {
     header: "Observaciones",
     accessor: "observaciones",
     render: (ordeño) => (

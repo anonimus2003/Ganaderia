@@ -1,3 +1,4 @@
+// modules/inventario/actions/ordeno.actions.ts (o la ruta de tu archivo)
 import { createClient } from "@/lib/supabase/client";
 import { Ordeño } from "../schemas";
 import { FiltrosOrdeño } from "../hooks/useOrdeno";
@@ -18,10 +19,11 @@ export async function getOrdeñosAction(page = 1, limit = 10, filtros?: FiltrosO
         nombre,
         genero,
         raza
-      )
+      ),
+      usuarios:registrado_por ( nombre, apellidos, rol )
     `, { count: "exact" })
     .order("fecha", { ascending: false })
-    .order("created_at", { ascending: false }); // <-- Agrega este orden secundario
+    .order("created_at", { ascending: false });
 
   if (filtros) {
     if (filtros.busqueda) {
@@ -45,8 +47,22 @@ export async function getOrdeñosAction(page = 1, limit = 10, filtros?: FiltrosO
     throw new Error(error.message);
   }
 
+  // Mapear los datos para unificar el nombre y apellido del creador
+  const ordeñosConRegistrador = (data || []).map((item: any) => {
+    const usuarioObj = item.usuarios;
+    
+    const nombreCreador = usuarioObj && (usuarioObj.nombre || usuarioObj.apellidos)
+      ? `${usuarioObj.nombre || ''} ${usuarioObj.apellidos || ''}`.trim()
+      : (item.registrado_por ? 'Usuario Registrado' : 'Sistema');
+
+    return {
+      ...item,
+      registrado_por_nombre: nombreCreador,
+    };
+  });
+
   return {
-    data: data || [],
+    data: ordeñosConRegistrador as Ordeño[],
     total: count || 0,
   };
 }
@@ -69,6 +85,7 @@ export async function saveOrdeñoAction(dataToSave: Partial<Ordeño>): Promise<v
     delete datosLimpios.id;
     delete datosLimpios.created_at;
     delete datosLimpios.bovinos;
+    delete datosLimpios.registrado_por; // Mantenemos el creador original al editar
 
     const { error } = await supabase
       .from("ordeño")
@@ -82,6 +99,12 @@ export async function saveOrdeñoAction(dataToSave: Partial<Ordeño>): Promise<v
   } else {
     delete datosLimpios.id;
     delete datosLimpios.bovinos;
+
+    // Asignar automáticamente el usuario actual si no viene definido
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user && !datosLimpios.registrado_por) {
+      datosLimpios.registrado_por = user.id;
+    }
 
     const { error } = await supabase
       .from("ordeño")

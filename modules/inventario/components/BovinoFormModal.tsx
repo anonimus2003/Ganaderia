@@ -44,7 +44,7 @@ const ETAPAS_HEMBRA: Exclude<Bovino["categoria"], null>[] = [
   "Novilla en desarrollo",
   "Ternera en crecimiento",
   "Novilla de vientre",
-  "Vaca en producción gestando",
+  "Vaca en produccion gestando",
   "Vaca seca",
   "Vaca horra",
   "Vaca en produccion vacia"
