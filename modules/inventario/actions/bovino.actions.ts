@@ -9,12 +9,12 @@ export async function getBovinosAction(page = 1, limit = 10, filtros?: FiltrosBo
   const from = (page - 1) * limit;
   const to = from + limit - 1;
 
-  // Usamos el alias directo apuntando a la columna sin restricciones con nombres complejos
+  // Consulta corregida usando la relación limpia con usuarios
   let query = supabase
     .from("bovinos")
     .select(`
       *,
-      usuarios!fk_bovinos_registrado_por_unico ( nombre, apellidos, rol )
+      usuarios ( nombre, apellidos, rol )
     `, { count: "exact" })
     .order("created_at", { ascending: false });
 
@@ -84,6 +84,10 @@ function limpiarCamposVacios(data: Partial<Bovino>) {
 
 export async function saveBovinoAction(dataToSave: Partial<Bovino>): Promise<void> {
   const datosLimpios = limpiarCamposVacios(dataToSave);
+
+  // ELIMINAR PROPIEDADES VIRTUALES O DE RELACIÓN QUE NO SON COLUMNAS DE LA TABLA "bovinos"
+  delete datosLimpios.registrado_por_nombre;
+  delete datosLimpios.usuarios;
 
   if (datosLimpios.id) {
     const bovinoId = datosLimpios.id;

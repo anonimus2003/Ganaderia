@@ -219,6 +219,8 @@ export async function registrarIngresoGanado(data: {
 // ==========================================
 // 4. REGISTRAR SALIDA DE GANADO
 // ==========================================
+// ==========================================
+// ==========================================
 export async function registrarSalidaGanado(data: {
   potreroId: string | number;
   animalesIds?: string[];
@@ -228,49 +230,57 @@ export async function registrarSalidaGanado(data: {
 }) {
   const supabase = await createClient();
   const fechaIso = data.fecha ? new Date(data.fecha).toISOString() : new Date().toISOString();
-  let descripcionAnimales = `${data.cantidad} animales`;
 
-  if (data.animalesIds && data.animalesIds.length > 0) {
-    const { data: bovinos, error: errBovinos } = await supabase
-      .from('bovinos')
-      .select('id, arete, nombre')
-      .in('id', data.animalesIds);
+  // 1. Convertimos el potreroId al tipo correcto (número si viene como string)
+  const potreroIdParsed = isNaN(Number(data.potreroId)) ? data.potreroId : Number(data.potreroId);
 
-    if (!errBovinos && bovinos && bovinos.length > 0) {
-      const detalleAnimales = bovinos
-        .map((b) => `${b.arete}${b.nombre ? ` (${b.nombre})` : ''}`)
-        .join(', ');
-
-      descripcionAnimales = `los animales: ${detalleAnimales}`;
-    }
-  }
-
-  let queryHistorial = supabase
+  // 2. Buscamos TODOS los registros de este potrero que no tengan fecha de salida
+  const { data: activos, error: errConsulta } = await supabase
     .from('historial_ocupacion_potreros')
-    .update({ fecha_salida: fechaIso })
-    .eq('potrero_id', data.potreroId)
+    .select('id, bovino_id')
+    .eq('potrero_id', potreroIdParsed)
     .is('fecha_salida', null);
 
-  if (data.animalesIds && data.animalesIds.length > 0) {
-    queryHistorial = queryHistorial.in('bovino_id', data.animalesIds);
+  if (errConsulta) {
+    console.error("❌ Error de lectura en Supabase:", errConsulta.message);
+    throw new Error(`Error buscando ocupaciones: ${errConsulta.message}`);
   }
 
-  const { error: errHistorial } = await queryHistorial;
-  if (errHistorial) throw errHistorial;
+  if (!activos || activos.length === 0) {
+    console.warn(`⚠️ No se encontraron filas con fecha_salida IS NULL para el potrero_id: ${potreroIdParsed}`);
+    throw new Error("No hay registros activos en este potrero para marcar salida.");
+  }
 
-  const { error: errPotrero } = await supabase
+  // 3. Extraemos las Claves Primarias (IDs numéricos de la tabla, ej: 372)
+  const idsAfectados = activos.map((item) => item.id);
+
+  // 4. UPDATE directo por ID primario con .select() para validar qué cambió en la DB
+  const { data: filasActualizadas, error: errUpdate } = await supabase
+    .from('historial_ocupacion_potreros')
+    .update({ fecha_salida: fechaIso })
+    .in('id', idsAfectados)
+    .select(); // 👈 El select() nos devuelve las filas cambiadas en tiempo real
+
+  if (errUpdate) {
+    console.error("❌ Error al actualizar en Supabase (Revisar RLS/Permisos):", errUpdate.message);
+    throw new Error(`Error en actualización: ${errUpdate.message}`);
+  }
+
+  console.log("✅ Filas actualizadas con éxito en Supabase:", filasActualizadas);
+
+  // 5. Cambiamos el estado del potrero a Disponible
+  await supabase
     .from('potreros')
     .update({ estado: 'Disponible' })
-    .eq('id', data.potreroId);
+    .eq('id', potreroIdParsed);
 
-  if (errPotrero) throw errPotrero;
-
+  // 6. Registro en bitácora
   return await supabase.from('bitacora_potreros').insert({
-    potrero_id: data.potreroId,
+    potrero_id: potreroIdParsed,
     tipo_evento: 'Salida Ganado',
-    descripcion: `Salida de ${descripcionAnimales}.`,
+    descripcion: `Salida de ${activos.length} animales.`,
     fecha: fechaIso,
-    cantidad_animales: data.cantidad,
+    cantidad_animales: activos.length,
   });
 }
 

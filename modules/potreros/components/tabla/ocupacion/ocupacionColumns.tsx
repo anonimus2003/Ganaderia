@@ -74,14 +74,19 @@ export const getOcupacionColumns = ({
     ),
   },
 
-  {
+{
     header: "Fecha Salida",
     accessor: "fecha_salida",
-    render: (ocupacion) => (
-      <span className="text-xs text-slate-700 block">
-        {ocupacion.fecha_salida ? ocupacion.fecha_salida.replace("T", " ").substring(0, 19) : "Activo en potrero"}
-      </span>
-    ),
+    render: (ocupacion) => {
+      // 🕵️‍♂️ MIRA ESTO EN LA CONSOLA DEL NAVEGADOR (F12)
+      console.log("Objeto recibido en la fila:", ocupacion);
+
+      return (
+        <span className="text-xs text-slate-700 block">
+          {ocupacion.fecha_salida ? ocupacion.fecha_salida.replace("T", " ").substring(0, 19) : "Activo en potrero"}
+        </span>
+      );
+    },
   },
 
   {

@@ -83,6 +83,9 @@ function limpiarCamposVacios(data: Partial<Medicamento>) {
 
 export async function saveMedicamentoAction(dataToSave: Partial<Medicamento>): Promise<void> {
   const datosLimpios = limpiarCamposVacios(dataToSave);
+
+  // ELIMINAR PROPIEDADES VIRTUALES O DE RELACIÓN QUE NO SON COLUMNAS DE LA TABLA
+  delete datosLimpios.registrado_por_nombre;
   delete datosLimpios.bovinos;
   delete datosLimpios.usuarios;
 

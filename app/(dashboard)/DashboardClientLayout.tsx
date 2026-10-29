@@ -14,10 +14,17 @@ interface DashboardClientLayoutProps {
   logoutAction: () => Promise<void>
 }
 
+// 🐮 LOGO AMPLIADO Y MEJORADO
 function CowLogo({ variant = 'white' }: { variant?: 'white' | 'black' }) {
   return (
     <div className="w-full h-full flex items-center justify-center bg-transparent">
-      <Image src="/logo.svg" alt="Logo Ganaderia" width={36} height={36} className={`w-full h-full object-contain ${variant === 'black' ? 'brightness-0' : 'brightness-0 invert'}`} />
+      <Image 
+        src="/logo.svg" 
+        alt="Logo Ganaderia" 
+        width={80} 
+        height={80} 
+        className={`w-full h-full object-contain ${variant === 'black' ? 'brightness-0' : 'brightness-0 invert'}`} 
+      />
     </div>
   )
 }
@@ -48,10 +55,10 @@ export default function DashboardClientLayout({
       {/* 📱 NAVBAR MÓVIL */}
       <div className="md:hidden fixed top-0 inset-x-0 h-14 bg-white border-b border-zinc-200 flex items-center justify-between px-4 z-35">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 flex items-center justify-center">
+          <div className="w-10 h-10 flex items-center justify-center">
             <CowLogo variant="black" />
           </div>
-          <span className="text-zinc-900 font-semibold text-base tracking-tight">Ganadería</span>
+          <span className="text-zinc-900 font-semibold text-base tracking-tight">Ruminax</span>
         </div>
         
         <button 
@@ -91,11 +98,12 @@ export default function DashboardClientLayout({
               className="flex items-center gap-3 overflow-hidden cursor-pointer hover:opacity-90 transition-opacity focus:outline-none"
               title={isCollapsed ? "Expandir menú" : "Colapsar menú"}
             >
-              <div className="w-9 h-9 flex-shrink-0 flex items-center justify-center">
+              {/* Contenedor del logo con mayor tamaño (w-12 h-12 en lugar de w-9 h-9) */}
+              <div className="w-12 h-12 flex-shrink-0 flex items-center justify-center">
                 <CowLogo variant="white" />
               </div>
               <span className={`text-white font-bold text-lg tracking-tight whitespace-nowrap transition-all ${isCollapsed ? 'md:opacity-0 md:w-0 md:hidden' : 'opacity-100'}`}>
-                Ganadería
+                Ruminax
               </span>
             </button>
 

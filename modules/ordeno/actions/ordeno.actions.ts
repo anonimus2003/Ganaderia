@@ -1,4 +1,4 @@
-// modules/inventario/actions/ordeno.actions.ts (o la ruta de tu archivo)
+// modules/inventario/actions/ordeno.actions.ts
 import { createClient } from "@/lib/supabase/client";
 import { Ordeño } from "../schemas";
 import { FiltrosOrdeño } from "../hooks/useOrdeno";
@@ -80,11 +80,15 @@ function limpiarCamposVacios(data: Partial<Ordeño>) {
 export async function saveOrdeñoAction(dataToSave: Partial<Ordeño>): Promise<void> {
   const datosLimpios = limpiarCamposVacios(dataToSave);
 
+  // ELIMINAR PROPIEDADES VIRTUALES O DE RELACIÓN QUE NO SON COLUMNAS DE LA TABLA "ordeño"
+  delete datosLimpios.registrado_por_nombre;
+  delete datosLimpios.bovinos;
+  delete datosLimpios.usuarios;
+
   if (datosLimpios.id) {
     const ordeñoId = datosLimpios.id;
     delete datosLimpios.id;
     delete datosLimpios.created_at;
-    delete datosLimpios.bovinos;
     delete datosLimpios.registrado_por; // Mantenemos el creador original al editar
 
     const { error } = await supabase
@@ -98,7 +102,6 @@ export async function saveOrdeñoAction(dataToSave: Partial<Ordeño>): Promise<v
     }
   } else {
     delete datosLimpios.id;
-    delete datosLimpios.bovinos;
 
     // Asignar automáticamente el usuario actual si no viene definido
     const { data: { user } } = await supabase.auth.getUser();
