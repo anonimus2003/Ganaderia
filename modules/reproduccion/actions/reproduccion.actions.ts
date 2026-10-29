@@ -90,6 +90,7 @@ export async function saveReproduccionAction(dataToSave: Partial<Reproduccion>):
   const datosLimpios = limpiarCamposVacios(dataToSave);
   delete datosLimpios.bovinos;
   delete datosLimpios.usuarios;
+  delete datosLimpios.registrado_por_nombre; // <--- Añade esta línea para proteger la BD
 
   if (datosLimpios.id) {
     const reproduccionId = datosLimpios.id;

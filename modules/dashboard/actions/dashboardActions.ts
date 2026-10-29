@@ -35,8 +35,18 @@ export async function getDashboardData(vacaId: string = "general"): Promise<Dash
 
     // 2. Días en Lactancia (DEL)
     vacaId === "general"
-      ? supabase.from("reproducciones").select("fecha_parto").not("fecha_parto", "is", null).is("fecha_secado", null)
-      : supabase.from("reproducciones").select("fecha_parto").eq("bovino_id", vacaId).not("fecha_parto", "is", null).is("fecha_secado", null).order("fecha_parto", { ascending: false }).limit(1),
+      ? supabase
+          .from("reproducciones")
+          .select("bovino_id, fecha_parto")
+          .not("fecha_parto", "is", null)
+          .order("fecha_parto", { ascending: false })
+      : supabase
+          .from("reproducciones")
+          .select("fecha_parto")
+          .eq("bovino_id", vacaId)
+          .not("fecha_parto", "is", null)
+          .order("fecha_parto", { ascending: false })
+          .limit(1),
 
     // 3. Total de animales activos
     supabase.from("bovinos").select("id", { count: "exact", head: true }).eq("condicion", "Activo"),
@@ -89,16 +99,34 @@ export async function getDashboardData(vacaId: string = "general"): Promise<Dash
   ahora.setHours(0, 0, 0, 0) // Normalizar medianoche para comparaciones exactas
 
   if (reproduccionesRes.data && reproduccionesRes.data.length > 0) {
-    const totalDias = reproduccionesRes.data.reduce((acc, row) => {
-      if (!row.fecha_parto) return acc
-      const fParto = new Date(row.fecha_parto)
-      const diffMs = ahora.getTime() - fParto.getTime()
-      return acc + Math.floor(diffMs / (1000 * 60 * 60 * 24))
-    }, 0)
-    diasLactancia = Math.round(totalDias / reproduccionesRes.data.length)
-  }
+    if (vacaId === "general") {
+      // Para el hato general: filtramos para tomar solo el parto más reciente de cada vaca única
+      const ultimosPartosPorVaca: Record<string, string> = {}
+      reproduccionesRes.data.forEach((row: any) => {
+        if (row.bovino_id && row.fecha_parto && !ultimosPartosPorVaca[row.bovino_id]) {
+          ultimosPartosPorVaca[row.bovino_id] = row.fecha_parto
+        }
+      })
 
-  const vacasOrdenoUnicas = new Set(vacasOrdenoRes.data?.map((item) => item.bovino_id)).size
+      const fechoPartosArr = Object.values(ultimosPartosPorVaca)
+      if (fechoPartosArr.length > 0) {
+        const totalDias = fechoPartosArr.reduce((acc, fPartoStr) => {
+          const fParto = new Date(fPartoStr)
+          const diffMs = ahora.getTime() - fParto.getTime()
+          return acc + Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)))
+        }, 0)
+        diasLactancia = Math.round(totalDias / fechoPartosArr.length)
+      }
+    } else {
+      // Para una vaca individual seleccionada
+      const row = reproduccionesRes.data[0]
+      if (row && row.fecha_parto) {
+        const fParto = new Date(row.fecha_parto)
+        const diffMs = ahora.getTime() - fParto.getTime()
+        diasLactancia = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)))
+      }
+    }
+  }
 
   // A) Procesar Vista Mensual
   const litrosPorMes: Record<string, { nombre: string; litros: number }> = {}
@@ -198,6 +226,8 @@ export async function getDashboardData(vacaId: string = "general"): Promise<Dash
     potrero: row.potrero_nombre || `Potrero ${row.potrero_id}`,
     litros: Number(row.total_litros || 0),
   }))
+
+  const vacasOrdenoUnicas = new Set(vacasOrdenoRes.data?.map((item) => item.bovino_id)).size
 
   return {
     metricas: {

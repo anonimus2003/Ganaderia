@@ -1,3 +1,4 @@
+// modules/potreros/actions/potreros.actions.ts
 import { createClient } from "@/lib/supabase/client";
 
 const supabase = createClient();
@@ -6,9 +7,32 @@ const supabase = createClient();
 // 1. HISTORIAL DE OCUPACIÓN
 // ==========================================
 export async function getHistorialOcupacionAction(page = 1, limit = 10, potreroId?: string | number) {
+  const supabase = await createClient();
   const from = (page - 1) * limit;
   const to = from + limit - 1;
 
+  // 1. Contar el total de registros considerando el filtro opcional
+  let countQuery = supabase
+    .from("historial_ocupacion_potreros")
+    .select("*", { count: "exact", head: true });
+
+  if (potreroId && potreroId !== "todos") {
+    countQuery = countQuery.eq("potrero_id", potreroId);
+  }
+
+  const { count, error: countError } = await countQuery;
+
+  if (countError) {
+    console.error("Error al contar historial de ocupación:", countError.message);
+    throw new Error(countError.message);
+  }
+
+  // Si no hay registros, retornamos vacío de inmediato para evitar el error de rango
+  if (!count || count === 0) {
+    return { data: [], total: 0 };
+  }
+
+  // 2. Consulta con datos y paginación segura
   let query = supabase
     .from("historial_ocupacion_potreros")
     .select(`
@@ -25,13 +49,11 @@ export async function getHistorialOcupacionAction(page = 1, limit = 10, potreroI
     `, { count: "exact" })
     .order("fecha_entrada", { ascending: false });
 
-
   if (potreroId && potreroId !== "todos") {
     query = query.eq("potrero_id", potreroId);
   }
-  
 
-  const { data, error, count } = await query.range(from, to);
+  const { data, error } = await query.range(from, to);
 
   if (error) {
     console.error("Error al obtener historial de ocupación:", error.message);
@@ -64,14 +86,31 @@ export async function getHistorialOcupacionAction(page = 1, limit = 10, potreroI
 }
 
 // ==========================================
-// 2. HISTORIAL DE ABONOS (Añade esta función que faltaba)
-// ==========================================
-// ==========================================
-// 2. HISTORIAL DE ABONOS (Corregido para tu esquema de BD)
+// 2. HISTORIAL DE ABONOS
 // ==========================================
 export async function getHistorialAbonosAction(page = 1, limit = 10, potreroId?: string | number) {
+  const supabase = await createClient();
   const from = (page - 1) * limit;
   const to = from + limit - 1;
+
+  let countQuery = supabase
+    .from("historial_abonos")
+    .select("*", { count: "exact", head: true });
+
+  if (potreroId && potreroId !== "todos") {
+    countQuery = countQuery.eq("potrero_id", potreroId);
+  }
+
+  const { count, error: countError } = await countQuery;
+
+  if (countError) {
+    console.error("Error al contar historial de abonos:", countError.message);
+    throw new Error(countError.message);
+  }
+
+  if (!count || count === 0) {
+    return { data: [], total: 0 };
+  }
 
   let query = supabase
     .from("historial_abonos")
@@ -93,7 +132,7 @@ export async function getHistorialAbonosAction(page = 1, limit = 10, potreroId?:
     query = query.eq("potrero_id", potreroId);
   }
 
-  const { data, error, count } = await query.range(from, to);
+  const { data, error } = await query.range(from, to);
 
   if (error) {
     console.error("Error al obtener historial de abonos:", error.message);
@@ -115,6 +154,7 @@ export async function getHistorialAbonosAction(page = 1, limit = 10, potreroId?:
     total: count || 0,
   };
 }
+
 // ==========================================
 // 3. REGISTRAR INGRESO DE GANADO
 // ==========================================
@@ -126,6 +166,7 @@ export async function registrarIngresoGanado(data: {
   cantidad: number;
   tipoAnimal?: string;
 }) {
+  const supabase = await createClient();
   const fechaIso = data.fecha ? new Date(data.fecha).toISOString() : new Date().toISOString();
   let descripcionAnimales = `${data.cantidad} animales (${data.tipoAnimal || 'Vaca'})`;
 
@@ -183,8 +224,9 @@ export async function registrarSalidaGanado(data: {
   animalesIds?: string[];
   fecha: string;
   cantidad: number;
-  tipoAnimal?: string; // 👈 Agrégalo aquí para que TypeScript lo acepte
+  tipoAnimal?: string;
 }) {
+  const supabase = await createClient();
   const fechaIso = data.fecha ? new Date(data.fecha).toISOString() : new Date().toISOString();
   let descripcionAnimales = `${data.cantidad} animales`;
 
@@ -244,6 +286,7 @@ export async function registrarAbono(data: {
   responsable?: string;
   detalleExtra?: string;
 }) {
+  const supabase = await createClient();
   const fechaIso = data.fecha ? new Date(data.fecha).toISOString() : new Date().toISOString();
 
   const { error: errAbono } = await supabase.from('historial_abonos').insert({
@@ -273,6 +316,7 @@ export async function registrarAbono(data: {
 // 6. ELIMINAR REGISTRO DE OCUPACIÓN
 // ==========================================
 export async function deleteHistorialOcupacionAction(id: number | string): Promise<void> {
+  const supabase = await createClient();
   const { error } = await supabase
     .from("historial_ocupacion_potreros")
     .delete()
@@ -288,6 +332,7 @@ export async function deleteHistorialOcupacionAction(id: number | string): Promi
 // 7. ELIMINAR REGISTRO DE ABONO
 // ==========================================
 export async function deleteHistorialAbonoAction(id: string | number): Promise<void> {
+  const supabase = await createClient();
   const { error } = await supabase
     .from("historial_abonos")
     .delete()

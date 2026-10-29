@@ -48,6 +48,10 @@ export function GraficaTopPotreros() {
     setPagina(0)
   }
 
+  // Cálculo para mostrar el rango actual en la descripción
+  const inicioRango = potrerosOrdenados.length > 0 ? pagina * ITEMS_POR_PAGINA + 1 : 0
+  const finRango = Math.min((pagina + 1) * ITEMS_POR_PAGINA, potrerosOrdenados.length)
+
   return (
     <Card className="w-full shadow-sm hover:shadow-md transition-shadow">
       <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
@@ -57,8 +61,7 @@ export function GraficaTopPotreros() {
           </CardTitle>
           <CardDescription className="text-xs">
             {ordenAscendente ? "Mostrando de menor a mayor producción" : "Mostrando de mayor a menor producción"}
-            {potrerosOrdenados.length > 0 &&
-              ` (${pagina * ITEMS_POR_PAGINA + 1} - ${Math.min((pagina + 1) * ITEMS_POR_PAGINA, potrerosOrdenados.length)} de ${potrerosOrdenados.length})`}
+            {potrerosOrdenados.length > 0 && ` (${inicioRango} - ${finRango} de ${potrerosOrdenados.length})`}
           </CardDescription>
         </div>
 

@@ -265,7 +265,7 @@ export default function PesajeFormModal({
                 <label className="text-xs font-medium">Condición Corporal (1 - 5)</label>
                 <Input
                   type="number"
-                  step="0.5"
+                  step="0.01"
                   min="1"
                   max="5"
                   className="h-9 text-sm"
@@ -277,7 +277,7 @@ export default function PesajeFormModal({
                         e.target.value === "" ? "" : parseFloat(e.target.value),
                     }))
                   }
-                  placeholder="Ej. 3.5"
+                  placeholder="Ej. 3.50"
                 />
               </div>
             </div>
