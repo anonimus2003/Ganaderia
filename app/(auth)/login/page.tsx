@@ -51,11 +51,11 @@ export default function LoginPage() {
       boxSizing: 'border-box'
     }}>
       <div style={{ 
-        maxWidth: '400px', 
+        maxWidth: '330px', 
         width: '100%',
         padding: '30px 24px', 
         backgroundColor: '#ffffff',
-        borderRadius: '20px', 
+        borderRadius: '30px', 
         boxShadow: '0 10px 25px rgba(0,0,0,0.3)',
         boxSizing: 'border-box'
       }}>
@@ -69,74 +69,96 @@ export default function LoginPage() {
       style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
     />
   </div>
-  <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#111827', margin: '0', textAlign: 'center' }}>Bienvenido</h2>
+  <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#111827', margin: '0', textAlign: 'center' }}>Bienvenido de Nuevo</h2>
+  <p style={{ fontSize: '14px', color: '#6b7280', margin: '4px 0 0 0', textAlign: 'center' }}>Inicia sesión para continuar</p>
 </div>
 
         {/* FORMULARIO */}
-        <form onSubmit={handleLogin} style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-          
-          {/* Campo de Correo */}
-          <div style={{ width: '100%', marginBottom: '16px' }}>
-            <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '600', color: '#1f2937' }}>
-              Correo Electrónico
-            </label>
-            <input 
-              type="email" 
-              required 
-              value={email} 
-              onChange={(e) => setEmail(e.target.value)} 
-              placeholder="correo@ejemplo.com"
-              style={{ 
-                width: '100%', 
-                padding: '11px 14px', 
-                border: '1px solid #e5e7eb', 
-                borderRadius: '16px', 
-                fontSize: '14px',
-                color: '#111827',
-                boxSizing: 'border-box',
-                outline: 'none',
-                transition: 'border-color 0.2s',
-              }}
-              onFocus={(e) => e.target.style.borderColor = '#000000'}
-              onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
-            />
-          </div>
+<form onSubmit={handleLogin} style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+  
+  {/* Campo de Correo / Usuario */}
+  <div style={{ width: '100%', marginBottom: '16px' }}>
+    <div style={{ position: 'relative', width: '100%', display: 'flex', alignItems: 'center' }}>
+      
+      {/* Icono de usuario */}
+      <img src="usuario.png" style={{ position: 'absolute', left: '14px', width: '18px', 
+        height: '18px', 
+        pointerEvents: 'none',
+      filter: 'grayscale(100%)', // <--- Convierte la imagen a escala de grises
+    opacity: 0.5 
+        
+        }} alt="icono" />
 
-          {/* Campo de Contraseña */}
-          <div style={{ width: '100%', marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '600', color: '#1f2937' }}>
-              Contraseña
-            </label>
-            <input 
-              type="password" 
-              required 
-              value={password} 
-              onChange={(e) => setPassword(e.target.value)} 
-              placeholder="••••••••"
-              style={{ 
-                width: '100%', 
-                padding: '11px 14px', 
-                border: '1px solid #e5e7eb', 
-                borderRadius: '16px', 
-                fontSize: '14px',
-                color: '#111827',
-                boxSizing: 'border-box',
-                outline: 'none',
-                transition: 'border-color 0.2s',
-              }}
-              onFocus={(e) => e.target.style.borderColor = '#000000'}
-              onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
-            />
-          </div>
+      <input 
+        type="text" 
+        required 
+        value={email} 
+        onChange={(e) => setEmail(e.target.value)} 
+        placeholder="Usuario o correo electrónico"
+        style={{ 
+          width: '100%', 
+          padding: '11px 14px 11px 42px', // Espacio extra a la izquierda para el icono
+          border: '1px solid #e5e7eb', 
+          borderRadius: '16px', 
+          fontSize: '14px',
+          color: '#111827',
+          boxSizing: 'border-box',
+          outline: 'none',
+          transition: 'border-color 0.2s',
+        }}
+        onFocus={(e) => e.target.style.borderColor = '#000000'}
+        onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
+      />
+    </div>
+  </div>
 
-          {/* Mensaje de error */}
-          {error && (
-            <div style={{ width: '100%', marginBottom: '16px' }}>
-              <p style={{ color: '#dc2626', fontSize: '13px', margin: 0, fontWeight: '600' }}>
-                Email o contraseña invalida
-              </p>
-            </div>
-          )}
+  {/* Campo de Contraseña */}
+  <div style={{ width: '100%', marginBottom: '20px' }}>
+    <div style={{ position: 'relative', width: '100%', display: 'flex', alignItems: 'center' }}>
+      
+      {/* Icono de contraseña */}
+      <img src="bloquear.png" 
+      style={{ position: 'absolute', 
+      left: '14px',
+      width: '18px', 
+      height: '18px',
+      pointerEvents: 'none' ,
+      filter: 'grayscale(100%)', // <--- Convierte la imagen a escala de grises
+    opacity: 0.5               // <--- Opcional: suaviza el tono gris
+      }} alt="icono" />
+      
+
+      <input 
+        type="password" 
+        required 
+        value={password} 
+        onChange={(e) => setPassword(e.target.value)} 
+        placeholder="Contraseña"
+        style={{ 
+          width: '100%', 
+          padding: '11px 14px 11px 42px', // Espacio extra a la izquierda para el icono
+          border: '1px solid #e5e7eb', 
+          borderRadius: '16px', 
+          fontSize: '14px',
+          color: '#111827',
+          boxSizing: 'border-box',
+          outline: 'none',
+          transition: 'border-color 0.2s',
+        }}
+        onFocus={(e) => e.target.style.borderColor = '#000000'}
+        onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
+      />
+    </div>
+  </div>
+
+  {/* Mensaje de error */}
+  {error && (
+    <div style={{ width: '100%', marginBottom: '16px' }}>
+      <p style={{ color: '#dc2626', fontSize: '13px', margin: 0, fontWeight: '600' }}>
+        Usuario o contraseña inválida
+      </p>
+    </div>
+  )}
 
           {/* Botón de Entrada */}
           <div style={{ width: '100%', marginBottom: '16px' }}>
@@ -149,7 +171,7 @@ export default function LoginPage() {
                 backgroundColor: '#000000', 
                 color: '#ffffff', 
                 border: 'none', 
-                borderRadius: '16px', 
+                borderRadius: '60px', 
                 fontWeight: '600',
                 fontSize: '15px',
                 cursor: loading ? 'not-allowed' : 'pointer',
@@ -159,35 +181,47 @@ export default function LoginPage() {
               onMouseEnter={(e) => { if(!loading) e.currentTarget.style.backgroundColor = '#222222' }}
               onMouseLeave={(e) => { if(!loading) e.currentTarget.style.backgroundColor = '#000000' }}
             >
-              {loading ? 'Iniciando sesión...' : 'Entrar'}
+              {loading ? 'Iniciando sesión...' : 'Iniciar sesión'}
             </button>
           </div>
 
           {/* Texto de Invitado */}
-          <div style={{ width: '100%', textAlign: 'left' }}>
-            <span 
-              onClick={handleGuestLogin}
-              style={{ 
-                fontSize: '13px', 
-                color: '#6b7280', 
-                textDecoration: 'none', 
-                fontWeight: '500',
-                cursor: 'pointer',
-                transition: 'color 0.2s'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = '#111827'
-                e.currentTarget.style.textDecoration = 'underline'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = '#6b7280'
-                e.currentTarget.style.textDecoration = 'none'
-              }}
-            >
-              Ingresar como invitado
-            </span>
-          </div>
+          {/* Contenedor principal con líneas a los lados y texto centrado */}
+<div style={{ width: '100%', display: 'flex', alignItems: 'center', margin: '20px 0' }}>
+  
+  {/* Línea izquierda */}
+  <div style={{ flex: 1, height: '1px', backgroundColor: '#e5e7eb' }} />
+  
+  {/* Contenedor del texto/enlace de invitado */}
+  <div style={{ padding: '0 12px', textAlign: 'center' }}>
+    <span 
+      onClick={handleGuestLogin}
+      style={{ 
+        fontSize: '11px', 
+        color: '#6b7280', 
+        textDecoration: 'none', 
+        fontWeight: '500',
+        cursor: 'pointer',
+        transition: 'color 0.2s',
+        whiteSpace: 'nowrap'
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.color = '#111827'
+        e.currentTarget.style.textDecoration = 'underline'
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.color = '#6b7280'
+        e.currentTarget.style.textDecoration = 'none'
+      }}
+    >
+      Ingresar como invitado
+    </span>
+  </div>
 
+  {/* Línea derecha */}
+  <div style={{ flex: 1, height: '1px', backgroundColor: '#e5e7eb' }} />
+
+</div>
         </form>
 
       </div>

@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import { useState, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -22,7 +22,7 @@ export function GraficaLeche() {
   const datosProcesados = useMemo(() => {
     if (!data?.graficaLeche) return []
 
-    // 1. MODO DÍAS: Procesamiento fila por fila exactamente como lo tenías antes
+    // 1. MODO DÍAS
     if (periodo === "dias") {
       const ordenados = [...(data.graficaLeche.dias || [])].sort(
         (a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime()
@@ -38,24 +38,28 @@ export function GraficaLeche() {
       })
     }
 
-    // 2. MODO MESES: Utiliza el consolidado precalculado de la Vista
+    // 2. MODO MESES
     if (periodo === "meses") {
       return (data.graficaLeche.meses || []).map((item: any) => ({
-        etiqueta: item.fecha, // Ej: "Ene 2026"
+        etiqueta: item.fecha || item.mesKey, 
         litros: Number(item.litros || 0),
       }))
     }
 
-    // 3. MODO AÑOS: Agrupa las sumas de los meses por Año (YYYY)
+    // 3. MODO AÑOS
     if (periodo === "anios") {
       const mapaAnios: Record<string, number> = {}
 
       ;(data.graficaLeche.meses || []).forEach((item: any) => {
-        const anioKey = item.mesKey.substring(0, 4) // Obtiene "YYYY" de "YYYY-MM"
+        const key = item.mesKey || item.fecha || ""
+        const match = key.match(/\d{4}/)
+        const anioKey = match ? match[0] : "Otros"
+
         mapaAnios[anioKey] = (mapaAnios[anioKey] || 0) + Number(item.litros || 0)
       })
 
       return Object.keys(mapaAnios)
+        .filter((anio) => anio !== "Otros")
         .sort()
         .map((anioKey) => ({
           etiqueta: anioKey,
@@ -82,7 +86,7 @@ export function GraficaLeche() {
         <div className="flex items-center gap-1 bg-muted p-1 rounded-lg text-xs font-medium">
           <button
             onClick={() => setPeriodo("dias")}
-            className={`px-2.5 py-1 rounded-md transition-all ${
+            className={`px-2.5 py-1 rounded-md transition-all outline-none ${
               periodo === "dias"
                 ? "bg-background text-foreground shadow-sm font-semibold"
                 : "text-muted-foreground hover:text-foreground"
@@ -92,7 +96,7 @@ export function GraficaLeche() {
           </button>
           <button
             onClick={() => setPeriodo("meses")}
-            className={`px-2.5 py-1 rounded-md transition-all ${
+            className={`px-2.5 py-1 rounded-md transition-all outline-none ${
               periodo === "meses"
                 ? "bg-background text-foreground shadow-sm font-semibold"
                 : "text-muted-foreground hover:text-foreground"
@@ -102,7 +106,7 @@ export function GraficaLeche() {
           </button>
           <button
             onClick={() => setPeriodo("anios")}
-            className={`px-2.5 py-1 rounded-md transition-all ${
+            className={`px-2.5 py-1 rounded-md transition-all outline-none ${
               periodo === "anios"
                 ? "bg-background text-foreground shadow-sm font-semibold"
                 : "text-muted-foreground hover:text-foreground"
@@ -123,27 +127,30 @@ export function GraficaLeche() {
             No hay registros de producción en este periodo.
           </div>
         ) : (
-          <ChartContainer config={chartConfig} className="h-[250px] w-full">
-            <AreaChart data={datosProcesados} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <defs>
-                <linearGradient id="fillLitros" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.4} />
-                  <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0.05} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="etiqueta" tickLine={false} axisLine={false} className="text-xs" />
-              <YAxis tickLine={false} axisLine={false} className="text-xs" />
-              <ChartTooltip content={<ChartTooltipContent />} />
-              <Area
-                type="monotone"
-                dataKey="litros"
-                stroke="hsl(var(--chart-1))"
-                strokeWidth={2}
-                fill="url(#fillLitros)"
-              />
-            </AreaChart>
-          </ChartContainer>
+          /* Se añade [&_*]:outline-none para evitar que los elementos internos de la gráfica muestren cuadros de enfoque */
+          <div className="w-full h-[250px] [&_*]:outline-none select-none">
+            <ChartContainer config={chartConfig} className="h-full w-full">
+              <AreaChart data={datosProcesados} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="fillLitros" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0.05} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="etiqueta" tickLine={false} axisLine={false} className="text-xs" />
+                <YAxis tickLine={false} axisLine={false} className="text-xs" />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Area
+                  type="monotone"
+                  dataKey="litros"
+                  stroke="hsl(var(--chart-1))"
+                  strokeWidth={2}
+                  fill="url(#fillLitros)"
+                />
+              </AreaChart>
+            </ChartContainer>
+          </div>
         )}
       </CardContent>
     </Card>

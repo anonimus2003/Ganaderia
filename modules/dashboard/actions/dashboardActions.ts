@@ -14,19 +14,19 @@ export async function getDashboardData(vacaId: string = "general"): Promise<Dash
   hace7Dias.setDate(hace7Dias.getDate() - 7)
   const fechaHace7Dias = hace7Dias.toISOString().split("T")[0]
 
-  // Ejecución simultánea de 10 consultas en PostgreSQL
+  // Ejecución simultánea de consultas en PostgreSQL
   const [
     ordeñoHoyRes,
     reproduccionesRes,
     totalBovinosRes,
     vacasOrdenoRes,
     bovinosListRes,
-    graficaLecheMesesRes, // 6. Vista SQL Meses
+    graficaLecheMesesRes, // 6. Histórico para meses y años (Directo de la tabla ordeño)
     graficaLecheDiasRes,  // 7. Tabla ordeño últimos 7 días
     graficaPesajeRes,     // 8. Pesajes
     estadoHatoRes,        // 9. Categorías
     medicamentosRes,      // 10. Alertas Retiro
-    potrerosRes           // 11. Potreros
+    potrerosRes           // 11. Potreros (Último pastoreo)
   ] = await Promise.all([
     // 1. Litros de ordeño hoy
     vacaId === "general"
@@ -57,10 +57,10 @@ export async function getDashboardData(vacaId: string = "general"): Promise<Dash
     // 5. Lista general para el selector de bovinos
     supabase.from("bovinos").select("id, arete, nombre").eq("condicion", "Activo").order("arete", { ascending: true }),
 
-    // 6. HISTÓRICO MENSUAL (Vista SQL)
+    // 6. HISTÓRICO MENSUAL/ANUAL (Directo de la tabla ordeño para evitar depender de vistas SQL)
     vacaId === "general"
-      ? supabase.from("v_produccion_mensual_total").select("mes_key, mes_nombre, total_litros")
-      : supabase.from("v_produccion_mensual_total").select("mes_key, mes_nombre, total_litros").eq("bovino_id", vacaId),
+      ? supabase.from("ordeño").select("fecha, litros")
+      : supabase.from("ordeño").select("fecha, litros").eq("bovino_id", vacaId),
 
     // 7. ÚLTIMOS 7 DÍAS DIARIOS
     vacaId === "general"
@@ -85,8 +85,8 @@ export async function getDashboardData(vacaId: string = "general"): Promise<Dash
       bovinos ( arete, nombre )
     `),
 
-    // 11. Rendimiento por Potrero
-    supabase.from("v_produccion_por_potrero").select("potrero_id, potrero_nombre, total_litros").order("total_litros", { ascending: false })
+    // 11. Rendimiento por Potrero (Ordenado por fecha descendente para capturar el último pastoreo)
+    supabase.from("v_produccion_por_potrero").select("potrero_id, potrero_nombre, total_litros, fecha").order("fecha", { ascending: false })
   ])
 
   // --- CÁLCULOS Y PROCESAMIENTO ---
@@ -100,7 +100,6 @@ export async function getDashboardData(vacaId: string = "general"): Promise<Dash
 
   if (reproduccionesRes.data && reproduccionesRes.data.length > 0) {
     if (vacaId === "general") {
-      // Para el hato general: filtramos para tomar solo el parto más reciente de cada vaca única
       const ultimosPartosPorVaca: Record<string, string> = {}
       reproduccionesRes.data.forEach((row: any) => {
         if (row.bovino_id && row.fecha_parto && !ultimosPartosPorVaca[row.bovino_id]) {
@@ -118,7 +117,6 @@ export async function getDashboardData(vacaId: string = "general"): Promise<Dash
         diasLactancia = Math.round(totalDias / fechoPartosArr.length)
       }
     } else {
-      // Para una vaca individual seleccionada
       const row = reproduccionesRes.data[0]
       if (row && row.fecha_parto) {
         const fParto = new Date(row.fecha_parto)
@@ -128,21 +126,36 @@ export async function getDashboardData(vacaId: string = "general"): Promise<Dash
     }
   }
 
-  // A) Procesar Vista Mensual
-  const litrosPorMes: Record<string, { nombre: string; litros: number }> = {}
+  // A) PROCESAR HISTÓRICO MENSUAL Y ANUAL
+  const litrosPorMes: Record<string, { mesNombre: string; litros: number }> = {}
   ;(graficaLecheMesesRes.data || []).forEach((row: any) => {
-    if (!row.mes_key) return
-    if (!litrosPorMes[row.mes_key]) {
-      litrosPorMes[row.mes_key] = { nombre: row.mes_nombre, litros: 0 }
+    if (!row.fecha) return
+    const fechaStr = row.fecha.split("T")[0]
+    const partesFecha = fechaStr.split("-")
+    if (partesFecha.length < 2) return
+
+    const anio = partesFecha[0]
+    const mes = partesFecha[1]
+    const mesKey = `${anio}-${mes}`
+
+    const nombresMeses: Record<string, string> = {
+      "01": "Ene", "02": "Feb", "03": "Mar", "04": "Abr",
+      "05": "May", "06": "Jun", "07": "Jul", "08": "Ago",
+      "09": "Sep", "10": "Oct", "11": "Nov", "12": "Dic"
     }
-    litrosPorMes[row.mes_key].litros += Number(row.total_litros || 0)
+    const nombreMesLegible = `${nombresMeses[mes] || mes} ${anio}`
+
+    if (!litrosPorMes[mesKey]) {
+      litrosPorMes[mesKey] = { mesNombre: nombreMesLegible, litros: 0 }
+    }
+    litrosPorMes[mesKey].litros += Number(row.litros || 0)
   })
 
   const graficaLecheMeses = Object.keys(litrosPorMes)
     .sort()
     .map((key) => ({
       mesKey: key,
-      fecha: litrosPorMes[key].nombre,
+      fecha: litrosPorMes[key].mesNombre,
       litros: Number(litrosPorMes[key].litros.toFixed(1))
     }))
 
@@ -165,7 +178,6 @@ export async function getDashboardData(vacaId: string = "general"): Promise<Dash
   medicamentosRes.data?.forEach((m: any) => {
     if (!m.fecha_aplicacion) return
     
-    // Parsear fecha de aplicación asegurando medianoche local
     const [year, month, day] = m.fecha_aplicacion.split("T")[0].split("-")
     const fAplicacion = new Date(Number(year), Number(month) - 1, Number(day))
 
@@ -221,11 +233,21 @@ export async function getDashboardData(vacaId: string = "general"): Promise<Dash
     cantidad: categoriaConteo[nombreCategoria]
   }))
 
-  // E) Potreros
-  const graficaPotreros = (potrerosRes.data || []).map((row: any) => ({
-    potrero: row.potrero_nombre || `Potrero ${row.potrero_id}`,
-    litros: Number(row.total_litros || 0),
-  }))
+  // E) Potreros (Filtrado estricto para capturar únicamente el ÚLTIMO pastoreo por potrero)
+  const ultimosPotrerosMap: Record<string, { potrero: string; litros: number }> = {}
+  ;(potrerosRes.data || []).forEach((row: any) => {
+    const potreroId = row.potrero_id
+    const nombrePotrero = row.potrero_nombre || `Potrero ${potreroId}`
+    
+    // Como vienen ordenados por fecha DESC, el primero que entra es el más reciente
+    if (!ultimosPotrerosMap[potreroId]) {
+      ultimosPotrerosMap[potreroId] = {
+        potrero: nombrePotrero,
+        litros: Number(row.total_litros || row.litros || 0),
+      }
+    }
+  })
+  const graficaPotreros = Object.values(ultimosPotrerosMap)
 
   const vacasOrdenoUnicas = new Set(vacasOrdenoRes.data?.map((item) => item.bovino_id)).size
 
