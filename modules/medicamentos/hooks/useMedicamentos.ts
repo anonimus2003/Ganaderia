@@ -56,7 +56,8 @@ export function useMedicamentos() {
     if (page > 1) setPage(p => p - 1);
   };
 
-  const handleSave = async (dataToSave: Partial<Medicamento>) => {
+  // ✅ CORREGIDO: Ahora acepta un objeto O un arreglo de objetos
+  const handleSave = async (dataToSave: Partial<Medicamento> | Partial<Medicamento>[]) => {
     await saveMedicamentoAction(dataToSave);
     await fetchMedicamentos();
   };
@@ -73,7 +74,7 @@ export function useMedicamentos() {
   };
 
   return {
-    medicamentos, // 👈 Ahora devuelve directamente los 10 paginados desde el servidor
+    medicamentos, 
     allMedicamentos: medicamentos, 
     loading,
     handleSave,
