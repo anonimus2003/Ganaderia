@@ -81,10 +81,41 @@ function limpiarCamposVacios(data: Partial<Medicamento>) {
   return limpio;
 }
 
-export async function saveMedicamentoAction(dataToSave: Partial<Medicamento>): Promise<void> {
+export async function saveMedicamentoAction(dataToSave: Partial<Medicamento> | Partial<Medicamento>[]): Promise<void> {
+  // 1. Si recibimos un arreglo (múltiples bovinos seleccionados)
+  if (Array.isArray(dataToSave)) {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    const registrosLimpios = dataToSave.map(item => {
+      const datosLimpios = limpiarCamposVacios(item);
+      
+      delete datosLimpios.registrado_por_nombre;
+      delete datosLimpios.bovinos;
+      delete datosLimpios.usuarios;
+      delete datosLimpios.id;
+
+      if (user && !datosLimpios.registrado_por) {
+        datosLimpios.registrado_por = user.id;
+      }
+
+      return datosLimpios;
+    });
+
+    const { error } = await supabase
+      .from("medicamentos")
+      .insert(registrosLimpios);
+
+    if (error) {
+      console.error("Error al insertar múltiples registros:", error.message);
+      throw new Error(error.message);
+    }
+    return;
+  }
+
+  // 2. Si es un único objeto (Crear individual o Editar)
   const datosLimpios = limpiarCamposVacios(dataToSave);
 
-  // ELIMINAR PROPIEDADES VIRTUALES O DE RELACIÓN QUE NO SON COLUMNAS DE LA TABLA
+  // Eliminar propiedades virtuales o de relación que no son columnas de la tabla
   delete datosLimpios.registrado_por_nombre;
   delete datosLimpios.bovinos;
   delete datosLimpios.usuarios;

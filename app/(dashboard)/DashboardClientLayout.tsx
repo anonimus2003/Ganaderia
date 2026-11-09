@@ -5,7 +5,8 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { 
-  Menu, X, Settings, LogOut, Users 
+  Menu, X, Settings, LogOut, Users, DollarSign, ShoppingCart, 
+  ChevronDown, ChevronRight, Layers, Wallet
 } from 'lucide-react'
 
 interface DashboardClientLayoutProps {
@@ -38,15 +39,37 @@ export default function DashboardClientLayout({
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const pathname = usePathname()
 
+  // Estado para controlar qué secciones están abiertas/desplegadas
+  const [openSections, setOpenSections] = useState<{ [key: string]: boolean }>({
+    operaciones: true,
+    finanzas: true,
+    administracion: true,
+  })
+
+  const toggleSection = (sectionKey: string) => {
+    // Si el menú lateral está colapsado y el usuario da clic en un letrero, lo expandimos automáticamente
+    if (isCollapsed) setIsCollapsed(false)
+    
+    setOpenSections((prev) => ({
+      ...prev,
+      [sectionKey]: !prev[sectionKey],
+    }))
+  }
+
   const isActive = (path: string) => pathname === path
 
-  const menuItems = [
+  const operacionesItems = [
     { href: '/inventario', label: 'Inventario', iconSrc: '/inventario.png' },
     { href: '/ordeno', label: 'Ordeño', iconSrc: '/leche.png' },
     { href: '/potreros', label: 'Potreros', iconSrc: '/ubicacion.png' },
     { href: '/pesaje', label: 'Pesaje', iconSrc: '/bascula.png' },
     { href: '/reproduccion', label: 'Reproducción', iconSrc: '/adn.png' },
     { href: '/medicamentos', label: 'Medicamentos', iconSrc: '/pildora.png' },
+  ]
+
+  const finanzasItems = [
+    { href: '/finanzas', label: 'Caja Ingresos y Egresos', icon: DollarSign },
+    { href: '/rentabilidad', label: 'Análisis de Rentabilidad', icon: ShoppingCart },
   ]
 
   return (
@@ -70,7 +93,7 @@ export default function DashboardClientLayout({
         </button>
       </div>
 
-      {/* 🌑 OVERLAY MÓVIL SUAVE */}
+      {/* 🌑 OVERLAY MÓVIL */}
       {isMobileOpen && (
         <div 
           className="md:hidden fixed inset-0 bg-zinc-900/30 z-40 transition-opacity"
@@ -98,7 +121,6 @@ export default function DashboardClientLayout({
               className="flex items-center gap-3 overflow-hidden cursor-pointer hover:opacity-90 transition-opacity focus:outline-none"
               title={isCollapsed ? "Expandir menú" : "Colapsar menú"}
             >
-              {/* Contenedor del logo con mayor tamaño (w-12 h-12 en lugar de w-9 h-9) */}
               <div className="w-12 h-12 flex-shrink-0 flex items-center justify-center">
                 <CowLogo variant="white" />
               </div>
@@ -127,97 +149,176 @@ export default function DashboardClientLayout({
           </div>
 
           {/* NAVEGACIÓN */}
-          <nav className="flex flex-col gap-1.5 mt-2">
-            {!isCollapsed && (
-              <span className="text-[11px] font-semibold text-emerald-200/70 uppercase tracking-wider px-2 mb-1">
-                Operaciones
-              </span>
-            )}
+          <nav className="flex flex-col gap-4 mt-2">
             
-            {menuItems.map((item) => {
-              const active = isActive(item.href)
-              
-              return (
-                <Link 
-                  key={item.href}
-                  href={item.href} 
-                  onClick={() => setIsMobileOpen(false)}
-                  className={`
-                    flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors duration-150
-                    ${active 
-                      ? 'bg-[#D1F843] text-zinc-950 font-semibold shadow-xs' 
-                      : 'text-white/90 hover:bg-white/10 hover:text-white'
-                    }
-                    ${isCollapsed ? 'md:justify-center' : 'justify-start'}
-                  `}
+            {/* 1. SECCIÓN OPERACIONES */}
+            <div className="flex flex-col gap-1">
+              {!isCollapsed ? (
+                <button
+                  type="button"
+                  onClick={() => toggleSection('operaciones')}
+                  className="flex items-center justify-between w-full text-[11px] font-semibold text-emerald-200/70 uppercase tracking-wider px-2 py-1 hover:text-white transition-colors cursor-pointer"
                 >
-                  {item.iconSrc ? (
-                    <div className="w-[18px] h-[18px] relative flex-shrink-0 flex items-center justify-center">
-                      <Image 
-                        src={item.iconSrc} 
-                        alt={item.label} 
-                        fill
-                        sizes="18px"
-                        className={`object-contain transition-all ${
-                          active ? 'brightness-0' : 'brightness-0 invert'
-                        }`} 
-                      />
-                    </div>
-                  ) : null}
-
-                  <span className={`whitespace-nowrap transition-all ${isCollapsed ? 'md:opacity-0 md:w-0 md:hidden' : 'opacity-100'}`}>
-                    {item.label}
+                  <span className="flex items-center gap-1.5">
+                    <Layers size={13} />
+                    Operaciones
                   </span>
-                </Link>
-              )
-            })}
+                  {openSections.operaciones ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                </button>
+              ) : (
+                <div className="border-b border-emerald-800/40 pb-1 mb-1" />
+              )}
 
-            {/* Panel Admin */}
+              {(openSections.operaciones || isCollapsed) && (
+                <div className="flex flex-col gap-1 mt-0.5">
+                  {operacionesItems.map((item) => {
+                    const active = isActive(item.href)
+                    return (
+                      <Link 
+                        key={item.href}
+                        href={item.href} 
+                        onClick={() => setIsMobileOpen(false)}
+                        className={`
+                          flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors duration-150
+                          ${active 
+                            ? 'bg-[#D1F843] text-zinc-950 font-semibold shadow-xs' 
+                            : 'text-white/90 hover:bg-white/10 hover:text-white'
+                          }
+                          ${isCollapsed ? 'md:justify-center' : 'justify-start'}
+                        `}
+                      >
+                        <div className="w-[18px] h-[18px] relative flex-shrink-0 flex items-center justify-center">
+                          <Image 
+                            src={item.iconSrc} 
+                            alt={item.label} 
+                            fill
+                            sizes="18px"
+                            className={`object-contain transition-all ${
+                              active ? 'brightness-0' : 'brightness-0 invert'
+                            }`} 
+                          />
+                        </div>
+
+                        <span className={`whitespace-nowrap transition-all ${isCollapsed ? 'md:opacity-0 md:w-0 md:hidden' : 'opacity-100'}`}>
+                          {item.label}
+                        </span>
+                      </Link>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+           {/* 2. SECCIÓN FINANZAS Y COMPRAS */}
+<div className="flex flex-col gap-1">
+  {!isCollapsed ? (
+    <button
+      type="button"
+      onClick={() => toggleSection('finanzas')}
+      className="flex items-center justify-between w-full text-[11px] font-semibold text-emerald-200/70 uppercase tracking-wider px-2 py-1 hover:text-white transition-colors cursor-pointer"
+    >
+      <span className="flex items-center gap-1.5">
+        <Wallet size={13} />
+        Finanzas y Compras
+      </span>
+      {openSections.finanzas ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+    </button>
+  ) : (
+    <div className="border-b border-emerald-800/40 pb-1 mb-1" />
+  )}
+
+  {(openSections.finanzas || isCollapsed) && (
+    <div className="flex flex-col gap-1 mt-0.5">
+      {finanzasItems.map((item) => {
+        const active = isActive(item.href)
+        const IconComp = item.icon
+        return (
+          <Link 
+            key={item.href}
+            href={item.href} 
+            onClick={() => setIsMobileOpen(false)}
+            className={`
+              flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors duration-150
+              ${active 
+                ? 'bg-[#D1F843] text-zinc-950 font-semibold shadow-xs' 
+                : 'text-white/90 hover:bg-white/10 hover:text-white'
+              }
+              ${isCollapsed ? 'md:justify-center' : 'justify-start'}
+            `}
+          >
+            <IconComp size={18} className="flex-shrink-0" strokeWidth={active ? 2.5 : 2} />
+
+            <span className={`whitespace-nowrap transition-all ${isCollapsed ? 'md:opacity-0 md:w-0 md:hidden' : 'opacity-100'}`}>
+              {item.label}
+            </span>
+          </Link>
+        )
+      })}
+    </div>
+  )}
+</div>
+
+            {/* 3. SECCIÓN ADMINISTRACIÓN (Solo visible para Administradores) */}
             {perfil?.rol === 'Administrador' && (
-              <div className="mt-4 flex flex-col gap-1.5">
-                {!isCollapsed && (
-                  <span className="text-[11px] font-semibold text-emerald-200/70 uppercase tracking-wider px-2 mb-1 block">
-                    Administración
-                  </span>
+              <div className="flex flex-col gap-1">
+                {!isCollapsed ? (
+                  <button
+                    type="button"
+                    onClick={() => toggleSection('administracion')}
+                    className="flex items-center justify-between w-full text-[11px] font-semibold text-emerald-200/70 uppercase tracking-wider px-2 py-1 hover:text-white transition-colors cursor-pointer"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <Settings size={13} />
+                      Administración
+                    </span>
+                    {openSections.administracion ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                  </button>
+                ) : (
+                  <div className="border-b border-emerald-800/40 pb-1 mb-1" />
                 )}
-                
-                <Link 
-                  href="/dashboard"
-                  onClick={() => setIsMobileOpen(false)}
-                  className={`
-                    flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors duration-150
-                    ${isActive('/dashboard') 
-                      ? 'bg-[#D1F843] text-zinc-950 font-semibold shadow-xs' 
-                      : 'text-white/90 hover:bg-white/10 hover:text-white'
-                    }
-                    ${isCollapsed ? 'md:justify-center' : 'justify-start'}
-                  `}
-                >
-                  <Settings size={18} className="flex-shrink-0" strokeWidth={isActive('/dashboard') ? 2.5 : 2} />
-                  <span className={`whitespace-nowrap transition-all ${isCollapsed ? 'md:opacity-0 md:w-0 md:hidden' : 'opacity-100'}`}>
-                    Panel Control
-                  </span>
-                </Link>
 
-                <Link 
-                  href="/usuarios"
-                  onClick={() => setIsMobileOpen(false)}
-                  className={`
-                    flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors duration-150
-                    ${isActive('/usuarios') 
-                      ? 'bg-[#D1F843] text-zinc-950 font-semibold shadow-xs' 
-                      : 'text-white/90 hover:bg-white/10 hover:text-white'
-                    }
-                    ${isCollapsed ? 'md:justify-center' : 'justify-start'}
-                  `}
-                >
-                  <Users size={18} className="flex-shrink-0" strokeWidth={isActive('/usuarios') ? 2.5 : 2} />
-                  <span className={`whitespace-nowrap transition-all ${isCollapsed ? 'md:opacity-0 md:w-0 md:hidden' : 'opacity-100'}`}>
-                    Usuarios
-                  </span>
-                </Link>
+                {(openSections.administracion || isCollapsed) && (
+                  <div className="flex flex-col gap-1 mt-0.5">
+                    <Link 
+                      href="/dashboard"
+                      onClick={() => setIsMobileOpen(false)}
+                      className={`
+                        flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors duration-150
+                        ${isActive('/dashboard') 
+                          ? 'bg-[#D1F843] text-zinc-950 font-semibold shadow-xs' 
+                          : 'text-white/90 hover:bg-white/10 hover:text-white'
+                        }
+                        ${isCollapsed ? 'md:justify-center' : 'justify-start'}
+                      `}
+                    >
+                      <Settings size={18} className="flex-shrink-0" strokeWidth={isActive('/dashboard') ? 2.5 : 2} />
+                      <span className={`whitespace-nowrap transition-all ${isCollapsed ? 'md:opacity-0 md:w-0 md:hidden' : 'opacity-100'}`}>
+                        Panel Control
+                      </span>
+                    </Link>
+
+                    <Link 
+                      href="/usuarios"
+                      onClick={() => setIsMobileOpen(false)}
+                      className={`
+                        flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors duration-150
+                        ${isActive('/usuarios') 
+                          ? 'bg-[#D1F843] text-zinc-950 font-semibold shadow-xs' 
+                          : 'text-white/90 hover:bg-white/10 hover:text-white'
+                        }
+                        ${isCollapsed ? 'md:justify-center' : 'justify-start'}
+                      `}
+                    >
+                      <Users size={18} className="flex-shrink-0" strokeWidth={isActive('/usuarios') ? 2.5 : 2} />
+                      <span className={`whitespace-nowrap transition-all ${isCollapsed ? 'md:opacity-0 md:w-0 md:hidden' : 'opacity-100'}`}>
+                        Usuarios
+                      </span>
+                    </Link>
+                  </div>
+                )}
               </div>
             )}
+
           </nav>
         </div>
 

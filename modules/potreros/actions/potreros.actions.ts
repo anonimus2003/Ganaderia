@@ -1,9 +1,9 @@
 import { createClient } from "@/lib/supabase/client";
 
-// Función auxiliar para forzar la hora exacta con la zona horaria de Colombia (-05:00)
-function obtenerFechaConZonaColombia(fechaInput?: string): string {
+// Función auxiliar corregida para guardar el texto literal exacto sin ajustes de zona horaria
+function obtenerFechaExactaLiteral(fechaInput?: string): string {
   if (!fechaInput) {
-    return new Date().toLocaleString("sv", { timeZone: "America/Bogota" }).replace(" ", "T") + "-05:00";
+    return new Date().toISOString().slice(0, 19).replace('T', ' ');
   }
 
   let fechaLimpia = fechaInput.trim();
@@ -13,8 +13,8 @@ function obtenerFechaConZonaColombia(fechaInput?: string): string {
     fechaLimpia += ":00";
   }
   
-  // Reemplazamos la 'T' por un espacio y le adjuntamos el offset fijo de Colombia (-05:00)
-  return `${fechaLimpia.replace('T', ' ')}`.replace(':00:00', ':00') + "-05:00";
+  // Reemplazamos la 'T' por un espacio y devolvemos la fecha limpia (ej: "2026-11-09 07:30:00")
+  return fechaLimpia.replace('T', ' ');
 }
 
 // ==========================================
@@ -180,7 +180,7 @@ export async function registrarIngresoGanado(data: {
   tipoAnimal?: string;
 }) {
   const supabase = await createClient();
-  const fechaIso = obtenerFechaConZonaColombia(data.fecha);
+  const fechaIso = obtenerFechaExactaLiteral(data.fecha);
   let descripcionAnimales = `${data.cantidad} animales (${data.tipoAnimal || 'Vaca'})`;
 
   if (data.animalesIds && data.animalesIds.length > 0) {
@@ -240,7 +240,7 @@ export async function registrarSalidaGanado(data: {
   tipoAnimal?: string;
 }) {
   const supabase = await createClient();
-  const fechaIso = obtenerFechaConZonaColombia(data.fecha);
+  const fechaIso = obtenerFechaExactaLiteral(data.fecha);
 
   // 1. Convertimos el potreroId al tipo correcto (número si viene como string)
   const potreroIdParsed = isNaN(Number(data.potreroId)) ? data.potreroId : Number(data.potreroId);
@@ -306,7 +306,7 @@ export async function registrarAbono(data: {
   detalleExtra?: string;
 }) {
   const supabase = await createClient();
-  const fechaIso = obtenerFechaConZonaColombia(data.fecha);
+  const fechaIso = obtenerFechaExactaLiteral(data.fecha);
 
   const { error: errAbono } = await supabase.from('historial_abonos').insert({
     potrero_id: data.potreroId,
