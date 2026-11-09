@@ -1,15 +1,34 @@
-// modules/inventario/actions/bovino.actions.ts
 import { createClient } from "@/lib/supabase/client";
 import { Bovino } from "../schemas";
 import { FiltrosBovino } from "../hooks/usebovinos";
 
 const supabase = createClient();
 
+// ==========================================
+// CONSULTA RÁPIDA PARA SELECTS (GENEALOGÍA)
+// ==========================================
+export async function getBovinosSelectAction() {
+  const { data, error } = await supabase
+    .from("bovinos")
+    .select("id, arete, nombre, genero, condicion")
+    .eq("condicion", "Activo")
+    .order("arete", { ascending: true });
+
+  if (error) {
+    console.error("Error al obtener bovinos para selectores:", error.message);
+    return [];
+  }
+
+  return data as Partial<Bovino>[];
+}
+
+// ==========================================
+// LISTADO PRINCIPAL CON PAGINACIÓN
+// ==========================================
 export async function getBovinosAction(page = 1, limit = 10, filtros?: FiltrosBovino) {
   const from = (page - 1) * limit;
   const to = from + limit - 1;
 
-  // Consulta corregida usando la relación limpia con usuarios
   let query = supabase
     .from("bovinos")
     .select(`
@@ -18,7 +37,6 @@ export async function getBovinosAction(page = 1, limit = 10, filtros?: FiltrosBo
     `, { count: "exact" })
     .order("created_at", { ascending: false });
 
-  // Aplicar filtros a las columnas reales de la BD
   if (filtros) {
     if (filtros.busqueda && filtros.busqueda.trim() !== "") {
       const term = `%${filtros.busqueda.trim()}%`;
@@ -49,9 +67,6 @@ export async function getBovinosAction(page = 1, limit = 10, filtros?: FiltrosBo
     throw new Error(error.message);
   }
 
-  console.log("DATOS CRUDOS DESDE SUPABASE:", data);
-
-  // Mapear los datos para unificar el nombre y apellido del creador
   const bovinosConRegistrador = (data || []).map((item: any) => {
     const usuarioObj = item.usuarios;
     
@@ -71,7 +86,6 @@ export async function getBovinosAction(page = 1, limit = 10, filtros?: FiltrosBo
   };
 }
 
-// Función auxiliar para limpiar cadenas vacías y convertirlas en null
 function limpiarCamposVacios(data: Partial<Bovino>) {
   const limpio: Record<string, any> = { ...data };
   Object.keys(limpio).forEach((key) => {
@@ -85,7 +99,6 @@ function limpiarCamposVacios(data: Partial<Bovino>) {
 export async function saveBovinoAction(dataToSave: Partial<Bovino>): Promise<void> {
   const datosLimpios = limpiarCamposVacios(dataToSave);
 
-  // ELIMINAR PROPIEDADES VIRTUALES O DE RELACIÓN QUE NO SON COLUMNAS DE LA TABLA "bovinos"
   delete datosLimpios.registrado_por_nombre;
   delete datosLimpios.usuarios;
 

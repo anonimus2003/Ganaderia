@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Bovino } from "../schemas";
+import { getBovinosSelectAction } from "../actions/bovino.actions";
 import {
   Dialog,
   DialogContent,
@@ -40,7 +41,7 @@ interface BovinoFormModalProps {
 }
 
 const ETAPAS_HEMBRA: Exclude<Bovino["categoria"], null>[] = [
- "Ternera en lactancia",
+  "Ternera en lactancia",
   "Novilla en desarrollo",
   "Ternera en crecimiento",
   "Novilla de vientre",
@@ -91,30 +92,42 @@ export default function BovinoFormModal({
   const [activeTab, setActiveTab] = useState("general");
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [listaCompletaBovinos, setListaCompletaBovinos] = useState<Partial<Bovino>[]>([]);
 
   const isEditing = !!initialData;
 
-  // Sincronizar cuando cambia initialData o se abre/cierra el modal
   useEffect(() => {
-    if (initialData) {
-      setFormData(initialData);
-    } else {
-      setFormData({
-        genero: "Hembra",
-        condicion: "Activo",
-        proposito: "Doble Propósito",
+    if (isOpen) {
+      if (initialData) {
+        setFormData(initialData);
+      } else {
+        setFormData({
+          genero: "Hembra",
+          condicion: "Activo",
+          proposito: "Doble Propósito",
+        });
+      }
+
+      // Cargar todos los bovinos para los selectores de Madre / Padre al abrir el modal
+      getBovinosSelectAction().then((data) => {
+        if (data && data.length > 0) {
+          setListaCompletaBovinos(data);
+        } else {
+          setListaCompletaBovinos(allBovinos);
+        }
       });
     }
-  }, [initialData, isOpen]);
+  }, [initialData, isOpen, allBovinos]);
 
-  // Filtrado seguro asegurando que allBovinos sea un arreglo
-  const listaBovinos = Array.isArray(allBovinos) ? allBovinos : [];
-  
-  const posiblesMadres = listaBovinos.filter(
-    (b) => b.genero === "Hembra" && b.id !== initialData?.id
+  // Usamos la lista completa independiente de la paginación de la tabla
+  const fuenteBovinos = listaCompletaBovinos.length > 0 ? listaCompletaBovinos : allBovinos;
+
+  const posiblesMadres = fuenteBovinos.filter(
+    (b) => b.genero === "Hembra" && String(b.id) !== String(initialData?.id)
   );
-  const posiblesPadres = listaBovinos.filter(
-    (b) => b.genero === "Macho" && b.id !== initialData?.id
+
+  const posiblesPadres = fuenteBovinos.filter(
+    (b) => b.genero === "Macho" && String(b.id) !== String(initialData?.id)
   );
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -142,8 +155,8 @@ export default function BovinoFormModal({
     }
   };
 
-  const madreActual = posiblesMadres.find((m) => m.id === formData.madre_id);
-  const padreActual = posiblesPadres.find((p) => p.id === formData.padre_id);
+  const madreActual = posiblesMadres.find((m) => String(m.id) === String(formData.madre_id));
+  const padreActual = posiblesPadres.find((p) => String(p.id) === String(formData.padre_id));
 
   const handleGenero = (value: "Hembra" | "Macho" | null) => {
     if (!value) return;
@@ -442,7 +455,7 @@ export default function BovinoFormModal({
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium">Madre Registrada</label>
                     <Select
-                      value={formData.madre_id || "none"}
+                      value={formData.madre_id ? String(formData.madre_id) : "none"}
                       onValueChange={(value) =>
                         setFormData((prev) => ({
                           ...prev,
@@ -462,7 +475,7 @@ export default function BovinoFormModal({
                       <SelectContent>
                         <SelectItem value="none">Sin madre registrada</SelectItem>
                         {posiblesMadres.map((madre) => (
-                          <SelectItem key={madre.id} value={madre.id}>
+                          <SelectItem key={String(madre.id)} value={String(madre.id)}>
                             {madre.arete} {madre.nombre ? `- ${madre.nombre}` : ""}
                           </SelectItem>
                         ))}
@@ -473,7 +486,7 @@ export default function BovinoFormModal({
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium">Padre Registrado</label>
                     <Select
-                      value={formData.padre_id || "none"}
+                      value={formData.padre_id ? String(formData.padre_id) : "none"}
                       onValueChange={(value) =>
                         setFormData((prev) => ({
                           ...prev,
@@ -493,7 +506,7 @@ export default function BovinoFormModal({
                       <SelectContent>
                         <SelectItem value="none">Sin padre registrado</SelectItem>
                         {posiblesPadres.map((padre) => (
-                          <SelectItem key={padre.id} value={padre.id}>
+                          <SelectItem key={String(padre.id)} value={String(padre.id)}>
                             {padre.arete} {padre.nombre ? `- ${padre.nombre}` : ""}
                           </SelectItem>
                         ))}

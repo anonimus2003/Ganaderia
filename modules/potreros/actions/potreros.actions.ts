@@ -1,7 +1,21 @@
-// modules/potreros/actions/potreros.actions.ts
 import { createClient } from "@/lib/supabase/client";
 
-const supabase = createClient();
+// Función auxiliar para forzar la hora exacta con la zona horaria de Colombia (-05:00)
+function obtenerFechaConZonaColombia(fechaInput?: string): string {
+  if (!fechaInput) {
+    return new Date().toLocaleString("sv", { timeZone: "America/Bogota" }).replace(" ", "T") + "-05:00";
+  }
+
+  let fechaLimpia = fechaInput.trim();
+  
+  // Si viene en formato "YYYY-MM-DDTHH:mm", le agregamos los segundos
+  if (fechaLimpia.length === 16) {
+    fechaLimpia += ":00";
+  }
+  
+  // Reemplazamos la 'T' por un espacio y le adjuntamos el offset fijo de Colombia (-05:00)
+  return `${fechaLimpia.replace('T', ' ')}`.replace(':00:00', ':00') + "-05:00";
+}
 
 // ==========================================
 // 1. HISTORIAL DE OCUPACIÓN
@@ -27,7 +41,6 @@ export async function getHistorialOcupacionAction(page = 1, limit = 10, potreroI
     throw new Error(countError.message);
   }
 
-  // Si no hay registros, retornamos vacío de inmediato para evitar el error de rango
   if (!count || count === 0) {
     return { data: [], total: 0 };
   }
@@ -167,7 +180,7 @@ export async function registrarIngresoGanado(data: {
   tipoAnimal?: string;
 }) {
   const supabase = await createClient();
-  const fechaIso = data.fecha ? new Date(data.fecha).toISOString() : new Date().toISOString();
+  const fechaIso = obtenerFechaConZonaColombia(data.fecha);
   let descripcionAnimales = `${data.cantidad} animales (${data.tipoAnimal || 'Vaca'})`;
 
   if (data.animalesIds && data.animalesIds.length > 0) {
@@ -219,8 +232,6 @@ export async function registrarIngresoGanado(data: {
 // ==========================================
 // 4. REGISTRAR SALIDA DE GANADO
 // ==========================================
-// ==========================================
-// ==========================================
 export async function registrarSalidaGanado(data: {
   potreroId: string | number;
   animalesIds?: string[];
@@ -229,7 +240,7 @@ export async function registrarSalidaGanado(data: {
   tipoAnimal?: string;
 }) {
   const supabase = await createClient();
-  const fechaIso = data.fecha ? new Date(data.fecha).toISOString() : new Date().toISOString();
+  const fechaIso = obtenerFechaConZonaColombia(data.fecha);
 
   // 1. Convertimos el potreroId al tipo correcto (número si viene como string)
   const potreroIdParsed = isNaN(Number(data.potreroId)) ? data.potreroId : Number(data.potreroId);
@@ -251,22 +262,20 @@ export async function registrarSalidaGanado(data: {
     throw new Error("No hay registros activos en este potrero para marcar salida.");
   }
 
-  // 3. Extraemos las Claves Primarias (IDs numéricos de la tabla, ej: 372)
+  // 3. Extraemos las Claves Primarias
   const idsAfectados = activos.map((item) => item.id);
 
-  // 4. UPDATE directo por ID primario con .select() para validar qué cambió en la DB
+  // 4. UPDATE directo por ID primario con .select()
   const { data: filasActualizadas, error: errUpdate } = await supabase
     .from('historial_ocupacion_potreros')
     .update({ fecha_salida: fechaIso })
     .in('id', idsAfectados)
-    .select(); // 👈 El select() nos devuelve las filas cambiadas en tiempo real
+    .select();
 
   if (errUpdate) {
-    console.error("❌ Error al actualizar en Supabase (Revisar RLS/Permisos):", errUpdate.message);
+    console.error("❌ Error al actualizar en Supabase:", errUpdate.message);
     throw new Error(`Error en actualización: ${errUpdate.message}`);
   }
-
-  console.log("✅ Filas actualizadas con éxito en Supabase:", filasActualizadas);
 
   // 5. Cambiamos el estado del potrero a Disponible
   await supabase
@@ -297,7 +306,7 @@ export async function registrarAbono(data: {
   detalleExtra?: string;
 }) {
   const supabase = await createClient();
-  const fechaIso = data.fecha ? new Date(data.fecha).toISOString() : new Date().toISOString();
+  const fechaIso = obtenerFechaConZonaColombia(data.fecha);
 
   const { error: errAbono } = await supabase.from('historial_abonos').insert({
     potrero_id: data.potreroId,

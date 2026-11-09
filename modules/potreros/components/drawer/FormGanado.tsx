@@ -26,7 +26,14 @@ export const FormGanado: React.FC<FormGanadoProps> = ({
   const estaOcupado = estadoNormalizado === 'ocupado' || animalesActualesCount > 0;
 
   // Estados del formulario
-  const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 16));
+  const [fecha, setFecha] = useState(() => {
+  const ahora = new Date();
+  const offset = ahora.getTimezoneOffset() * 60000;
+
+  return new Date(ahora.getTime() - offset)
+    .toISOString()
+    .slice(0, 16);
+});
   const [aforo, setAforo] = useState<string>('');
   const [animalesSeleccionados, setAnimalesSeleccionados] = useState<string[]>([]);
 
