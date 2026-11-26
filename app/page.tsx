@@ -1,19 +1,32 @@
+import { Suspense } from "react"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/server"
 
-export default async function HomePage() {
-  try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+async function HomeRedirect() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-    if (user) {
-      redirect("/dashboard")
-    }
-  } catch {
-    // Si no hay sesión o falla la lectura inicial, enviamos a /auth
+  if (user) {
+    redirect("/dashboard")
+  } else {
+    redirect("/auth")
   }
 
-  redirect("/auth")
+  return null
+}
+
+export default function HomePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
+          Cargando...
+        </div>
+      }
+    >
+      <HomeRedirect />
+    </Suspense>
+  )
 }
