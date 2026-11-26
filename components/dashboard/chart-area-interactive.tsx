@@ -74,7 +74,7 @@ function fechaBogotaISO(offsetDias = 0): string {
     month: "2-digit",
     day: "2-digit",
   })
-  const hoyStr = formatter.format(new Date()) // YYYY-MM-DD
+  const hoyStr = formatter.format(new Date())
   const [y, m, d] = hoyStr.split("-").map(Number)
   const dt = new Date(Date.UTC(y, m - 1, d + offsetDias))
   return dt.toISOString().slice(0, 10)
@@ -100,18 +100,24 @@ function etiquetaMes(anio: number, mesIdx: number): string {
 }
 
 async function obtenerTodosLosOrdenos(
-  supabase: ReturnType<typeof createClient>
+  supabase: ReturnType<typeof createClient>,
+  bovinoId?: string
 ): Promise<{ rows: OrdenoRow[]; errorMsg: string | null }> {
   const pageSize = 1000
   let from = 0
   const todasLasFilas: OrdenoRow[] = []
 
   while (true) {
-    const { data, error } = await supabase
+    let query = supabase
       .from("ordeño")
       .select("id, bovino_id, fecha, litros, jornada, concentrado_kg")
       .order("fecha", { ascending: true })
-      .range(from, from + pageSize - 1)
+
+    if (bovinoId && bovinoId !== "ALL") {
+      query = query.eq("bovino_id", bovinoId)
+    }
+
+    const { data, error } = await query.range(from, from + pageSize - 1)
 
     if (error) {
       return { rows: todasLasFilas, errorMsg: error.message }
@@ -129,7 +135,11 @@ async function obtenerTodosLosOrdenos(
   return { rows: todasLasFilas, errorMsg: null }
 }
 
-export function ChartAreaInteractive() {
+export function ChartAreaInteractive({
+  bovinoId = "ALL",
+}: {
+  bovinoId?: string
+}) {
   const isMobile = useIsMobile()
   const supabase = React.useMemo(() => createClient(), [])
   const [timeRange, setTimeRange] = React.useState<RangoProduccion>("7d")
@@ -148,7 +158,10 @@ export function ChartAreaInteractive() {
 
     async function cargarProduccionLeche() {
       setCargando(true)
-      const { rows, errorMsg: err } = await obtenerTodosLosOrdenos(supabase)
+      const { rows, errorMsg: err } = await obtenerTodosLosOrdenos(
+        supabase,
+        bovinoId
+      )
 
       if (!activo) return
 
@@ -161,7 +174,7 @@ export function ChartAreaInteractive() {
     return () => {
       activo = false
     }
-  }, [supabase])
+  }, [supabase, bovinoId])
 
   const filteredData = React.useMemo<PuntoLecheArea[]>(() => {
     const hoyStr = fechaBogotaISO(0)
@@ -259,7 +272,6 @@ export function ChartAreaInteractive() {
       })
     }
 
-    // timeRange === "anos" -> todos los años registrados en `ordeño`
     const mapa = new Map<string, PuntoLecheArea>()
 
     for (const fila of filasOrdeno) {
@@ -313,10 +325,10 @@ export function ChartAreaInteractive() {
 
   const descripcionTexto =
     timeRange === "7d"
-      ? `Producción diaria (${filasOrdeno.length} registros cargados · últimos 7 días)`
+      ? `Producción diaria (${filasOrdeno.length} registros · últimos 7 días)`
       : timeRange === "meses"
-        ? `Producción mensual (${filasOrdeno.length} registros cargados · últimos 12 meses)`
-        : `Producción anual (${filasOrdeno.length} registros cargados · todos los años)`
+        ? `Producción mensual (${filasOrdeno.length} registros · últimos 12 meses)`
+        : `Producción anual (${filasOrdeno.length} registros · todos los años)`
 
   return (
     <Card className="@container/card">

@@ -1,8 +1,8 @@
 "use client"
 
-import { Suspense, useEffect, useState } from "react"
-import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { Suspense, useEffect, useMemo, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import type { EmailOtpType } from "@supabase/supabase-js"
 import { toast } from "sonner"
 import { createClient } from "@/lib/client"
 
@@ -16,42 +16,94 @@ import {
 } from "@/components/ui/card"
 import {
   Field,
-  FieldDescription,
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 
 function ResetPasswordFormContent() {
+  const router = useRouter()
   const searchParams = useSearchParams()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [verifying, setVerifying] = useState(true)
+  const [hasRecoverySession, setHasRecoverySession] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   useEffect(() => {
+    let active = true
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!active) return
+      if (event === "PASSWORD_RECOVERY" || (event === "SIGNED_IN" && session)) {
+        setHasRecoverySession(true)
+        setErrorMsg(null)
+        setVerifying(false)
+      }
+    })
+
     async function initRecoverySession() {
       const code = searchParams.get("code")
+      const tokenHash = searchParams.get("token_hash")
+      const type = searchParams.get("type") as EmailOtpType | null
 
+      // 1. Si viene ?code=..., intercambiarlo una sola vez y limpiar la URL
       if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code)
-        if (error) {
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+        if (!active) return
+
+        if (error || !data.session) {
           setErrorMsg(
             "El enlace de recuperación expiró o ya fue utilizado. Solicita uno nuevo."
           )
+          setHasRecoverySession(false)
+        } else {
+          setHasRecoverySession(true)
+          setErrorMsg(null)
+          router.replace(window.location.pathname)
         }
         setVerifying(false)
         return
       }
 
+      // 2. Si viene con token_hash + type=recovery
+      if (tokenHash && type) {
+        const { data, error } = await supabase.auth.verifyOtp({
+          token_hash: tokenHash,
+          type,
+        })
+        if (!active) return
+
+        if (error || !data.session) {
+          setErrorMsg(
+            "El enlace de recuperación no es válido o ya expiró. Solicita uno nuevo."
+          )
+          setHasRecoverySession(false)
+        } else {
+          setHasRecoverySession(true)
+          setErrorMsg(null)
+          router.replace(window.location.pathname)
+        }
+        setVerifying(false)
+        return
+      }
+
+      // 3. Revisar sesión existente (por si ya se intercambió en /auth/callback o llegó por #hash)
       const {
         data: { session },
       } = await supabase.auth.getSession()
 
-      if (!session) {
+      if (!active) return
+
+      if (session) {
+        setHasRecoverySession(true)
+        setErrorMsg(null)
+      } else if (!window.location.hash.includes("access_token")) {
         setErrorMsg(
           "No se detectó una sesión válida de recuperación. Abre el enlace directamente desde tu correo."
         )
@@ -59,8 +111,13 @@ function ResetPasswordFormContent() {
       setVerifying(false)
     }
 
-    initRecoverySession()
-  }, [searchParams, supabase])
+    void initRecoverySession()
+
+    return () => {
+      active = false
+      subscription.unsubscribe()
+    }
+  }, [searchParams, supabase, router])
 
   async function handleUpdatePassword(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -129,7 +186,7 @@ function ResetPasswordFormContent() {
                         placeholder="••••••••"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        disabled={loading}
+                        disabled={loading || !hasRecoverySession}
                         required
                       />
                     </Field>
@@ -144,7 +201,7 @@ function ResetPasswordFormContent() {
                         placeholder="••••••••"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
-                        disabled={loading}
+                        disabled={loading || !hasRecoverySession}
                         required
                       />
                     </Field>
@@ -159,7 +216,11 @@ function ResetPasswordFormContent() {
                     )}
 
                     <Field>
-                      <Button type="submit" className="w-full" disabled={loading}>
+                      <Button
+                        type="submit"
+                        className="w-full"
+                        disabled={loading || !hasRecoverySession}
+                      >
                         {loading ? "Guardando..." : "Guardar nueva contraseña"}
                       </Button>
                     </Field>

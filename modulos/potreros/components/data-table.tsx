@@ -43,7 +43,9 @@ import {
   createOcupacionPotreroAction,
   deleteOcupacionPotreroAction,
   fetchCatalogosOcupacionPotreroAction,
+  fetchOcupacionesActivasPotreroAction,
   fetchOcupacionPotrerosPageAction,
+  sacarTodosPotreroAction,
   updateOcupacionPotreroAction,
 } from "../actions/actions"
 import {
@@ -54,6 +56,7 @@ import {
   type OcupacionPotreroFilterState,
   type OcupacionPotreroPayload,
   type PotreroOption,
+  type SalidaPotreroLotePayload,
 } from "@/modulos/potreros/components/potreros-ocupacion-drawer"
 import {
   AlertDialog,
@@ -102,6 +105,7 @@ import {
   Columns3Icon,
   ChevronDownIcon,
   PlusIcon,
+  LogOutIcon,
   ChevronsLeftIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -150,9 +154,25 @@ const DEFAULT_FILTERS: OcupacionPotreroFilterState = {
 
 function formatFechaHora(value?: string | null): string {
   if (!value) return "—"
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return value
+  const trimmed = value.trim()
+
+  const naiveMatch = trimmed.match(
+    /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/
+  )
+  if (naiveMatch) {
+    const [, y, m, d, hh, mm] = naiveMatch
+    const hour24 = Number(hh)
+    const minute = Number(mm)
+    const ampm = hour24 >= 12 ? "p. m." : "a. m."
+    const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12
+    const yy = y.slice(-2)
+    return `${d}/${m}/${yy}, ${hour12}:${String(minute).padStart(2, "0")} ${ampm}`
+  }
+
+  const parsed = new Date(trimmed)
+  if (Number.isNaN(parsed.getTime())) return trimmed
   return parsed.toLocaleString("es-CO", {
+    timeZone: "America/Bogota",
     dateStyle: "short",
     timeStyle: "short",
   })
@@ -250,12 +270,14 @@ export function DataTable({
   permissions,
   potreros: initialPotreros = [],
   bovinos: initialBovinos = [],
+  ocupacionesActivas: initialOcupacionesActivas = [],
 }: {
   data: OcupacionRow[]
   totalCount?: number
   permissions?: PermisosModulo
   potreros?: PotreroOption[]
   bovinos?: BovinoOption[]
+  ocupacionesActivas?: HistorialOcupacionPotrero[]
 }) {
   const canCreate = permissions?.canCreate ?? true
   const canEdit = permissions?.canEdit ?? true
@@ -275,6 +297,9 @@ export function DataTable({
   const [bovinosCatalogo, setBovinosCatalogo] = React.useState<
     BovinoOption[]
   >(() => initialBovinos)
+  const [ocupacionesActivas, setOcupacionesActivas] = React.useState<
+    OcupacionRow[]
+  >(() => initialOcupacionesActivas ?? [])
 
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const [rowSelection, setRowSelection] = React.useState({})
@@ -307,38 +332,98 @@ export function DataTable({
     React.useState<OcupacionPotreroFilterState>(DEFAULT_FILTERS)
 
   const isInitialMount = React.useRef(true)
+  const prevInitialDataKeyRef = React.useRef("")
+  const prevPotrerosKeyRef = React.useRef("")
+  const prevBovinosKeyRef = React.useRef("")
+  const prevActivasKeyRef = React.useRef("")
 
   React.useEffect(() => {
-    setData(initialData ?? [])
-    setTotalCount(initialTotalCount || (initialData?.length ?? 0))
+    const next = initialData ?? []
+    const nextKey = `${initialTotalCount}|${next
+      .map((r) => `${r.id}:${r.fecha_salida ?? ""}:${r.potrero_id}`)
+      .join(",")}`
+    if (nextKey !== prevInitialDataKeyRef.current) {
+      prevInitialDataKeyRef.current = nextKey
+      setData(next)
+      setTotalCount(initialTotalCount || next.length)
+    }
   }, [initialData, initialTotalCount])
 
   React.useEffect(() => {
-    if (initialPotreros.length > 0) {
+    const nextKey = initialPotreros
+      .map((p) => `${p.id}:${p.nombre}`)
+      .join("|")
+    if (initialPotreros.length > 0 && nextKey !== prevPotrerosKeyRef.current) {
+      prevPotrerosKeyRef.current = nextKey
       setPotrerosCatalogo(initialPotreros)
     }
   }, [initialPotreros])
 
   React.useEffect(() => {
-    if (initialBovinos.length > 0) {
+    const nextKey = initialBovinos
+      .map((b) => `${b.id}:${b.arete}`)
+      .join("|")
+    if (initialBovinos.length > 0 && nextKey !== prevBovinosKeyRef.current) {
+      prevBovinosKeyRef.current = nextKey
       setBovinosCatalogo(initialBovinos)
     }
   }, [initialBovinos])
 
   React.useEffect(() => {
+    const next = initialOcupacionesActivas ?? []
+    const nextKey = next
+      .map((x) => `${x.id}:${x.fecha_salida ?? ""}:${x.potrero_id}`)
+      .join("|")
+    if (nextKey !== prevActivasKeyRef.current) {
+      prevActivasKeyRef.current = nextKey
+      setOcupacionesActivas(next)
+    }
+  }, [initialOcupacionesActivas])
+
+  const refreshOcupacionesActivas = React.useCallback(async () => {
+    const res = await fetchOcupacionesActivasPotreroAction()
+    if (!res.error) {
+      const next = res.items ?? []
+      prevActivasKeyRef.current = next
+        .map((x) => `${x.id}:${x.fecha_salida ?? ""}:${x.potrero_id}`)
+        .join("|")
+      setOcupacionesActivas(next)
+    }
+  }, [])
+
+  React.useEffect(() => {
     if (!drawerOpen || !drawerMode) return
-    if (potrerosCatalogo.length > 0 && bovinosCatalogo.length > 0) return
 
     let active = true
-    void fetchCatalogosOcupacionPotreroAction().then((res) => {
-      if (!active || res.error) return
-      if (res.potreros.length > 0) setPotrerosCatalogo(res.potreros)
-      if (res.bovinos.length > 0) setBovinosCatalogo(res.bovinos)
-    })
+
+    if (potrerosCatalogo.length === 0 || bovinosCatalogo.length === 0) {
+      void fetchCatalogosOcupacionPotreroAction().then((res) => {
+        if (!active || res.error) return
+        if (res.potreros.length > 0) setPotrerosCatalogo(res.potreros)
+        if (res.bovinos.length > 0) setBovinosCatalogo(res.bovinos)
+      })
+    }
+
+    if (drawerMode === "exit") {
+      void fetchOcupacionesActivasPotreroAction().then((res) => {
+        if (!active || res.error) return
+        const next = res.items ?? []
+        prevActivasKeyRef.current = next
+          .map((x) => `${x.id}:${x.fecha_salida ?? ""}:${x.potrero_id}`)
+          .join("|")
+        setOcupacionesActivas(next)
+      })
+    }
+
     return () => {
       active = false
     }
-  }, [drawerOpen, drawerMode, potrerosCatalogo.length, bovinosCatalogo.length])
+  }, [
+    drawerOpen,
+    drawerMode,
+    potrerosCatalogo.length,
+    bovinosCatalogo.length,
+  ])
 
   const loadPage = React.useCallback(
     async (
@@ -383,8 +468,8 @@ export function DataTable({
         toast.error("No tienes permiso para registrar ocupación de potreros")
         return
       }
-      if (mode === "edit" && !canEdit) {
-        toast.error("No tienes permiso para editar ocupación de potreros")
+      if ((mode === "edit" || mode === "exit") && !canEdit) {
+        toast.error("No tienes permiso para actualizar ocupación de potreros")
         return
       }
       setDrawerMode(mode)
@@ -427,7 +512,10 @@ export function DataTable({
               ? `${countCreated} bovinos registrados en ${getPotreroLabel(inserted)}`
               : `Ocupación en ${getPotreroLabel(inserted)} registrada`
           )
-          await loadPage(0, pagination.pageSize, filters)
+          await Promise.all([
+            loadPage(0, pagination.pageSize, filters),
+            refreshOcupacionesActivas(),
+          ])
           setPagination((prev) => ({ ...prev, pageIndex: 0 }))
         } else if (mode === "edit" && typeof existingId === "number") {
           const { data: updated, error } = await updateOcupacionPotreroAction(
@@ -450,13 +538,63 @@ export function DataTable({
                 : row
             )
           )
+          await refreshOcupacionesActivas()
           toast.success(`Ocupación #${existingId} actualizada`)
         }
       } finally {
         setIsSubmitting(false)
       }
     },
-    [canCreate, canEdit, loadPage, pagination.pageSize, filters]
+    [
+      canCreate,
+      canEdit,
+      loadPage,
+      pagination.pageSize,
+      filters,
+      refreshOcupacionesActivas,
+    ]
+  )
+
+  const handleExitPotrero = React.useCallback(
+    async (values: SalidaPotreroLotePayload) => {
+      if (!canEdit) {
+        toast.error("No tienes permiso para registrar salida de potreros")
+        return
+      }
+
+      setIsSubmitting(true)
+      try {
+        const res = await sacarTodosPotreroAction(values)
+        if (!res.ok) {
+          toast.error(res.error ?? "No se pudo sacar los animales del potrero")
+          throw new Error(res.error ?? "Error al sacar animales")
+        }
+
+        const potreroNombre =
+          potrerosCatalogo.find((p) => Number(p.id) === values.potrero_id)
+            ?.nombre ?? `Potrero #${values.potrero_id}`
+
+        toast.success(
+          `Salida registrada para ${res.updatedCount} animal(es) de ${potreroNombre}`
+        )
+
+        await Promise.all([
+          loadPage(pagination.pageIndex, pagination.pageSize, filters),
+          refreshOcupacionesActivas(),
+        ])
+      } finally {
+        setIsSubmitting(false)
+      }
+    },
+    [
+      canEdit,
+      potrerosCatalogo,
+      loadPage,
+      pagination.pageIndex,
+      pagination.pageSize,
+      filters,
+      refreshOcupacionesActivas,
+    ]
   )
 
   const confirmDeleteOcupacion = React.useCallback(async () => {
@@ -478,7 +616,10 @@ export function DataTable({
       }
       toast.success(`Registro de ocupación #${itemToDelete.id} eliminado`)
       setItemToDelete(null)
-      await loadPage(pagination.pageIndex, pagination.pageSize, filters)
+      await Promise.all([
+        loadPage(pagination.pageIndex, pagination.pageSize, filters),
+        refreshOcupacionesActivas(),
+      ])
     } finally {
       setIsDeleting(false)
     }
@@ -489,6 +630,7 @@ export function DataTable({
     pagination.pageIndex,
     pagination.pageSize,
     filters,
+    refreshOcupacionesActivas,
   ])
 
   const handleApplyFilters = React.useCallback(
@@ -614,7 +756,9 @@ export function DataTable({
           cell: ({ row }) => (
             <span>
               {row.original.created_at
-                ? new Date(row.original.created_at).toLocaleDateString("es-CO")
+                ? new Date(row.original.created_at).toLocaleDateString("es-CO", {
+                    timeZone: "America/Bogota",
+                  })
                 : "—"}
             </span>
           ),
@@ -734,7 +878,9 @@ export function DataTable({
 
     const csvLines = rowsToExport.map((item) => {
       const creadoFecha = item.created_at
-        ? new Date(item.created_at).toLocaleDateString("es-CO")
+        ? new Date(item.created_at).toLocaleDateString("es-CO", {
+            timeZone: "America/Bogota",
+          })
         : ""
 
       const cells = [
@@ -835,6 +981,17 @@ export function DataTable({
               </DropdownMenuContent>
             </DropdownMenu>
 
+            {canEdit && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => openDrawer("exit")}
+              >
+                <LogOutIcon />
+                <span className="hidden lg:inline">Sacar animales</span>
+              </Button>
+            )}
+
             {canCreate && (
               <Button
                 variant="outline"
@@ -914,17 +1071,20 @@ export function DataTable({
                 <Select
                   value={`${pagination.pageSize}`}
                   onValueChange={(value) => {
-                    setPagination({
+                    const nextSize = Number(value)
+                    if (!Number.isFinite(nextSize) || nextSize <= 0) return
+                    setPagination((prev) => ({
+                      ...prev,
+                      pageSize: nextSize,
                       pageIndex: 0,
-                      pageSize: Number(value),
-                    })
+                    }))
                   }}
-                  items={[10, 20, 30, 40, 50].map((pageSize) => ({
-                    label: `${pageSize}`,
-                    value: `${pageSize}`,
-                  }))}
                 >
-                  <SelectTrigger size="sm" className="w-20" id="rows-per-page">
+                  <SelectTrigger
+                    size="sm"
+                    className="w-20"
+                    id="rows-per-page"
+                  >
                     <SelectValue placeholder={pagination.pageSize} />
                   </SelectTrigger>
                   <SelectContent side="top">
@@ -950,7 +1110,7 @@ export function DataTable({
                   }
                   disabled={!canPreviousPage}
                 >
-                  <span className="sr-only">Primera página</span>
+                  <span className="sr-only">Ir a la primera página</span>
                   <ChevronsLeftIcon />
                 </Button>
                 <Button
@@ -965,7 +1125,7 @@ export function DataTable({
                   }
                   disabled={!canPreviousPage}
                 >
-                  <span className="sr-only">Página anterior</span>
+                  <span className="sr-only">Ir a la página anterior</span>
                   <ChevronLeftIcon />
                 </Button>
                 <Button
@@ -980,7 +1140,7 @@ export function DataTable({
                   }
                   disabled={!canNextPage}
                 >
-                  <span className="sr-only">Página siguiente</span>
+                  <span className="sr-only">Ir a la página siguiente</span>
                   <ChevronRightIcon />
                 </Button>
                 <Button
@@ -995,7 +1155,7 @@ export function DataTable({
                   }
                   disabled={!canNextPage}
                 >
-                  <span className="sr-only">Última página</span>
+                  <span className="sr-only">Ir a la última página</span>
                   <ChevronsRightIcon />
                 </Button>
               </div>
@@ -1006,13 +1166,21 @@ export function DataTable({
 
       <OcupacionPotreroDrawer
         open={drawerOpen}
-        onOpenChange={setDrawerOpen}
+        onOpenChange={(nextOpen) => {
+          setDrawerOpen(nextOpen)
+          if (!nextOpen) {
+            setDrawerMode(null)
+            setSelectedItem(null)
+          }
+        }}
         mode={drawerMode}
         item={selectedItem}
         potreros={potrerosCatalogo}
         bovinos={bovinosCatalogo}
+        ocupacionesActivas={ocupacionesActivas}
         isSubmitting={isSubmitting}
         onSave={handleSaveOcupacion}
+        onExitPotrero={handleExitPotrero}
         filters={filters}
         onApplyFilters={handleApplyFilters}
         onClearFilters={handleClearFilters}
@@ -1026,20 +1194,10 @@ export function DataTable({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              ¿Eliminar registro de ocupación?
-            </AlertDialogTitle>
+            <AlertDialogTitle>¿Eliminar registro de ocupación?</AlertDialogTitle>
             <AlertDialogDescription>
-              Vas a eliminar permanentemente el registro de ocupación{" "}
-              <span className="font-semibold text-foreground">
-                #{itemToDelete?.id}
-              </span>{" "}
-              en{" "}
-              <span className="font-semibold text-foreground">
-                {itemToDelete ? getPotreroLabel(itemToDelete) : ""}
-              </span>{" "}
-              ({itemToDelete ? getBovinoLabel(itemToDelete) : ""}). Esta acción
-              no se puede deshacer.
+              Esta acción eliminará el registro #{itemToDelete?.id} del
+              historial de ocupación de potreros. No se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1051,7 +1209,7 @@ export function DataTable({
               disabled={isDeleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {isDeleting ? "Eliminando..." : "Sí, eliminar"}
+              {isDeleting ? "Eliminando..." : "Eliminar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

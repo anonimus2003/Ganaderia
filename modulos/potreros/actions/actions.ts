@@ -9,6 +9,7 @@ import type {
   OcupacionPotreroFilterState,
   OcupacionPotreroPayload,
   PotreroOption,
+  SalidaPotreroLotePayload,
 } from "@/modulos/potreros/components/potreros-ocupacion-drawer"
 import type { HistorialOcupacionPotrero } from "@/modulos/potreros/components/data-table"
 
@@ -38,10 +39,41 @@ const payloadSchema = z.object({
     .transform((val) => (val === undefined ? null : val)),
 })
 
-function toIsoStringSafe(value: string): string {
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return new Date().toISOString()
-  return parsed.toISOString()
+const salidaLoteSchema = z.object({
+  potrero_id: z.coerce.number().int().positive("Selecciona un potrero válido"),
+  ocupacion_ids: z.array(z.coerce.number().int().positive()).optional(),
+  bovino_ids: z.array(z.string().trim().min(1)).optional(),
+  fecha_salida: z.string().trim().min(1, "La fecha de salida es obligatoria"),
+})
+
+function toBogotaTimestampWithoutTz(value: string): string {
+  const trimmed = value.trim()
+  const match = trimmed.match(
+    /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?$/
+  )
+  if (match) {
+    const [, y, m, d, hh, mm, ss = "00"] = match
+    return `${y}-${m}-${d} ${hh}:${mm}:${ss}`
+  }
+
+  const parsed = new Date(trimmed)
+  const baseDate = Number.isNaN(parsed.getTime()) ? new Date() : parsed
+
+  const parts = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "America/Bogota",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(baseDate)
+
+  const get = (type: string) =>
+    parts.find((p) => p.type === type)?.value ?? "00"
+
+  return `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get("minute")}:${get("second")}`
 }
 
 async function getAuthenticatedUser() {
@@ -252,6 +284,46 @@ export async function fetchCatalogosOcupacionPotreroAction(): Promise<{
   }
 }
 
+export async function fetchOcupacionesActivasPotreroAction(): Promise<{
+  items: HistorialOcupacionPotrero[]
+  error: string | null
+}> {
+  const { supabase, user } = await getAuthenticatedUser()
+  if (!user) {
+    return {
+      items: [],
+      error: "Debes iniciar sesión para consultar animales en potreros.",
+    }
+  }
+
+  const permisos = await getPermisosModulo(POTREROS_MODULE)
+  if (!permisos.canView) {
+    return {
+      items: [],
+      error: "No tienes permiso para ver el módulo de Potreros.",
+    }
+  }
+
+  const { data, error } = await supabase
+    .from("historial_ocupacion_potreros")
+    .select("*")
+    .is("fecha_salida", null)
+    .order("fecha_entrada", { ascending: false })
+    .order("id", { ascending: false })
+
+  if (error) {
+    console.error("[fetchOcupacionesActivasPotreroAction]", error.message)
+    return { items: [], error: error.message }
+  }
+
+  const enriched = await enrichOcupacionRows(
+    supabase,
+    (data ?? []) as Record<string, unknown>[]
+  )
+
+  return { items: enriched, error: null }
+}
+
 export async function fetchOcupacionPotrerosPageAction(params: {
   pageIndex: number
   pageSize: number
@@ -309,14 +381,14 @@ export async function fetchOcupacionPotrerosPageAction(params: {
   if (f?.fechaDesde?.trim()) {
     query = query.gte(
       "fecha_entrada",
-      `${f.fechaDesde.trim()}T00:00:00`
+      toBogotaTimestampWithoutTz(`${f.fechaDesde.trim()}T00:00:00`)
     )
   }
 
   if (f?.fechaHasta?.trim()) {
     query = query.lte(
       "fecha_entrada",
-      `${f.fechaHasta.trim()}T23:59:59`
+      toBogotaTimestampWithoutTz(`${f.fechaHasta.trim()}T23:59:59`)
     )
   }
 
@@ -421,16 +493,16 @@ export async function createOcupacionPotreroAction(
     }
   }
 
-  const entradaIso = toIsoStringSafe(parsed.data.fecha_entrada)
-  const salidaIso = parsed.data.fecha_salida
-    ? toIsoStringSafe(parsed.data.fecha_salida)
+  const entradaTs = toBogotaTimestampWithoutTz(parsed.data.fecha_entrada)
+  const salidaTs = parsed.data.fecha_salida
+    ? toBogotaTimestampWithoutTz(parsed.data.fecha_salida)
     : null
 
   const rowsToInsert = uniqueBovinoIds.map((bovinoId) => ({
     potrero_id: parsed.data.potrero_id,
     bovino_id: bovinoId,
-    fecha_entrada: entradaIso,
-    fecha_salida: salidaIso,
+    fecha_entrada: entradaTs,
+    fecha_salida: salidaTs,
     aforo: parsed.data.aforo,
     registrado_por: user.id,
   }))
@@ -451,6 +523,69 @@ export async function createOcupacionPotreroAction(
   return {
     data: enriched[0] ?? null,
     createdCount: enriched.length,
+    error: null,
+  }
+}
+
+export async function sacarTodosPotreroAction(
+  values: SalidaPotreroLotePayload
+): Promise<{
+  ok: boolean
+  updatedCount: number
+  error: string | null
+}> {
+  const parsed = salidaLoteSchema.safeParse(values)
+  if (!parsed.success) {
+    return {
+      ok: false,
+      updatedCount: 0,
+      error: parsed.error.issues[0]?.message ?? "Datos de salida inválidos",
+    }
+  }
+
+  const { supabase, user } = await getAuthenticatedUser()
+  if (!user) {
+    return {
+      ok: false,
+      updatedCount: 0,
+      error: "Debes iniciar sesión para realizar esta acción.",
+    }
+  }
+
+  const permisos = await getPermisosModulo(POTREROS_MODULE)
+  if (!permisos.canEdit) {
+    return {
+      ok: false,
+      updatedCount: 0,
+      error: "No tienes permiso para registrar salida de potreros.",
+    }
+  }
+
+  const salidaTs = toBogotaTimestampWithoutTz(parsed.data.fecha_salida)
+
+  let query = supabase
+    .from("historial_ocupacion_potreros")
+    .update({ fecha_salida: salidaTs })
+    .eq("potrero_id", parsed.data.potrero_id)
+    .is("fecha_salida", null)
+
+  if (parsed.data.ocupacion_ids && parsed.data.ocupacion_ids.length > 0) {
+    query = query.in("id", parsed.data.ocupacion_ids)
+  } else if (parsed.data.bovino_ids && parsed.data.bovino_ids.length > 0) {
+    query = query.in("bovino_id", parsed.data.bovino_ids)
+  }
+
+  const { data, error } = await query.select("id")
+
+  if (error) {
+    console.error("[sacarTodosPotreroAction]", error.message)
+    return { ok: false, updatedCount: 0, error: error.message }
+  }
+
+  revalidatePath(POTREROS_PATH)
+  return {
+    ok: true,
+    updatedCount: data?.length ?? 0,
     error: null,
   }
 }
@@ -487,9 +622,9 @@ export async function updateOcupacionPotreroAction(
     }
   }
 
-  const entradaIso = toIsoStringSafe(parsed.data.fecha_entrada)
-  const salidaIso = parsed.data.fecha_salida
-    ? toIsoStringSafe(parsed.data.fecha_salida)
+  const entradaTs = toBogotaTimestampWithoutTz(parsed.data.fecha_entrada)
+  const salidaTs = parsed.data.fecha_salida
+    ? toBogotaTimestampWithoutTz(parsed.data.fecha_salida)
     : null
 
   const { data, error } = await supabase
@@ -497,8 +632,8 @@ export async function updateOcupacionPotreroAction(
     .update({
       potrero_id: parsed.data.potrero_id,
       bovino_id: parsed.data.bovino_id,
-      fecha_entrada: entradaIso,
-      fecha_salida: salidaIso,
+      fecha_entrada: entradaTs,
+      fecha_salida: salidaTs,
       aforo: parsed.data.aforo,
     })
     .eq("id", id)

@@ -31,7 +31,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { CheckSquareIcon, SearchIcon, XIcon } from "lucide-react"
+import {
+  CheckSquareIcon,
+  LogOutIcon,
+  SearchIcon,
+  XIcon,
+} from "lucide-react"
 
 export interface PotreroOption {
   id: number
@@ -74,11 +79,19 @@ export interface OcupacionPotreroPayload {
   aforo: number | null
 }
 
+export interface SalidaPotreroLotePayload {
+  potrero_id: number
+  ocupacion_ids: number[]
+  bovino_ids: string[]
+  fecha_salida: string
+}
+
 export type OcupacionPotreroDrawerMode =
   | "create"
-  | "view"
   | "edit"
+  | "view"
   | "filter"
+  | "exit"
   | null
 
 export interface OcupacionPotreroFilterState {
@@ -89,15 +102,38 @@ export interface OcupacionPotreroFilterState {
   fechaHasta: string
 }
 
+function formatLocalDateTime(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
 function toDateTimeLocalInput(isoOrDate?: string | null): string {
-  const base = isoOrDate ? new Date(isoOrDate) : new Date()
-  if (Number.isNaN(base.getTime())) {
-    const now = new Date()
-    const offsetMs = now.getTimezoneOffset() * 60_000
-    return new Date(now.getTime() - offsetMs).toISOString().slice(0, 16)
+  if (!isoOrDate) {
+    return formatLocalDateTime(new Date())
   }
-  const offsetMs = base.getTimezoneOffset() * 60_000
-  return new Date(base.getTime() - offsetMs).toISOString().slice(0, 16)
+  // Si ya viene en formato YYYY-MM-DDTHH:mm o YYYY-MM-DD HH:mm:ss sin zona, preservar hora local
+  const trimmed = isoOrDate.trim()
+  const matchLocal = trimmed.match(
+    /^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})(?::\d{2})?(?!Z|[+-]\d{2}:?\d{2})/i
+  )
+  if (matchLocal) {
+    return `${matchLocal[1]}T${matchLocal[2]}`
+  }
+  const parsed = new Date(trimmed)
+  if (Number.isNaN(parsed.getTime())) {
+    return formatLocalDateTime(new Date())
+  }
+  return formatLocalDateTime(parsed)
+}
+
+function formatFechaCorta(value?: string | null): string {
+  if (!value) return ""
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return value
+  return parsed.toLocaleString("es-CO", {
+    dateStyle: "short",
+    timeStyle: "short",
+  })
 }
 
 function formatBovinoOptionLabel(b: BovinoOption): string {
@@ -122,12 +158,14 @@ interface OcupacionPotreroDrawerProps {
   item: HistorialOcupacionPotrero | null
   potreros?: PotreroOption[]
   bovinos?: BovinoOption[]
+  ocupacionesActivas?: HistorialOcupacionPotrero[]
   isSubmitting?: boolean
   onSave: (
     values: OcupacionPotreroPayload,
     mode: "create" | "edit",
     existingId?: number
   ) => Promise<void> | void
+  onExitPotrero?: (values: SalidaPotreroLotePayload) => Promise<void> | void
   filters: OcupacionPotreroFilterState
   onApplyFilters: (nextFilters: OcupacionPotreroFilterState) => void
   onClearFilters: () => void
@@ -140,8 +178,10 @@ export function OcupacionPotreroDrawer({
   item,
   potreros = [],
   bovinos = [],
+  ocupacionesActivas = [],
   isSubmitting = false,
   onSave,
+  onExitPotrero,
   filters,
   onApplyFilters,
   onClearFilters,
@@ -149,6 +189,7 @@ export function OcupacionPotreroDrawer({
   const isMobile = useIsMobile()
   const isReadOnly = mode === "view"
   const isCreate = mode === "create"
+  const isExit = mode === "exit"
 
   const [potreroId, setPotreroId] = React.useState<string>("")
   const [selectedBovinoIds, setSelectedBovinoIds] = React.useState<string[]>([])
@@ -167,8 +208,83 @@ export function OcupacionPotreroDrawer({
     React.useState<OcupacionPotreroFilterState>(filters)
 
   const wasOpenRef = React.useRef(false)
+  const initializedExitSelectionRef = React.useRef(false)
+
+  const bovinosById = React.useMemo(() => {
+    const map = new Map<string, BovinoOption>()
+    for (const b of bovinos) {
+      map.set(b.id, b)
+    }
+    return map
+  }, [bovinos])
+
+  const animalesEnPotreroSeleccionado = React.useMemo(() => {
+    const pNum = Number(potreroId)
+    if (!Number.isInteger(pNum) || pNum <= 0) return []
+
+    return ocupacionesActivas
+      .filter((oc) => Number(oc.potrero_id) === pNum && !oc.fecha_salida)
+      .map((oc) => {
+        const b = bovinosById.get(oc.bovino_id)
+        const arete =
+          b?.arete?.trim() ||
+          oc.bovino_label?.split("—")[0]?.trim() ||
+          oc.bovino_id.slice(0, 8)
+        const nombre =
+          b?.nombre?.trim() ||
+          oc.bovino_label?.split("—").slice(1).join("—").trim() ||
+          null
+        const categoria = b?.categoria?.trim() || null
+        return {
+          ocupacionId: oc.id,
+          bovinoId: oc.bovino_id,
+          arete,
+          nombre,
+          categoria,
+          fechaEntrada: oc.fecha_entrada,
+        }
+      })
+  }, [potreroId, ocupacionesActivas, bovinosById])
+
+  const filteredAnimalesEnPotrero = React.useMemo(() => {
+    const term = bovinoSearch.trim().toLowerCase()
+    if (!term) return animalesEnPotreroSeleccionado
+    return animalesEnPotreroSeleccionado.filter((a) => {
+      return (
+        a.arete.toLowerCase().includes(term) ||
+        (a.nombre?.toLowerCase().includes(term) ?? false) ||
+        (a.categoria?.toLowerCase().includes(term) ?? false)
+      )
+    })
+  }, [animalesEnPotreroSeleccionado, bovinoSearch])
 
   const potreroSelectItems = React.useMemo(() => {
+    if (isExit) {
+      const conteoPorPotrero = new Map<number, number>()
+      for (const oc of ocupacionesActivas) {
+        if (!oc.fecha_salida) {
+          const idNum = Number(oc.potrero_id)
+          conteoPorPotrero.set(idNum, (conteoPorPotrero.get(idNum) ?? 0) + 1)
+        }
+      }
+
+      if (potreros.length > 0) {
+        return potreros.map((p) => {
+          const cant = conteoPorPotrero.get(Number(p.id)) ?? 0
+          const baseLabel = formatPotreroOptionLabel(p)
+          return {
+            label: `${baseLabel} — ${cant} ${cant === 1 ? "animal" : "animales"}`,
+            value: String(p.id),
+          }
+        })
+      }
+
+      return Array.from(conteoPorPotrero.entries()).map(([idNum, cant]) => ({
+        label: `Potrero #${idNum} — ${cant} ${cant === 1 ? "animal" : "animales"}`,
+        value: String(idNum),
+      }))
+    }
+
     const base = potreros.map((p) => ({
       label: formatPotreroOptionLabel(p),
       value: String(p.id),
@@ -183,7 +299,7 @@ export function OcupacionPotreroDrawer({
       })
     }
     return base
-  }, [potreros, item])
+  }, [potreros, item, isExit, ocupacionesActivas])
 
   const bovinoSingleSelectItems = React.useMemo(() => {
     const base = bovinos.map((b) => ({
@@ -215,14 +331,42 @@ export function OcupacionPotreroDrawer({
     })
   }, [bovinos, bovinoSearch])
 
+  const aplicarPotreroExit = React.useCallback(
+    (nextPotreroId: string, sourceActivas: HistorialOcupacionPotrero[]) => {
+      setPotreroId(nextPotreroId)
+      setBovinoSearch("")
+      setValidationError(null)
+
+      const pNum = Number(nextPotreroId)
+      if (!Number.isInteger(pNum) || pNum <= 0) {
+        setSelectedBovinoIds([])
+        return
+      }
+
+      const idsEnEsePotrero = sourceActivas
+        .filter((oc) => Number(oc.potrero_id) === pNum && !oc.fecha_salida)
+        .map((oc) => oc.bovino_id)
+
+      setSelectedBovinoIds(Array.from(new Set(idsEnEsePotrero)))
+    },
+    []
+  )
+
+  // Inicialización única al abrir el drawer (nunca resetea fechas mientras está abierto)
   React.useEffect(() => {
     const justOpened = open && !wasOpenRef.current
     wasOpenRef.current = open
+
+    if (!open) {
+      initializedExitSelectionRef.current = false
+      return
+    }
 
     if (!justOpened) return
 
     setValidationError(null)
     setBovinoSearch("")
+    initializedExitSelectionRef.current = false
 
     if ((mode === "edit" || mode === "view") && item) {
       setPotreroId(String(item.potrero_id))
@@ -244,10 +388,62 @@ export function OcupacionPotreroDrawer({
       setFechaEntrada(toDateTimeLocalInput())
       setFechaSalida("")
       setAforo("")
+    } else if (mode === "exit") {
+      setFechaSalida(toDateTimeLocalInput())
+
+      const conteo = new Map<number, number>()
+      for (const oc of ocupacionesActivas) {
+        if (!oc.fecha_salida) {
+          const idNum = Number(oc.potrero_id)
+          conteo.set(idNum, (conteo.get(idNum) ?? 0) + 1)
+        }
+      }
+
+      const potreroConAnimales = potreros.find(
+        (p) => (conteo.get(Number(p.id)) ?? 0) > 0
+      )
+      const chosenId = potreroConAnimales
+        ? String(potreroConAnimales.id)
+        : potreros[0]
+          ? String(potreros[0].id)
+          : ""
+
+      aplicarPotreroExit(chosenId, ocupacionesActivas)
+      if (ocupacionesActivas.length > 0) {
+        initializedExitSelectionRef.current = true
+      }
     } else if (mode === "filter") {
       setDraftFilters(filters)
     }
-  }, [open, mode, item, potreros, filters])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, mode])
+
+  // Sincroniza potrero y animales marcados cuando ocupacionesActivas llega tarde, sin tocar fechaSalida
+  React.useEffect(() => {
+    if (!open || mode !== "exit" || initializedExitSelectionRef.current) return
+    if (ocupacionesActivas.length === 0) return
+
+    initializedExitSelectionRef.current = true
+
+    const conteo = new Map<number, number>()
+    for (const oc of ocupacionesActivas) {
+      if (!oc.fecha_salida) {
+        const idNum = Number(oc.potrero_id)
+        conteo.set(idNum, (conteo.get(idNum) ?? 0) + 1)
+      }
+    }
+
+    const potreroConAnimales = potreros.find(
+      (p) => (conteo.get(Number(p.id)) ?? 0) > 0
+    )
+    const chosenId = potreroConAnimales
+      ? String(potreroConAnimales.id)
+      : potreros[0]
+        ? String(potreros[0].id)
+        : ""
+
+    aplicarPotreroExit(chosenId, ocupacionesActivas)
+  }, [open, mode, ocupacionesActivas, potreros, aplicarPotreroExit])
 
   function toggleBovinoSelection(id: string) {
     setSelectedBovinoIds((prev) =>
@@ -255,7 +451,7 @@ export function OcupacionPotreroDrawer({
     )
   }
 
-  function handleSelectAllVisible() {
+  function handleSelectAllCreate() {
     const visibleIds = filteredBovinos.map((b) => b.id)
     setSelectedBovinoIds((prev) => {
       const set = new Set(prev)
@@ -264,8 +460,54 @@ export function OcupacionPotreroDrawer({
     })
   }
 
+  function handleSelectAllExit() {
+    const allIds = animalesEnPotreroSeleccionado.map((a) => a.bovinoId)
+    setSelectedBovinoIds(Array.from(new Set(allIds)))
+  }
+
   function handleClearSelection() {
     setSelectedBovinoIds([])
+  }
+
+  async function handleExitSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setValidationError(null)
+
+    const potreroNum = Number(potreroId)
+    if (!Number.isInteger(potreroNum) || potreroNum <= 0) {
+      setValidationError("Debes seleccionar un potrero válido.")
+      return
+    }
+
+    if (selectedBovinoIds.length === 0) {
+      setValidationError(
+        "Selecciona al menos un animal para sacar del potrero."
+      )
+      return
+    }
+
+    if (!fechaSalida.trim()) {
+      setValidationError("La fecha y hora de salida son obligatorias.")
+      return
+    }
+
+    const ocupacionIdsSeleccionadas = animalesEnPotreroSeleccionado
+      .filter((a) => selectedBovinoIds.includes(a.bovinoId))
+      .map((a) => a.ocupacionId)
+
+    const payload: SalidaPotreroLotePayload = {
+      potrero_id: potreroNum,
+      ocupacion_ids: ocupacionIdsSeleccionadas,
+      bovino_ids: selectedBovinoIds,
+      fecha_salida: fechaSalida.trim(),
+    }
+
+    try {
+      await onExitPotrero?.(payload)
+      onOpenChange(false)
+    } catch {
+      // El error se notifica con toast en DataTable
+    }
   }
 
   async function handleSaveSubmit(e: React.FormEvent) {
@@ -360,20 +602,24 @@ export function OcupacionPotreroDrawer({
   const drawerTitle =
     mode === "create"
       ? "Registrar ingreso a potrero"
-      : mode === "edit"
-        ? `Editar ocupación #${item?.id ?? ""}`
-        : mode === "filter"
-          ? "Filtrar historial de ocupación"
-          : `Detalle de ocupación #${item?.id ?? ""}`
+      : mode === "exit"
+        ? "Sacar animales del potrero"
+        : mode === "edit"
+          ? `Editar ocupación #${item?.id ?? ""}`
+          : mode === "filter"
+            ? "Filtrar historial de ocupación"
+            : `Detalle de ocupación #${item?.id ?? ""}`
 
   const drawerDescription =
     mode === "create"
       ? "Selecciona el potrero y marca todos los bovinos que entran al mismo tiempo."
-      : mode === "edit"
-        ? "Actualiza las fechas, el potrero o el aforo del registro seleccionado."
-        : mode === "filter"
-          ? "Filtra por potrero, bovino, estado o rango de fechas."
-          : "Consulta el detalle del movimiento registrado en el potrero."
+      : mode === "exit"
+        ? "Selecciona el potrero para ver todos los animales que están adentro y sacarlos todos de una vez."
+        : mode === "edit"
+          ? "Actualiza las fechas, el potrero o el aforo del registro seleccionado."
+          : mode === "filter"
+            ? "Filtra por potrero, bovino, estado o rango de fechas."
+            : "Consulta el detalle del movimiento registrado en el potrero."
 
   return (
     <Drawer
@@ -516,6 +762,157 @@ export function OcupacionPotreroDrawer({
                     </div>
                   </div>
                 </form>
+              ) : isExit ? (
+                <form
+                  id="ocupacion-exit-form"
+                  onSubmit={handleExitSubmit}
+                  className="flex flex-col gap-4"
+                >
+                  {validationError && (
+                    <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                      {validationError}
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="exit-potrero-select">Potrero *</Label>
+                    <Select
+                      disabled={isSubmitting}
+                      value={potreroId}
+                      onValueChange={(value) => {
+                        if (value) {
+                          aplicarPotreroExit(value, ocupacionesActivas)
+                        }
+                      }}
+                    >
+                      <SelectTrigger id="exit-potrero-select" className="w-full">
+                        <SelectValue placeholder="Selecciona un potrero" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {potreroSelectItems.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="exit-fecha-salida">
+                      Fecha y hora de salida *
+                    </Label>
+                    <Input
+                      id="exit-fecha-salida"
+                      type="datetime-local"
+                      disabled={isSubmitting}
+                      value={fechaSalida}
+                      onChange={(e) => setFechaSalida(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <Label>
+                        Animales en el potrero ({animalesEnPotreroSeleccionado.length}){" "}
+                        <Badge variant="secondary" className="ml-1">
+                          {selectedBovinoIds.length} a sacar
+                        </Badge>
+                      </Label>
+
+                      <div className="flex items-center gap-1">
+                        {animalesEnPotreroSeleccionado.length > 0 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            disabled={isSubmitting}
+                            onClick={handleSelectAllExit}
+                          >
+                            <CheckSquareIcon className="mr-1 size-3.5" />
+                            Marcar todos
+                          </Button>
+                        )}
+                        {selectedBovinoIds.length > 0 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs text-muted-foreground"
+                            disabled={isSubmitting}
+                            onClick={handleClearSelection}
+                          >
+                            <XIcon className="mr-1 size-3.5" />
+                            Ninguno
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="relative">
+                      <SearchIcon className="pointer-events-none absolute top-2.5 left-2.5 size-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Filtrar animales en este potrero..."
+                        className="pl-8"
+                        disabled={
+                          isSubmitting ||
+                          animalesEnPotreroSeleccionado.length === 0
+                        }
+                        value={bovinoSearch}
+                        onChange={(e) => setBovinoSearch(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="max-h-56 overflow-y-auto rounded-lg border divide-y">
+                      {filteredAnimalesEnPotrero.length === 0 ? (
+                        <div className="p-4 text-center text-xs text-muted-foreground">
+                          {animalesEnPotreroSeleccionado.length === 0
+                            ? "Este potrero no tiene animales activos en este momento."
+                            : "Ningún animal en este potrero coincide con el filtro."}
+                        </div>
+                      ) : (
+                        filteredAnimalesEnPotrero.map((a) => {
+                          const checked = selectedBovinoIds.includes(a.bovinoId)
+                          return (
+                            <label
+                              key={a.ocupacionId}
+                              className="flex cursor-pointer items-center justify-between gap-3 px-3 py-2 hover:bg-muted/50"
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <Checkbox
+                                  checked={checked}
+                                  disabled={isSubmitting}
+                                  onCheckedChange={() =>
+                                    toggleBovinoSelection(a.bovinoId)
+                                  }
+                                />
+                                <div className="flex flex-col">
+                                  <span className="font-medium text-foreground">
+                                    {a.arete}
+                                    {a.nombre ? ` — ${a.nombre}` : ""}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {a.categoria ? `${a.categoria} · ` : ""}
+                                    Entró: {formatFechaCorta(a.fechaEntrada)}
+                                  </span>
+                                </div>
+                              </div>
+                              {checked && (
+                                <Badge variant="outline" className="text-[11px]">
+                                  Sacar
+                                </Badge>
+                              )}
+                            </label>
+                          )
+                        })
+                      )}
+                    </div>
+                  </div>
+                </form>
               ) : (
                 <form
                   id="ocupacion-record-form"
@@ -587,7 +984,7 @@ export function OcupacionPotreroDrawer({
                             disabled={
                               isSubmitting || filteredBovinos.length === 0
                             }
-                            onClick={handleSelectAllVisible}
+                            onClick={handleSelectAllCreate}
                           >
                             <CheckSquareIcon className="mr-1 size-3.5" />
                             Marcar visibles
@@ -743,6 +1140,26 @@ export function OcupacionPotreroDrawer({
                     Limpiar filtros
                   </Button>
                 </>
+              ) : isExit ? (
+                <>
+                  <Button
+                    type="submit"
+                    form="ocupacion-exit-form"
+                    disabled={isSubmitting || selectedBovinoIds.length === 0}
+                  >
+                    <LogOutIcon className="mr-1.5 size-4" />
+                    {isSubmitting
+                      ? "Sacando..."
+                      : selectedBovinoIds.length > 0
+                        ? `Sacar todos (${selectedBovinoIds.length})`
+                        : "Sacar todos"}
+                  </Button>
+                  <DrawerClose
+                    render={<Button variant="outline" disabled={isSubmitting} />}
+                  >
+                    Cancelar
+                  </DrawerClose>
+                </>
               ) : isReadOnly ? (
                 <DrawerClose render={<Button variant="outline" />}>
                   Cerrar
@@ -783,6 +1200,7 @@ export function PotrerosOcupacionView({
   permissions,
   potreros = [],
   bovinos = [],
+  ocupacionesActivas,
   mapSlot,
 }: {
   initialData: HistorialOcupacionPotrero[]
@@ -790,6 +1208,7 @@ export function PotrerosOcupacionView({
   permissions?: PermisosModulo
   potreros?: PotreroOption[]
   bovinos?: BovinoOption[]
+  ocupacionesActivas?: HistorialOcupacionPotrero[]
   mapSlot?: React.ReactNode
 }) {
   return (
@@ -801,6 +1220,7 @@ export function PotrerosOcupacionView({
         permissions={permissions}
         potreros={potreros}
         bovinos={bovinos}
+        ocupacionesActivas={ocupacionesActivas}
       />
     </div>
   )

@@ -24,6 +24,7 @@ export const description = "A bar chart with a label for livestock weightings"
 
 interface PesajeRow {
   id: string
+  bovino_id?: string | null
   fecha: string
   peso_kgs: number | string
   condicion_corporal: number | string | null
@@ -67,18 +68,24 @@ function formatoMesTitulo(claveMes: string): string {
 }
 
 async function obtenerTodosLosPesajes(
-  supabase: ReturnType<typeof createClient>
+  supabase: ReturnType<typeof createClient>,
+  bovinoId?: string
 ): Promise<{ rows: PesajeRow[]; errorMsg: string | null }> {
   const pageSize = 1000
   let from = 0
   const todasLasFilas: PesajeRow[] = []
 
   while (true) {
-    const { data, error } = await supabase
+    let query = supabase
       .from("pesajes")
-      .select("id, fecha, peso_kgs, condicion_corporal, ganancia_diaria_kg")
+      .select("id, bovino_id, fecha, peso_kgs, condicion_corporal, ganancia_diaria_kg")
       .order("fecha", { ascending: true })
-      .range(from, from + pageSize - 1)
+
+    if (bovinoId && bovinoId !== "ALL") {
+      query = query.eq("bovino_id", bovinoId)
+    }
+
+    const { data, error } = await query.range(from, from + pageSize - 1)
 
     if (error) {
       return { rows: todasLasFilas, errorMsg: error.message }
@@ -96,7 +103,11 @@ async function obtenerTodosLosPesajes(
   return { rows: todasLasFilas, errorMsg: null }
 }
 
-export function ChartBarLabel() {
+export function ChartBarLabel({
+  bovinoId = "ALL",
+}: {
+  bovinoId?: string
+}) {
   const supabase = React.useMemo(() => createClient(), [])
   const [datosMensuales, setDatosMensuales] = React.useState<PuntoPesajeMensual[]>([])
   const [cargando, setCargando] = React.useState(true)
@@ -107,7 +118,10 @@ export function ChartBarLabel() {
 
     async function cargarPesajes() {
       setCargando(true)
-      const { rows, errorMsg: err } = await obtenerTodosLosPesajes(supabase)
+      const { rows, errorMsg: err } = await obtenerTodosLosPesajes(
+        supabase,
+        bovinoId
+      )
 
       if (!activo) return
 
@@ -127,7 +141,7 @@ export function ChartBarLabel() {
           continue
         }
 
-        const claveMes = fechaStr.slice(0, 7) // YYYY-MM
+        const claveMes = fechaStr.slice(0, 7)
         const actual = agrupado.get(claveMes) ?? { sumaPeso: 0, conteo: 0 }
         actual.sumaPeso += peso
         actual.conteo += 1
@@ -155,7 +169,7 @@ export function ChartBarLabel() {
     return () => {
       activo = false
     }
-  }, [supabase])
+  }, [supabase, bovinoId])
 
   const variacionMensualPct = React.useMemo(() => {
     if (datosMensuales.length < 2) return null
