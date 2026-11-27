@@ -47,6 +47,7 @@ const MODULOS_SISTEMA: { key: ModuloSistema; label: string; descripcion: string 
   { key: "medicamentos", label: "Medicamentos", descripcion: "Tratamientos y tiempos de retiro" },
   { key: "reproduccion", label: "Reproducción", descripcion: "Servicios, palpaciones y partos" },
   { key: "finanzas", label: "Finanzas", descripcion: "Ingresos, egresos y reportes" },
+  { key: "pesajes", label: "Pesajes", descripcion: "Pesaje animales" },
 ]
 
 export function PermisosMatrix({

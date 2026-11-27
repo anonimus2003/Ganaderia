@@ -8,6 +8,8 @@ export type ModuloSistema =
   | "medicamentos"
   | "reproduccion"
   | "finanzas"
+  | "pesajes"
+    
 
 export interface PermisosModulo {
   canView: boolean

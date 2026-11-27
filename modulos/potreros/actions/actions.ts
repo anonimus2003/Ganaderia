@@ -121,6 +121,35 @@ async function ensureUserInPerfiles(
   )
 }
 
+async function syncPotreroEstadoFromHistorial(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  potreroId: number
+): Promise<void> {
+  if (!Number.isInteger(potreroId) || potreroId <= 0) return
+
+  const { count, error } = await supabase
+    .from("historial_ocupacion_potreros")
+    .select("id", { count: "exact", head: true })
+    .eq("potrero_id", potreroId)
+    .is("fecha_salida", null)
+
+  if (error) {
+    console.error("[syncPotreroEstadoFromHistorial]", error.message)
+    return
+  }
+
+  const nuevoEstado = (count ?? 0) > 0 ? "Ocupado" : "En Descanso"
+
+  const { error: updateError } = await supabase
+    .from("potreros")
+    .update({ estado: nuevoEstado })
+    .eq("id", potreroId)
+
+  if (updateError) {
+    console.error("[syncPotreroEstadoFromHistorial:update]", updateError.message)
+  }
+}
+
 async function enrichOcupacionRows(
   supabase: Awaited<ReturnType<typeof createClient>>,
   rows: Record<string, unknown>[]
@@ -516,6 +545,8 @@ export async function createOcupacionPotreroAction(
     return { data: null, error: error.message }
   }
 
+  await syncPotreroEstadoFromHistorial(supabase, parsed.data.potrero_id)
+
   const insertedRows = (data ?? []) as Record<string, unknown>[]
   const enriched = await enrichOcupacionRows(supabase, insertedRows)
 
@@ -582,6 +613,8 @@ export async function sacarTodosPotreroAction(
     return { ok: false, updatedCount: 0, error: error.message }
   }
 
+  await syncPotreroEstadoFromHistorial(supabase, parsed.data.potrero_id)
+
   revalidatePath(POTREROS_PATH)
   return {
     ok: true,
@@ -622,6 +655,12 @@ export async function updateOcupacionPotreroAction(
     }
   }
 
+  const { data: prevRow } = await supabase
+    .from("historial_ocupacion_potreros")
+    .select("potrero_id")
+    .eq("id", id)
+    .maybeSingle()
+
   const entradaTs = toBogotaTimestampWithoutTz(parsed.data.fecha_entrada)
   const salidaTs = parsed.data.fecha_salida
     ? toBogotaTimestampWithoutTz(parsed.data.fecha_salida)
@@ -646,6 +685,16 @@ export async function updateOcupacionPotreroAction(
       error: error?.message ?? "No se pudo actualizar la ocupación.",
     }
   }
+
+  const potreroAnteriorId = Number(prevRow?.potrero_id)
+  if (
+    Number.isInteger(potreroAnteriorId) &&
+    potreroAnteriorId > 0 &&
+    potreroAnteriorId !== parsed.data.potrero_id
+  ) {
+    await syncPotreroEstadoFromHistorial(supabase, potreroAnteriorId)
+  }
+  await syncPotreroEstadoFromHistorial(supabase, parsed.data.potrero_id)
 
   const [enriched] = await enrichOcupacionRows(supabase, [
     data as Record<string, unknown>,
@@ -678,6 +727,12 @@ export async function deleteOcupacionPotreroAction(
     }
   }
 
+  const { data: existingRow } = await supabase
+    .from("historial_ocupacion_potreros")
+    .select("potrero_id")
+    .eq("id", id)
+    .maybeSingle()
+
   const { error } = await supabase
     .from("historial_ocupacion_potreros")
     .delete()
@@ -685,6 +740,11 @@ export async function deleteOcupacionPotreroAction(
 
   if (error) {
     return { ok: false, error: error.message }
+  }
+
+  const potreroId = Number(existingRow?.potrero_id)
+  if (Number.isInteger(potreroId) && potreroId > 0) {
+    await syncPotreroEstadoFromHistorial(supabase, potreroId)
   }
 
   revalidatePath(POTREROS_PATH)

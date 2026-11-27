@@ -31,7 +31,8 @@ import {
   SearchIcon,
   Wallet,
   FileChartColumnIcon,
-  ShieldCheck
+  ShieldCheck,
+  Weight
 } from "lucide-react"
 
 const data = {
@@ -70,6 +71,11 @@ const data = {
       title: "Reproducción",
       url: "/dashboard/reproduccion",
       icon: <Dna />,
+    },
+    {
+      title: "Pesajes",
+      url: "/dashboard/pesajes",
+      icon: <Weight />,
     },
   ],
   finanzas: [
